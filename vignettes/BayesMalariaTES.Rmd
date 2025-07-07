@@ -1,0 +1,83 @@
+---
+title: "BayesMalariaTES"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{BayesMalariaTES}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+<style>
+p.caption {
+font-size: 0.85em;
+font-style: italic;
+color: grey
+}
+</style>
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE,
+    collapse = TRUE,
+    comment = "#>"
+)
+```
+
+
+```{r load-packages}
+library(BayesMalariaTES)
+library(future)
+```
+
+```{r define-inputs}
+# Input Excel file containing cleaned TES genotype data
+input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", 
+                          package = "BayesMalariaTES")
+
+# Marker information: must match marker column headers
+marker_info <- data.frame(
+  Marker = c("313", "383", "TA1", "POLYA", "PFPK2", "2490", "TA109"),
+  RepeatLength = c(2, 2, 3, 3, 3, 3, 3)
+)
+
+# MCMC configuration
+mcmc_params <- list(
+  n_chains = 4,
+  R_hat_threshold = 1.01,
+  ESS_threshold = 400,
+  chunk_size = 2000,
+  max_iterations = 5000,
+  burn_in_frac = 0.25
+)
+
+# Output folder
+output_dir <- file.path(tempdir(), "infection_classification_results")
+```
+
+# Run the classification
+
+```{r run-analysis}
+plan(multisession, workers = mcmc_params$n_chains)
+
+# Run the full pipeline
+final_summary <- classify_infections(
+  input_data_path = input_file,
+  marker_information = marker_info,
+  mcmc_config = mcmc_params,
+  output_folder = output_dir
+)
+
+plan(sequential)
+```
+
+
+```{r view-results}
+knitr::kable(head(final_summary), caption = "Top rows of the classification summary.")
+
+# Histogram of posterior probabilities
+graphics::hist(final_summary$Probability, breaks = 20,
+     main = "Posterior Probability of Recrudescence",
+     xlab = "Probability")
+```
+

@@ -1,0 +1,38 @@
+Package: BayesMalariaTES
+Type: Package
+Title: The Title of the Project
+Version: 0.0.0.9000
+Authors@R:c(
+    person(given = "Veronica Adhiambo",
+           family = "Ochieng",
+           email = "veronica.adhiambo@aims.ac.rw",
+           role = c("cre", "aut")),
+    person(given = "Mateusz",
+           family = "Plucinski",
+           role = "aut"),
+    person(given = "Monica",
+           family = "Golumbeanu",
+           role = "aut")
+  )
+Description: A paragraph providing a full description of the project (on 
+    several lines...)
+URL: https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES
+BugReports: https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests: 
+    knitr,
+    rJava,
+    future,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+Imports: 
+    abind,
+    coda,
+    future.apply,
+    gtools,
+    readxl
