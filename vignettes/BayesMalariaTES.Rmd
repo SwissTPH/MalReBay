@@ -26,14 +26,14 @@ knitr::opts_chunk$set(
 
 
 ```{r load-packages}
-library(BayesMalariaTES)
+library(MalReBay)
 library(future)
 ```
 
 ```{r define-inputs}
 # Input Excel file containing cleaned TES genotype data
 input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", 
-                          package = "BayesMalariaTES")
+                          package = "MalReBay")
 
 # Marker information: must match marker column headers
 marker_info <- data.frame(
