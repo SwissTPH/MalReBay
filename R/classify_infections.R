@@ -21,7 +21,7 @@
 #' @examples
 #' # First, get the path to the example data file included with the package
 #' example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
-#'                             package = "BayesMalariaTES")
+#'                             package = "MalReBay")
 #'
 #' # Create a temporary directory to save the results
 #' temp_output_dir <- tempdir()

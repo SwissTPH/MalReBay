@@ -1,8 +1,8 @@
 ---
-title: "BayesMalariaTES"
+title: "MalReBay"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{BayesMalariaTES}
+  %\VignetteIndexEntry{MalReBay}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

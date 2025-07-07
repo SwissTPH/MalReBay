@@ -2,7 +2,7 @@ citHeader("To cite BayesMalariaTES in publications use:")
 
 bibentry(
   bibtype = "Manual",
-  title   = "BayesMalariaTES: {An} {R} package to ...",
+  title   = "MalReBay: {An} {R} package to ...",
   author  = c(person("Adhiambo Veronica")),
   year    = "2025",
   note    = "R package version 0.0.0.9000",

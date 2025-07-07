@@ -1,6 +1,6 @@
 test_that("classify_infections runs and returns a correctly structured data frame", {
   example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
-                              package = "BayesMalariaTES")
+                              package = "MalReBay")
   
   testthat::skip_if_not(file.exists(example_file), "Example data file not found.")
   
