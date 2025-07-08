@@ -1,8 +1,8 @@
 Package: MalReBay
 Type: Package
-Title: The Title of the Project
+Title: Bayesian classification for malaria recurrences
 Version: 0.0.0.9000
-Authors@R:c(
+Authors@R: c(
     person(given = "Veronica Adhiambo",
            family = "Ochieng",
            email = "veronica.adhiambo@aims.ac.rw",
@@ -14,11 +14,10 @@ Authors@R:c(
            family = "Golumbeanu",
            role = "aut")
   )
-Description: A paragraph providing a full description of the project (on 
-    several lines...)
-URL: https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES
-BugReports: https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues
-License: MIT + file LICENSE
+Description: Classification of malaria infection recurrence using Bayesian algorithm.
+URL: https://github.com/SwissTPH/MalReBay
+BugReports: https://github.com/SwissTPH/MalReBay/issues
+License: GPL (>= 3) + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
