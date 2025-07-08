@@ -4,15 +4,15 @@
 \name{MalReBay-package}
 \alias{MalReBay}
 \alias{MalReBay-package}
-\title{MalReBay: The Title of the Project}
+\title{MalReBay: Bayesian classification for malaria recurrences}
 \description{
-A paragraph providing a full description of the project (on several lines...)
+Classification of malaria infection recurrence using Bayesian algorithm.
 }
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES}
-  \item Report bugs at \url{https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues}
+  \item \url{https://github.com/SwissTPH/MalReBay}
+  \item Report bugs at \url{https://github.com/SwissTPH/MalReBay/issues}
 }
 
 }
