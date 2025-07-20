@@ -1,6 +1,8 @@
-generate_likelihood_diagnostics <- function(all_chains_loglikelihood, site_name) {
+generate_likelihood_diagnostics <- function(all_chains_loglikelihood = full_loglik_history,
+                                            site_name = site,
+                                            output_folder = output_folder) {
   # Create a dedicated folder for this site's diagnostics
-  site_dir <- file.path("diagnostics", site_name)
+  site_dir <- file.path(output_folder, "convergence_diagnosis", site_name)
   dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   
   # Clean chains

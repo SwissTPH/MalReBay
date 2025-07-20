@@ -25,6 +25,8 @@ Suggests:
     knitr,
     rJava,
     future,
+    dplyr,
+    tidyr,
     rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
@@ -34,4 +36,5 @@ Imports:
     coda,
     future.apply,
     gtools,
+    magrittr,
     readxl

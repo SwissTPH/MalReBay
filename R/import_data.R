@@ -1,79 +1,155 @@
-# This file defines a function to import and clean the genotyping data.
-# It takes a file path as input and returns a list with two data frames:
-# 'late_failures' and 'additional'.
+#' Import and process genotyping data
+#'
+#' @param filepath Path to the input Excel file.
+#' @return A list containing processed data frames and metadata.
+#' @noRd
+#' 
+#' 
+# This script imports genotyping data from an Excel file, detects the data type (length-polymorphic or amplicon sequencing)
 
-import_and_clean_data <- function(filepath) {
+detect_data_type <- function(input_df) {
+  meta_cols_guess <- min(3, ncol(input_df) - 1)
+  allele_cols <- (meta_cols_guess + 1):ncol(input_df)
+  if (length(allele_cols) == 0) {
+    stop("Error: No allele columns found to determine data type.")
+  }
+  all_allele_values <- unlist(input_df[, allele_cols])
+  first_value <- all_allele_values[!is.na(all_allele_values) & all_allele_values != ""][1]
+  if (is.na(first_value)) {
+    stop("Error: All allele columns are empty. Cannot determine data type.")
+  }
+  if (!is.na(suppressWarnings(as.numeric(first_value)))) {
+    return("length_polymorphic")
+  } else {
+    return("ampseq")
+  }
+}
+
+
+# Import and process genotyping data from an Excel file, detecting the data type and preparing marker information.
+
+import_data <- function(filepath) {
   sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
-  if (inherits(sheet_names, "try-error") || length(sheet_names) == 0) {
-    stop("ERROR: Cannot read sheets from the file. Please ensure it is a valid Excel file: ", filepath)
+  if (inherits(sheet_names, "try-error")) {
+    stop("ERROR: Cannot read file. Ensure it's a valid Excel file: ", filepath)
   }
+  temp_df <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[1]))
+  data_type <- detect_data_type(temp_df)
+  message("INFO: Detected '", data_type, "' data format.")
   
-  # Read Late Treatment ailures Data as first sheet
-  late_failures_sheet <- sheet_names[1]
-  late_failures_df <- as.data.frame(readxl::read_excel(filepath, sheet = late_failures_sheet, skip = 3))
-  
-  # Robustly Rename ID Column (First Column)
-  if (ncol(late_failures_df) < 1) {
-    stop("The first sheet '", late_failures_sheet, "' appears to be empty or has no columns.")
-  }
-  original_id_col_name <- names(late_failures_df)[1]
-  names(late_failures_df)[1] <- "Sample.ID"
-  message("INFO: Renamed first column from '", original_id_col_name, "' to 'Sample.ID'")
-  
-  # Read Additional Data from the second Sheet, if it exists
-  if (length(sheet_names) > 1) {
-    additional_sheet <- sheet_names[2]
-    additional_df <- as.data.frame(readxl::read_excel(filepath, sheet = additional_sheet, skip = 3))
+  if (data_type == "length_polymorphic") {
+    marker_info <- data.frame(
+      marker_id = c("313", "383", "TA1", "POLYA", "PFPK2", "2490", "TA109",
+                    "TA42", "TA81", "TA87", "TA40", "ARAII", "PFG377", "TA60",
+                    "K1", "3D7", "FC27", "MAD20", "R033", "RO33", "glurp"),
+      markertype = c(rep("microsatellite", 14), "msp1", "msp1", "msp1", "msp2", "msp2", "msp2", "glurp"),
+      repeatlength = c(2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, NA, NA, NA, NA, NA, NA, NA),
+      binning_method = c(rep("microsatellite", 14), rep("cluster", 7)),
+      cluster_gap_threshold = c(rep(NA, 14), 10, 10, 10, 10, 10, 10, 50)
+    )
+  } else { # data_type == "ampseq"
+    allele_cols <- grep("_allele_\\d+$", colnames(temp_df), value = TRUE)
+    base_markers <- unique(gsub("_allele_\\d+$", "", allele_cols))
     
-    if (ncol(additional_df) > 0) {
-      original_add_id_col <- names(additional_df)[1]
-      names(additional_df)[1] <- "Sample.ID"
-      message("INFO: Renamed first column of additional data from '", original_add_id_col, "' to 'Sample.ID'")
+    marker_info <- data.frame(
+      marker_id = base_markers,
+      markertype = "amplicon",
+      repeatlength = NA, 
+      binning_method = "exact",
+      cluster_gap_threshold = NA,
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  late_failures_df <- NULL
+  additional_df <- NULL
+  missing_markers <- c("N/A", "-", "NA", "na", "", " ", "Failed", "failed", "0")
+  
+  if (data_type == "ampseq") {
+    message("INFO: Following amplicon sequencing data processing pipeline.")
+    colnames(temp_df)[1:2] <- c("Sample.ID", "Site")
+    temp_df[temp_df %in% missing_markers] <- NA
+    
+    # Clean Sample IDs and check for pairs
+    temp_df$Sample.ID <- gsub("D0$", " Day 0", temp_df$Sample.ID)
+    temp_df$Sample.ID <- gsub("D[0-9]+$", " Day Failure", temp_df$Sample.ID)
+    day0_ids <- unique(gsub(" Day 0", "", temp_df$Sample.ID[grepl(" Day 0", temp_df$Sample.ID)]))
+    day_failure_ids <- unique(gsub(" Day Failure", "", temp_df$Sample.ID[grepl(" Day Failure", temp_df$Sample.ID)]))
+    
+    if (!all(day0_ids %in% day_failure_ids)) {
+      missing_pairs <- day0_ids[!day0_ids %in% day_failure_ids]
+      stop("ERROR: Ampseq data has 'Day 0' samples missing their 'Day Failure' pair. Missing pairs for: ", 
+           paste(missing_pairs, collapse=", "))
     }
     
-  } else {
-    message("INFO: No second sheet found for additional data. Creating an empty placeholder.")
-    additional_df <- late_failures_df[0, , drop = FALSE]
-  }
-  missing_markers <- c(0, "0", "N/A", "-", "NA", "na", "", " ", "Failed", "failed")
-  
-  # Clean late failures data
-  late_failures_df[late_failures_df %in% missing_markers] <- NA
-  late_failures_df$Sample.ID <- sub("D0$", " Day 0", late_failures_df$Sample.ID)
-  late_failures_df$Sample.ID <- sub("D[0-9]+$", " Day Failure", late_failures_df$Sample.ID)
-  
-  # Validate pairing
-  day0_ids <- unique(unlist(strsplit(late_failures_df$Sample.ID[grepl("Day 0", late_failures_df$Sample.ID)], " Day 0")))
-  dayF_ids <- unique(unlist(strsplit(late_failures_df$Sample.ID[grepl("Day Failure", late_failures_df$Sample.ID)], " Day Failure")))
-  
-  if (any(!paste(day0_ids, "Day Failure") %in% late_failures_df$Sample.ID)) {
-    stop("ERROR: Some 'Day 0' samples are missing their 'Day Failure' pair. Please check your data.")
-  }
-  if (any(!paste(dayF_ids, "Day 0") %in% late_failures_df$Sample.ID)) {
-    stop("ERROR: Some 'Day Failure' samples are missing their 'Day 0' pair. Please check your data.")
-  }
-  
-  # Clean additional data (if it has rows)
-  if (nrow(additional_df) > 0) {
+    late_failures_df <- temp_df
+    additional_df <- temp_df[0, ]
+    
+  } else { # data_type == "length_polymorphic"
+    message("INFO: Following length-polymorphic data processing pipeline.")
+    
+    colnames_cleaned <- tolower(colnames(temp_df)[1:2])
+    is_cleaned_format <- all(c("sample.id", "site") %in% colnames_cleaned)
+    
+    if (is_cleaned_format) {
+      late_failures_df <- temp_df
+    } else {
+      late_failures_df <- data.frame(
+        Sample.ID = paste0(temp_df[[1]], "D", temp_df[[2]]),
+        Site = temp_df[[3]],
+        temp_df[, -c(1, 2, 3), drop = FALSE],
+        check.names = FALSE
+      )
+    }
+    
+    if (length(sheet_names) > 1) {
+      additional_df_raw <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
+      if (nrow(additional_df_raw) > 0) {
+        add_cleaned <- all(c("sample.id", "site") %in% tolower(colnames(additional_df_raw)[1:2]))
+        if(add_cleaned) {
+          additional_df <- additional_df_raw
+        } else {
+          additional_df <- data.frame(
+            Sample.ID = paste0(additional_df_raw[[1]], "D", additional_df_raw[[2]]),
+            Site = additional_df_raw[[3]],
+            additional_df_raw[, -c(1, 2, 3), drop = FALSE],
+            check.names = FALSE
+          )
+        }
+      } else {
+        additional_df <- late_failures_df[0, ] 
+      }
+    } else {
+      additional_df <- late_failures_df[0, ] 
+    }
+    
+    late_failures_df[late_failures_df %in% missing_markers] <- NA
     additional_df[additional_df %in% missing_markers] <- NA
-    additional_df$Sample.ID <- sub("_D0", " Day 0", additional_df$Sample.ID)
-    additional_df$Sample.ID <- sub("_D[0-9]*", " Day Failure", additional_df$Sample.ID)
+    
+    if (ncol(late_failures_df) > 2) {
+      late_failures_df[, 3:ncol(late_failures_df)] <- lapply(late_failures_df[, 3:ncol(late_failures_df)], function(x) as.numeric(as.character(x)))
+    }
+    if (ncol(additional_df) > 2) {
+      additional_df[, 3:ncol(additional_df)] <- lapply(additional_df[, 3:ncol(additional_df)], function(x) as.numeric(as.character(x)))
+    }
+    
+    late_failures_df$Sample.ID <- gsub("D0$", " Day 0", late_failures_df$Sample.ID)
+    late_failures_df$Sample.ID <- gsub("D[0-9]+$", " Day Failure", late_failures_df$Sample.ID)
+    day0_ids <- unique(gsub(" Day 0", "", late_failures_df$Sample.ID[grepl(" Day 0", late_failures_df$Sample.ID)]))
+    day_failure_ids <- unique(gsub(" Day Failure", "", late_failures_df$Sample.ID[grepl(" Day Failure", late_failures_df$Sample.ID)]))
+    
+    if (!all(day0_ids %in% day_failure_ids)) {
+      missing_pairs <- day0_ids[!day0_ids %in% day_failure_ids]
+      stop("ERROR: Length data has 'Day 0' samples missing their 'Day Failure' pair. Missing pairs for: ", 
+           paste(missing_pairs, collapse=", "))
+    }
   }
-  
-  # Convert marker columns to numeric; assuming first two columns are non-numeric (e.g., Sample.ID, Site)
-  if (ncol(late_failures_df) > 2) {
-    cols_to_convert_late <- colnames(late_failures_df)[-c(1, 2)]
-    late_failures_df[, cols_to_convert_late] <- suppressWarnings(lapply(late_failures_df[, cols_to_convert_late], as.numeric))
-  }
-  if (nrow(additional_df) > 0 && ncol(additional_df) > 2) {
-    cols_to_convert_add <- colnames(additional_df)[-c(1, 2)]
-    additional_df[, cols_to_convert_add] <- suppressWarnings(lapply(additional_df[, cols_to_convert_add], as.numeric))
-  }
-  
   return(
     list(
       late_failures = late_failures_df,
-      additional = additional_df
+      additional = additional_df,
+      marker_info = marker_info,
+      data_type = data_type
     )
   )
 }

@@ -1,113 +1,85 @@
 
-
-# Recode allele function
-recodeallele = function(alleles_definitions_subset,proposed) {
-  
-  ret = which(proposed > alleles_definitions_subset[,1] & proposed <= alleles_definitions_subset[,2])
-  if (length(ret) == 0) {
-    ret = NA
+recodeallele <- function(alleles_definitions_subset, proposed) {
+  if (is.na(proposed) || nrow(alleles_definitions_subset) == 0) {
+    return(NA_integer_)
   }
-  ret
+  # Find which bin 'proposed' falls into
+  ret <- which(proposed > alleles_definitions_subset[, 1] & proposed <= alleles_definitions_subset[, 2])
+  if (length(ret) == 0) {
+    ret <- NA_integer_
+  }
+  return(ret[1]) 
 }
 
-recode_alleles = function(genotypedata, alleles_definitions) {
+recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
+  ids <- unique(gsub(" Day 0", "", genotypedata$Sample.ID[grepl(" Day 0", genotypedata$Sample.ID)]))
+  locinames <- names(alleles_definitions)
+  nids <- length(ids)
+  nloci <- length(locinames)
   
-  ########### generate MOI for each sample
-  
-  ids = unique(unlist(strsplit(genotypedata$Sample.ID[grepl("Day 0",genotypedata$Sample.ID)]," Day 0")))
-  locinames = unique(sapply(colnames(genotypedata)[-1],function(x) strsplit(x,"_")[[1]][1]))
-  nids = length(ids)
-  nloci = length(locinames)
-  
-  
-  MOI0 = rep(0,nids)
-  MOIf = rep(0,nids)
-  
-  # for each individual, cycle through each locus and count number of separate alleles
-  
+  MOI0 <- rep(0, nids)
+  MOIf <- rep(0, nids)
   for (i in 1:nids) {
     for (j in 1:nloci) {
-      locicolumns = grepl(paste(locinames[j],"_",sep=""),colnames(genotypedata))
-      nalleles0 = sum(!is.na(genotypedata[grepl(paste(ids[i],"Day 0"),genotypedata$Sample.ID),locicolumns]))
-      nallelesf = sum(!is.na(genotypedata[grepl(paste(ids[i],"Day Failure"),genotypedata$Sample.ID),locicolumns]))
-      
-      MOI0[i] = max(MOI0[i],nalleles0)
-      MOIf[i] = max(MOIf[i],nallelesf)
+      locicolumns <- grepl(paste0("^", locinames[j], "_"), colnames(genotypedata))
+      nalleles0 <- sum(!is.na(genotypedata[grepl(paste(ids[i], "Day 0"), genotypedata$Sample.ID), locicolumns]))
+      nallelesf <- sum(!is.na(genotypedata[grepl(paste(ids[i], "Day Failure"), genotypedata$Sample.ID), locicolumns]))
+      MOI0[i] <- max(MOI0[i], nalleles0)
+      MOIf[i] <- max(MOIf[i], nallelesf)
     }
   }
   
-  
-  observeddatamatrix = list()
-  for (j in 1:nloci) { 
-    locus = locinames[j]
-    # Use more robust pattern matching for column names
-    locus_allele_cols_pattern = paste0("^", locus, "_") # Match from the beginning of the name
-    locicolumns_logical = grepl(locus_allele_cols_pattern, colnames(genotypedata))
+  observeddatamatrix <- list()
+  for (locus_name in locinames) {
     
-    current_locus_raw_df = genotypedata[, locicolumns_logical, drop = FALSE]
+    # Get the binning method for this specific locus
+    locus_marker_info <- marker_info[marker_info$marker_id == locus_name, ]
+    binning_method <- locus_marker_info$binning_method[1]
     
-    raw_allele_values_matrix_locus_j = matrix(numeric(0), 
-                                              nrow = nrow(genotypedata), 
-                                              ncol = ncol(current_locus_raw_df)) # Pre-allocate
+    # Get the raw allele data for this locus
+    locus_cols_pattern <- paste0("^", locus_name, "_")
+    locus_cols_logical <- grepl(locus_cols_pattern, colnames(genotypedata))
+    raw_alleles_matrix <- as.matrix(genotypedata[, locus_cols_logical, drop = FALSE])
     
-    if (ncol(current_locus_raw_df) > 0) {
-      for(col_idx in 1:ncol(current_locus_raw_df)){
-        raw_allele_values_matrix_locus_j[,col_idx] = as.numeric(as.character(current_locus_raw_df[[col_idx]]))
-      }
+    recoded_matrix <- NULL
+    if (binning_method %in% c("microsatellite", "cluster")) {
+      current_definitions <- alleles_definitions[[locus_name]]
+      recoded_matrix <- apply(raw_alleles_matrix, MARGIN = c(1, 2), FUN = function(cell_value) {
+        recodeallele(alleles_definitions_subset = current_definitions, proposed = cell_value)
+      })
+      
+    } else if (binning_method == "exact") {
+      recoded_matrix <- raw_alleles_matrix
+      
+    } else {
+      stop("Unknown binning_method '", binning_method, "' for locus: ", locus_name)
     }
     
-    newalleles_recoded_matrix = matrix(NA_integer_, # Store recoded integers or NA
-                                       nrow = nrow(raw_allele_values_matrix_locus_j), 
-                                       ncol = ncol(raw_allele_values_matrix_locus_j))
-    
-    if (ncol(raw_allele_values_matrix_locus_j) > 0) { # Only proceed if there are allele columns
-      for (k_col_idx in 1:ncol(raw_allele_values_matrix_locus_j)) {   # Iterate over allele columns (e.g., _1, _2, _3)
-        for (i_row_idx in 1:nrow(raw_allele_values_matrix_locus_j)) { # Iterate over samples in genotypedata
-          
-          proposed_value = raw_allele_values_matrix_locus_j[i_row_idx, k_col_idx]
-          
-          if (!is.na(proposed_value)) {
-            
-            newalleles_recoded_matrix[i_row_idx, k_col_idx] = recodeallele(
-              alleles_definitions_subset = alleles_definitions[[j]], # Pass the definitions for current locus j
-              proposed = proposed_value
-            )
-          } else {
-            newalleles_recoded_matrix[i_row_idx, k_col_idx] = NA # Keep NA as NA
-          }
-        }
-      }
+    if (is.null(dim(recoded_matrix))) {
+      recoded_matrix <- matrix(recoded_matrix, nrow = nrow(raw_alleles_matrix))
     }
     
-    tempobservedata = character(nids) # Pre-allocate for efficiency
-    
-    for (i_patient_idx in 1:nids) { # Inner loop over unique patient IDs (1 to nids)
-      patient_id_str = ids[i_patient_idx] # Get the actual patient ID string
+    tempobservedata <- character(nids)
+    for (i_patient_idx in 1:nids) {
+      patient_id_str <- ids[i_patient_idx]
+      day0_logical_idx <- grepl(paste(patient_id_str, "Day 0"), genotypedata$Sample.ID)
+      dayf_logical_idx <- grepl(paste(patient_id_str, "Day Failure"), genotypedata$Sample.ID)
       
-      day0_logical_idx = genotypedata$Sample.ID == paste(patient_id_str, "Day 0")
-      dayf_logical_idx = genotypedata$Sample.ID == paste(patient_id_str, "Day Failure")
+      day0_alleles <- recoded_matrix[day0_logical_idx, , drop = FALSE]
+      day0_unique_sorted <- sort(unique(day0_alleles[!is.na(day0_alleles)]))
       
-      day0_recoded_alleles_for_patient_locus = newalleles_recoded_matrix[day0_logical_idx, , drop = FALSE]
-      day0_unique_sorted = sort(unique(day0_recoded_alleles_for_patient_locus[!is.na(day0_recoded_alleles_for_patient_locus)]))
+      dayf_alleles <- recoded_matrix[dayf_logical_idx, , drop = FALSE]
+      dayf_unique_sorted <- sort(unique(dayf_alleles[!is.na(dayf_alleles)]))
       
-      dayf_recoded_alleles_for_patient_locus = newalleles_recoded_matrix[dayf_logical_idx, , drop = FALSE]
-      dayf_unique_sorted = sort(unique(dayf_recoded_alleles_for_patient_locus[!is.na(dayf_recoded_alleles_for_patient_locus)]))
-      
-      day0_str = paste(day0_unique_sorted, collapse = "-")
-      dayf_str = paste(dayf_unique_sorted, collapse = "-")
-      
-      if (length(day0_unique_sorted) == 0) day0_str = ""
-      if (length(dayf_unique_sorted) == 0) dayf_str = ""
-      
-      tempobservedata[i_patient_idx] = paste(day0_str, dayf_str, sep = "/")
+      day0_str <- paste(day0_unique_sorted, collapse = "-")
+      dayf_str <- paste(dayf_unique_sorted, collapse = "-")
+      tempobservedata[i_patient_idx] <- paste(day0_str, dayf_str, sep = "/")
     }
-    observeddatamatrix[[j]] = tempobservedata
+    
+    observeddatamatrix[[locus_name]] <- tempobservedata
   }
   
-  
-  
-  
-  MOItemp = cbind(MOI0,MOIf)
-  rownames(MOItemp) = ids
+  MOItemp <- cbind(MOI0, MOIf)
+  rownames(MOItemp) <- ids
   list(observeddatamatrix = observeddatamatrix, MOI = MOItemp)
 }
