@@ -5,6 +5,8 @@
 
 <!-- badges: start -->
 
+[![Codecov test
+coverage](https://codecov.io/gh/SwissTPH/MalReBay/graph/badge.svg)](https://app.codecov.io/gh/SwissTPH/MalReBay)
 <!-- badges: end -->
 
 MalReBay is an R package designed to analyze genotyping data from
@@ -32,9 +34,5 @@ You can install the development version of MalReBay from
 [GitHub](https://github.com/SwissTPH/MalReBay) with:
 
 ``` r
-if (!requireNamespace("remotes", quietly = TRUE)) {
-  install.packages("remotes")
-}
-
 remotes::install_github("SwissTPH/MalReBay")
 ```
