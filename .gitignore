@@ -18,7 +18,6 @@
 
 # User-specific files ----
 README.html
-inst/doc
 .Rproj.user
 .Rdata
 .httr-oauth
