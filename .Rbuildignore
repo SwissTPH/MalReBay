@@ -11,6 +11,5 @@
 ^^\.*\\.Rproj$$
 ^^\\.Rproj\\.user$$
 ^MalReBay\.Rproj$
-^vignettes$
 ^doc$
 ^Meta$
