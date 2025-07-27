@@ -193,23 +193,23 @@ run_one_chain <- function(chain_id,
       if (MOI0[i] > 0 && MOIf[i] > 0) {
         
         allpossiblerecrud <- expand.grid(1:MOI0[i], 1:MOIf[i])
-        current_marker_type <- marker_info$markertype[j]
-        
-        if (current_marker_type == "microsatellite") {
+        method <- marker_info$binning_method[j]
+
+        if (method == "microsatellite" || method == "cluster") {
           distances <- sapply(1:nrow(allpossiblerecrud), function(x) {
             abs(alleles0[i, maxMOI * (j - 1) + allpossiblerecrud[x, 1]] - allelesf[i, maxMOI * (j - 1) + allpossiblerecrud[x, 2]])
           })
-          
-        } else { # For MSAP, MSP, etc.
+        } else { 
           distances <- sapply(1:nrow(allpossiblerecrud), function(x) {
             allele_day0_type <- recoded0[i, maxMOI * (j - 1) + allpossiblerecrud[x, 1]]
             allele_dayf_type <- recodedf[i, maxMOI * (j - 1) + allpossiblerecrud[x, 2]]
             if (is.na(allele_day0_type) || is.na(allele_dayf_type)) {
-              return(1) 
+              return(Inf) 
             }
             return(ifelse(allele_day0_type == allele_dayf_type, 0, 1))
           })
         }
+
         if (all(is.na(distances))) {
           stop(paste("FATAL ERROR during initialization for Indiv", i, "Locus", j, ": All distances are NA. Halting."))
         }
@@ -263,32 +263,40 @@ run_one_chain <- function(chain_id,
         }
         return(1)
       }
-      # numerator <- dvect[distances[valid] + 1]
-      current_marker_type <- current_marker_info$markertype[y]
 
-    if (current_marker_type == "microsatellite") {
-      numerator <- dvect[distances[valid] + 1]
-    } else {
-      
-      prob_match <- 1 - qq_crossfamily
-      prob_mismatch <- qq_crossfamily
-      
-      numerator <- ifelse(distances[valid] == 0, prob_match, prob_mismatch)
-    }
-     
-      denominators <- sapply(which(valid), function(z) {
-      recr_allele <- allrecrf[x, y, z]
-      if (is.na(recr_allele)) {
-        return(NA) 
+      current_marker_type <- current_marker_info$markertype[y]
+      method <- current_marker_info$binning_method[y]
+
+      if (method == "microsatellite") {
+          numerator <- dvect[distances[valid] + 1]
+      } else if (method == "cluster") {
+          threshold <- current_marker_info$cluster_gap_threshold[y]
+          prob_match <- 1 - qq_crossfamily
+          prob_mismatch <- qq_crossfamily
+          numerator <- ifelse(distances[valid] <= threshold, prob_match, prob_mismatch)
+      } else { 
+          prob_match <- 1 - qq_crossfamily
+          prob_mismatch <- qq_crossfamily
+          numerator <- ifelse(distances[valid] == 0, prob_match, prob_mismatch)
       }
       
-      if (current_marker_type == "microsatellite") {
-        distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
-        probs <- dvect[distances_to_pop + 1]
-      } else {         
-        all_allele_types <- 1:frequencies_RR$n_alleles[y]
-        distances_to_pop <- ifelse(all_allele_types == recr_allele, 0, 1)
-        probs <- ifelse(distances_to_pop == 0, 1 - qq_crossfamily, qq_crossfamily)
+        denominators <- sapply(which(valid), function(z) {
+        recr_allele <- allrecrf[x, y, z]
+        if (is.na(recr_allele)) {
+          return(NA) 
+        }
+      
+      if (method == "microsatellite") {
+          distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
+          probs <- dvect[distances_to_pop + 1]
+      } else if (method == "cluster") {
+          threshold <- current_marker_info$cluster_gap_threshold[y]
+          distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
+          probs <- ifelse(distances_to_pop <= threshold, 1 - qq_crossfamily, qq_crossfamily)
+      } else { # For "exact" markers
+          all_allele_types <- 1:frequencies_RR$n_alleles[y]
+          distances_to_pop <- ifelse(all_allele_types == recr_allele, 0, 1)
+          probs <- ifelse(distances_to_pop == 0, 1 - qq_crossfamily, qq_crossfamily)
       }
 
       sum(frequencies_RR$freq_matrix[y, 1:frequencies_RR$n_alleles[y]] * probs, na.rm = TRUE)
@@ -380,9 +388,9 @@ run_one_chain <- function(chain_id,
       d_posterior_beta <- d_prior_beta + sum(valid_distances)
       if (d_posterior_beta <= 0) { d_posterior_beta <- 1 }
       dposterior <<- stats::rbeta(1, d_posterior_alpha, d_posterior_beta)
-      if (chain_id == 1 && count < 10) {
-        message(sprintf("Chain 1, Count %d: dposterior = %.4f", count, dposterior))
-      }
+      # if (chain_id == 1 && count < 10) {
+        # message(sprintf("Chain 1, Count %d: dposterior = %.4f", count, dposterior))
+      # }
       dvect_new <- (1 - dposterior) ^ (seq_along(dvect) - 1) * dposterior
       dvect <<- dvect_new / sum(dvect_new)
     }

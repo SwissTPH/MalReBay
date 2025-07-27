@@ -39,13 +39,13 @@ import_data <- function(filepath) {
   
   if (data_type == "length_polymorphic") {
     marker_info <- data.frame(
-      marker_id = c("313", "383", "TA1", "POLYA", "PFPK2", "2490", "TA109",
+      marker_id = c("313", "383", "TA1", "POLYA", "PolyA", "PFPK2", "2490", "TA109",
                     "TA42", "TA81", "TA87", "TA40", "ARAII", "PFG377", "TA60",
                     "K1", "3D7", "FC27", "MAD20", "R033", "RO33", "glurp"),
-      markertype = c(rep("microsatellite", 14), "msp1", "msp1", "msp1", "msp2", "msp2", "msp2", "glurp"),
-      repeatlength = c(2, 2, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, NA, NA, NA, NA, NA, NA, NA),
-      binning_method = c(rep("microsatellite", 14), rep("cluster", 7)),
-      cluster_gap_threshold = c(rep(NA, 14), 10, 10, 10, 10, 10, 10, 50)
+      markertype = c(rep("microsatellite", 15), "msp1", "msp1", "msp1", "msp2", "msp2", "msp2", "glurp"),
+      repeatlength = c(2, 2, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, NA, NA, NA, NA, NA, NA, NA),
+      binning_method = c(rep("microsatellite", 15), rep("cluster", 7)),
+      cluster_gap_threshold = c(rep(NA, 15), 10, 10, 10, 10, 10, 10, 50)
     )
   } else { # data_type == "ampseq"
     allele_cols <- grep("_allele_\\d+$", colnames(temp_df), value = TRUE)
