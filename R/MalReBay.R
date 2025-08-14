@@ -62,11 +62,18 @@ classify_infections <- function(input_filepath,
   marker_information <- imported_data$marker_info
   data_type <- imported_data$data_type
   
+  colnames(genotypedata_latefailures) <- trimws(colnames(genotypedata_latefailures))
+  if (nrow(additional_genotypedata) > 0) {
+    colnames(additional_genotypedata) <- trimws(colnames(additional_genotypedata))
+  }
+  colnames(genotypedata_latefailures) <- gsub("R033_", "RO33_", colnames(genotypedata_latefailures))
+  colnames(additional_genotypedata) <- gsub("R033_", "RO33_", colnames(additional_genotypedata))
+
   defaults <- list(n_chains = 4, 
                    rhat_threshold = 1.01, 
                    ess_threshold = 400,    
-                   chunk_size = 2000, 
-                   max_iterations = 20000, 
+                   chunk_size = 10000, 
+                   max_iterations = 100000, 
                    burn_in_frac = 0.25,
                    record_hidden_alleles = FALSE)
   
@@ -87,12 +94,26 @@ classify_infections <- function(input_filepath,
       warning("The following requested markers were NOT found and will be ignored: ",
               paste(missing_markers, collapse = ", "))
     }
+
+    extra_markers_in_data <- setdiff(available_base_markers, requested_base_markers)
+    if (length(extra_markers_in_data) > 0) {
+      message("INFO: The following markers were found in your data but are not on the package's predefined list: ",
+              paste(extra_markers_in_data, collapse = ", "))
+    }
+    
     message("Proceeding with analysis for these markers: ", paste(markers_to_use, collapse = ", "))
+
   } else if (data_type == "ampseq") {
-    markers_to_use <- marker_information$marker_id
+    data_marker_columns <- grep("_allele_\\d+$", colnames(genotypedata_latefailures), value = TRUE)
+    available_base_markers <- unique(gsub("_allele_\\d+$", "", data_marker_columns))
+    requested_base_markers <- marker_information$marker_id
+    markers_to_use <- intersect(requested_base_markers, available_base_markers)
+
+    if (length(markers_to_use) == 0) {
+      stop("None of the markers from the ampseq data were found in the marker_information sheet.")
+    }
     message("Amplicon sequencing data detected. The following haplotype markers will be used for analysis: ",
             paste(available_base_markers, collapse = ", "))
-    markers_to_use <- available_base_markers
   }else {
     stop("Unknown data type detected: ", data_type)
   }
@@ -121,50 +142,100 @@ classify_infections <- function(input_filepath,
   
   if (is.null(results) || length(results$ids) == 0) {
     warning("MCMC results are empty. No summary table can be generated.")
-    # Return an empty dataframe with the correct column names
-    return(data.frame(Site=character(), ID=character(), Probability=numeric()))
+    return(
+      list(
+        summary = data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()),
+        marker_details = NULL
+      )
+    )
   }
   
-  summary_list <- list() 
-  for (i in 1:length(results$ids)) {
-    site_name <- names(results$ids)[i]
-    if (is.null(site_name)) {
-      site_name <- paste0("Site_", i)
-    }
-    site_ids <- results$ids[[i]]
-    site_probs_matrix <- results$classifications[[i]]
-    if (is.null(site_ids) || is.null(site_probs_matrix) || length(site_ids) == 0 || nrow(site_probs_matrix) == 0) {
-      cat(sprintf("INFO: No valid patient data to summarize for site '%s'. Skipping.\n", site_name))
-      next
-    }
-    if (length(site_ids) != nrow(site_probs_matrix)) {
-      warning(sprintf("For site '%s', the number of IDs (%d) does not match the number of rows in the probability matrix (%d). Skipping site.", 
-                      site_name, length(site_ids), nrow(site_probs_matrix)))
-      next
-    }
+  summary_list_probs <- list() 
+  for (site_name in names(results$ids)) {
+    site_ids <- results$ids[[site_name]]
+    site_probs_matrix <- results$classifications[[site_name]]
     
+    if (is.null(site_ids) || is.null(site_probs_matrix) || length(site_ids) == 0 || nrow(site_probs_matrix) == 0) {
+      cat(sprintf("INFO: No valid patient data for probabilities for site '%s'. Skipping.\n", site_name))
+      next
+    }
+
     probabilities <- rowMeans(site_probs_matrix, na.rm = TRUE)
-    site_df <- data.frame(
+    summary_list_probs[[site_name]] <- data.frame(
       Site = site_name, 
       Sample.ID = site_ids, 
       Probability = probabilities,
       stringsAsFactors = FALSE
     )
-    summary_list[[i]] <- site_df
   }
   
-  if (length(summary_list) == 0) {
-    warning("No data was successfully summarized across all sites.")
-    summary_df <- data.frame(Site=character(), Sample.ID=character(), Probability=numeric())
-  } else {
-    summary_df <- do.call(rbind, summary_list)
+  if (length(summary_list_probs) == 0) {
+     warning("No probability data was successfully summarized across all sites.")
+     return(data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), 
+                       N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()))
   }
   
+  probabilities_df <- dplyr::bind_rows(summary_list_probs)
+  locus_summary_df <- dplyr::bind_rows(results$locus_summary, .id = "Site")
+  locus_summary_df <- dplyr::rename(locus_summary_df, 
+                                    Sample.ID = patient_id,
+                                    N_Available_D0 = n_available_d0,
+                                    N_Available_DF = n_available_df,
+                                    N_Comparable_Loci = n_comparable_loci)
+
+  # Use `summary_df` as the final variable name for the main summary
+  summary_df <- dplyr::left_join(probabilities_df, 
+                                 locus_summary_df, 
+                                 by = c("Sample.ID", "Site"))
   
   if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
   csv_path <- file.path(output_folder, "probability_of_recrudescence_summary.csv")
   utils::write.csv(summary_df, csv_path, row.names = FALSE)
   message("Summary table saved to: ", csv_path)
+
+  # --- MARKER DETAILS DATAFRAME CREATION ---
+  marker_details_list <- list()
+  for (site_name in names(results$ids)) {
+    if (is.null(results$locus_lrs[[site_name]])) next 
+    
+    site_ids <- results$ids[[site_name]]
+    site_lrs <- results$locus_lrs[[site_name]]
+    site_dists <- results$locus_dists[[site_name]]
+    
+    if (!is.null(results$locinames) && !is.null(results$locinames[[site_name]])) {
+      marker_names <- results$locinames[[site_name]]
+    } else {
+      marker_names <- dimnames(site_lrs)[[2]]
+      if (is.null(marker_names)) {
+        marker_names <- paste0("Locus_", 1:ncol(site_lrs))
+      }
+    }
+
+    mean_lrs <- apply(site_lrs, c(1, 2), mean, na.rm = TRUE)
+    mean_dists <- apply(site_dists, c(1, 2), mean, na.rm = TRUE)
+    rownames(mean_lrs) <- rownames(mean_dists) <- site_ids
+    colnames(mean_lrs) <- colnames(mean_dists) <- marker_names
+    lrs_df <- as.data.frame(as.table(mean_lrs), stringsAsFactors = FALSE)
+    colnames(lrs_df) <- c("Sample.ID", "Marker", "Mean_Likelihood_Ratio")
+    dists_df <- as.data.frame(as.table(mean_dists), stringsAsFactors = FALSE)
+    colnames(dists_df) <- c("Sample.ID", "Marker", "Mean_Distance")
+    site_marker_details <- dplyr::full_join(lrs_df, dists_df, by = c("Sample.ID", "Marker"))
+    site_marker_details$Site <- site_name
+    marker_details_list[[site_name]] <- site_marker_details
+  }
+
+  if (length(marker_details_list) > 0) {
+    marker_details_df <- dplyr::bind_rows(marker_details_list)
+    marker_details_df$Interpretation <- ifelse(marker_details_df$Mean_Likelihood_Ratio > 1, "Supports Recrudescence", "Supports Reinfection/Error")
+    marker_csv_path <- file.path(output_folder, "marker_level_summary.csv")
+    utils::write.csv(marker_details_df, marker_csv_path, row.names = FALSE)
+    message("Detailed marker-level summary saved to: ", marker_csv_path)
+  }
   
-  return(summary_df)
+return(
+    list(
+        summary = summary_df,
+        marker_details = if (exists("marker_details_df")) marker_details_df else NULL
+    )
+)
 }

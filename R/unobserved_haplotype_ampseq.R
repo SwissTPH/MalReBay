@@ -1,6 +1,4 @@
-# ==============================================================================
-# NEW, CORRECTED switch_hidden_ampseq function
-# ==============================================================================
+
 switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
                                  classification, qq, frequencies_RR, nloci, maxMOI) { 
   

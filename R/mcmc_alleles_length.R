@@ -5,9 +5,8 @@ run_one_chain <- function(chain_id,
                           nids, ids, nloci, maxMOI, locinames,
                           genotypedata_RR, additional_neutral, alleles_definitions_RR,
                           marker_info,
-                          record_hidden_alleles = FALSE
-) 
-{
+                          record_hidden_alleles = FALSE, is_locus_comparable ) 
+{  
   ##### calculate MOI
   MOI0 <- rep(0, nids)
   MOIf <- rep(0, nids)
@@ -16,8 +15,10 @@ run_one_chain <- function(chain_id,
       locicolumns <- grepl(paste(locinames[j], "_", sep = ""), colnames(genotypedata_RR))
       nalleles0 <- sum(!is.na(genotypedata_RR[grepl(paste(ids[i], "Day 0"), genotypedata_RR$Sample.ID), locicolumns]))
       nallelesf <- sum(!is.na(genotypedata_RR[grepl(paste(ids[i], "Day Failure"), genotypedata_RR$Sample.ID), locicolumns]))
-      MOI0[i] <- max(MOI0[i], nalleles0)
-      MOIf[i] <- max(MOIf[i], nallelesf)
+      # MOI0[i] <- max(MOI0[i], nalleles0)
+      # MOIf[i] <- max(MOIf[i], nallelesf)
+      MOI0[i] <- min(7, max(MOI0[i], nalleles0))
+      MOIf[i] <- min(7, max(MOIf[i], nallelesf))
     }
   }
   
@@ -230,9 +231,13 @@ run_one_chain <- function(chain_id,
   
   num_records <- floor((nruns - burnin) / record_interval)
   state_classification <- matrix(NA, nids, num_records)
-  n_params_to_record <- 3 + (2 * nloci)
+  n_params_to_record <- 4 + (2 * nloci)
   state_parameters <- matrix(NA, n_params_to_record, num_records)
   state_loglikelihood <- rep(NA_real_, num_records)
+
+  # Per-Locus Information
+  state_locus_lr <- array(NA, c(nids, nloci, num_records))
+  state_locus_dist <- array(NA, c(nids, nloci, num_records))
   
   if (record_hidden_alleles) {
     state_alleles0 <- array(NA, c(nids, maxMOI * nloci, num_records))
@@ -242,16 +247,22 @@ run_one_chain <- function(chain_id,
     state_allelesf <- NULL
   }
   
+ 
   # Define ALL variables needed by runmcmc() before it's defined.
   count <- 1
   dposterior <- 0.75
+  p_discordant <- 0.05
 
   # Define MCMC function
   runmcmc <- function() {
     current_marker_info <- marker_info 
     calculate_single_locus <- function(x, y) {
+      if (!is_locus_comparable[x, y]) {
+        return(1)
+      }
       should_print_debug <- (count < 5)
       distances <- round(alldistance[x, y, ])
+      
       valid <- !is.na(distances) & distances >= 0 & distances < length(dvect)
       if (!any(valid)) {
         if (should_print_debug) {
@@ -282,6 +293,7 @@ run_one_chain <- function(chain_id,
         return(NA) 
       }
       
+<<<<<<< Updated upstream
       if (current_marker_type == "microsatellite") {
         distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
         probs <- dvect[distances_to_pop + 1]
@@ -293,6 +305,17 @@ run_one_chain <- function(chain_id,
 
       sum(frequencies_RR$freq_matrix[y, 1:frequencies_RR$n_alleles[y]] * probs, na.rm = TRUE)
     })
+=======
+   
+      denominators <- sapply(which(valid), function(z) {
+        recr_allele <- allrecrf[x, y, z]
+        if (is.na(recr_allele) || recr_allele == 0) {
+          return(NA)
+        }
+        # The probability is just the frequency of that allele type.
+        return(frequencies_RR$freq_matrix[y, recr_allele])
+      })
+>>>>>>> Stashed changes
       epsilon <- 1e-10
       ratios <- numerator / (denominators + epsilon)
       
@@ -310,12 +333,18 @@ run_one_chain <- function(chain_id,
         return(1) 
       }
       
-      return(mean(final_ratios))
+      
+      recrud_locus_lr <- mean(final_ratios)
+      return((1 - p_discordant) * recrud_locus_lr + p_discordant)
     }
     
+    # storing  Per-Locus Information
+    locus_lrs_this_step <- matrix(NA, nrow = nids, ncol = nloci)
+
     likelihoodratio <- sapply(1:nids, function(x) {
-      loc_results <- sapply(1:nloci, function(y) calculate_single_locus(x, y))
-      exp(sum(log(pmax(loc_results, 1e-10))))
+    loc_results <- sapply(1:nloci, function(y) calculate_single_locus(x, y))
+    locus_lrs_this_step[x, ] <<- loc_results
+    exp(sum(log(pmax(loc_results, 1e-10))))
     })
     z = stats::runif(nids); newclassification = classification; newclassification[classification == 0 & z < likelihoodratio] = 1; newclassification[classification == 1 & z < 1/likelihoodratio] = 0; classification <<- newclassification
     
@@ -337,7 +366,8 @@ run_one_chain <- function(chain_id,
         thresholddistance = thresholddistance,
         qq_crossfamily = qq_crossfamily,
         hidden_crossfamily0 = hidden_crossfamily0,
-        hidden_crossfamilyf = hidden_crossfamilyf
+        hidden_crossfamilyf = hidden_crossfamilyf,
+        is_locus_comparable = is_locus_comparable
       )
       
       hidden0       <<- updated_states$hidden0
@@ -357,23 +387,53 @@ run_one_chain <- function(chain_id,
       hidden_crossfamilyf <<- updated_states$hidden_crossfamilyf
     }
     
-    q_prior_alpha = 0; 
-    q_prior_beta = 0; 
+    q_prior_alpha = 1; 
+    q_prior_beta = 10; 
     q_posterior_alpha = q_prior_alpha + sum(c(hidden0,hiddenf) == 1,na.rm=TRUE); 
     q_posterior_beta = q_prior_beta + sum(c(hidden0,hiddenf)==0,na.rm=TRUE); 
     if (q_posterior_alpha == 0) { q_posterior_alpha =1 }; 
     qq <<- stats::rbeta(1, q_posterior_alpha , q_posterior_beta)
 
     q_cross_prior_alpha <- 1
-    q_cross_prior_beta <- 999 # Prior belief: cross-family jumps are rare
+    q_cross_prior_beta <- 99 # Prior belief: cross-family jumps are rare
     q_cross_posterior_alpha <- q_cross_prior_alpha + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 1, na.rm=TRUE)
     q_cross_posterior_beta <- q_cross_prior_beta + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 0, na.rm=TRUE)
     qq_crossfamily <<- stats::rbeta(1, q_cross_posterior_alpha, q_cross_posterior_beta)
     
+    p_discordant_prior_alpha <- 1
+    p_discordant_prior_beta <- 9
+    recrud_indices <- which(classification == 1)
+
+    if (length(recrud_indices) > 0) {
+      recrud_distances <- mindistance[recrud_indices, , drop = FALSE]
+      discordance_thresholds <- rep(0, ncol(recrud_distances))
+      microsat_indices <- which(marker_info$binning_method == "microsatellite")
+      discordance_thresholds[microsat_indices] <- 5
+      msp_indices <- which(marker_info$markertype %in% c("msp1", "msp2"))
+      discordance_thresholds[msp_indices] <- 2.5 
+      glurp_indices <- which(marker_info$markertype == "glurp")
+      discordance_thresholds[glurp_indices] <- 5 
+      is_discordant <- t(t(recrud_distances) > discordance_thresholds)
+      n_discordant_loci <- sum(is_discordant, na.rm = TRUE)
+      n_total_recrud_loci <- sum(!is.na(recrud_distances))
+      
+    } else {
+      n_discordant_loci <- 0
+      n_total_recrud_loci <- 0
+    }
+
+    p_discordant_posterior_alpha <- p_discordant_prior_alpha + n_discordant_loci
+    p_discordant_posterior_beta <- p_discordant_prior_beta + (n_total_recrud_loci - n_discordant_loci)
+    p_discordant <<- rbeta(1, p_discordant_posterior_alpha, p_discordant_posterior_beta)
+        
+    # updating microsatellite-specific parameters
+    microsat_indices <- which(marker_info$binning_method == "microsatellite")
+    
     if (sum(classification == 1) >= 1) {
       d_prior_alpha <- 2
-      d_prior_beta <- 5 
-      valid_distances <- mindistance[classification == 1, ]
+      d_prior_beta <- 2 
+      
+      valid_distances <- mindistance[classification == 1, microsat_indices, drop = FALSE]
       valid_distances <- valid_distances[!is.na(valid_distances)]
       
       d_posterior_alpha <- d_prior_alpha + length(valid_distances)
@@ -387,13 +447,11 @@ run_one_chain <- function(chain_id,
       dvect <<- dvect_new / sum(dvect_new)
     }
     
-    tempdata <- recoded0
-    recrudescence_indices <- which(classification == 1)
-    if (length(recrudescence_indices) > 0) {
-      for (idx in recrudescence_indices) { tempdata[idx, recr0[idx,]] <- 0 }
-    }
-    tempdata <- rbind(tempdata, recodedf)
-    full_data <- rbind(tempdata, recoded_additional_neutral)
+    
+    reinfection_indices <- which(classification == 0)
+    reinfection_d0_data <- recoded0[reinfection_indices, , drop = FALSE]
+    
+    full_data <- rbind(reinfection_d0_data, recodedf, recoded_additional_neutral)
     
     new_freq_matrix <- frequencies_RR$freq_matrix
     
@@ -418,9 +476,13 @@ run_one_chain <- function(chain_id,
       state_parameters[1, record_idx] <<- qq
       state_parameters[2, record_idx] <<- qq_crossfamily
       state_parameters[3, record_idx] <<- dposterior
-      state_parameters[4:(4+nloci-1), record_idx] <<- apply(frequencies_RR$freq_matrix, 1, max)
-      state_parameters[(4+nloci):(4+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(frequencies_RR$freq_matrix[x, 1:frequencies_RR$n_alleles[x]]^2))
+      state_parameters[4, record_idx] <<- p_discordant
+      state_parameters[5:(5+nloci-1), record_idx] <<- apply(frequencies_RR$freq_matrix, 1, max)
+      state_parameters[(5+nloci):(5+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(frequencies_RR$freq_matrix[x, 1:frequencies_RR$n_alleles[x]]^2))
       state_loglikelihood[record_idx] <<- ifelse(is.finite(loglik_val), loglik_val, NA)
+      # Per-Locus Information
+      state_locus_lr[,, record_idx] <<- locus_lrs_this_step
+      state_locus_dist[,, record_idx] <<- mindistance
       if (record_hidden_alleles) {
         state_alleles0[,, record_idx] <<- alleles0
         state_allelesf[,, record_idx] <<- allelesf
@@ -437,7 +499,10 @@ run_one_chain <- function(chain_id,
       parameters     = state_parameters,
       alleles0       = state_alleles0,
       allelesf       = state_allelesf,
-      loglikelihood  = state_loglikelihood
+      loglikelihood  = state_loglikelihood,
+      # Per-Locus Information
+      locus_lrs      = state_locus_lr,
+      locus_dists    = state_locus_dist 
     )
   )
   

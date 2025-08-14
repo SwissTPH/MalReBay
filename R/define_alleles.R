@@ -1,4 +1,4 @@
-define_alleles <- function(genotypedata, marker_info_subset, maxk) {
+define_alleles <- function(genotypedata, marker_info_subset, maxk = Inf) {
   
   locus_names <- marker_info_subset$marker_id
   final_alleles <- vector("list", length(locus_names))
@@ -7,6 +7,11 @@ define_alleles <- function(genotypedata, marker_info_subset, maxk) {
   for (locus_name in locus_names) {
     marker_details <- marker_info_subset[marker_info_subset$marker_id == locus_name, ]
     current_binning_method <- marker_details$binning_method
+    
+    message(paste("    -> Binning method is:", current_binning_method))
+    
+    locus_cols <- grep(paste0("^", locus_name, "_"), colnames(genotypedata), value = TRUE)
+    message(paste("    -> Found", length(locus_cols), "columns for this locus."))
     
     if (current_binning_method == "exact") {
       message(paste("INFO: Skipping allele definition for amplicon locus:", locus_name, "(alleles are exact codes)"))
@@ -77,13 +82,21 @@ define_alleles <- function(genotypedata, marker_info_subset, maxk) {
       next
     }
     
-    
     if (nrow(binned_alleles) > 0) {
-      current_maxk <- if (!is.null(names(maxk)) && locus_name %in% names(maxk)) maxk[[locus_name]] else maxk[1]
-      num_alleles_to_keep <- min(current_maxk, nrow(binned_alleles))
-      sorted_indices <- order(binned_alleles[, "count"], decreasing = TRUE)[1:num_alleles_to_keep]
-      locus_alleles <- binned_alleles[sorted_indices, c("lower", "upper"), drop = FALSE]
+      current_maxk <- if (!is.null(names(maxk)) && locus_name %in% names(maxk)) {
+        maxk[[locus_name]] 
+      } else {
+        maxk[1]
+      }
+      if (is.finite(current_maxk) && current_maxk < nrow(binned_alleles)) {
+        message(paste("INFO: For locus", locus_name, "-> filtering to the top", current_maxk, "most frequent alleles."))
+        sorted_indices <- order(binned_alleles[, "count"], decreasing = TRUE)[1:current_maxk]
+        locus_alleles <- binned_alleles[sorted_indices, c("lower", "upper"), drop = FALSE]
+      } else {
+        locus_alleles <- binned_alleles[, c("lower", "upper"), drop = FALSE]
+      }
       final_alleles[[locus_name]] <- locus_alleles[order(locus_alleles[, "lower"]), , drop = FALSE]
+      
     } else {
       final_alleles[[locus_name]] <- matrix(NA, ncol = 2, nrow = 0, dimnames = list(NULL, c("lower", "upper")))
     }

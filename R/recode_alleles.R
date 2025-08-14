@@ -1,15 +1,19 @@
 
-recodeallele <- function(alleles_definitions_subset, proposed) {
-  if (is.na(proposed) || nrow(alleles_definitions_subset) == 0) {
+recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allowed = Inf) {
+  if (is.na(proposed) || is.null(alleles_definitions_subset) || nrow(alleles_definitions_subset) == 0) {
     return(NA_integer_)
   }
-  # Find which bin 'proposed' falls into
-  ret <- which(proposed > alleles_definitions_subset[, 1] & proposed <= alleles_definitions_subset[, 2])
-  if (length(ret) == 0) {
-    ret <- NA_integer_
+
+  bin_centers <- rowMeans(alleles_definitions_subset, na.rm = TRUE)
+  closest_bin_index <- which.min(abs(proposed - bin_centers))
+  min_distance <- abs(proposed - bin_centers[closest_bin_index])
+  if (min_distance > max_distance_allowed) {
+    return(NA_integer_)
   }
-  return(ret[1]) 
+
+  return(closest_bin_index)
 }
+
 
 recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
   ids <- unique(gsub(" Day 0", "", genotypedata$Sample.ID[grepl(" Day 0", genotypedata$Sample.ID)]))
