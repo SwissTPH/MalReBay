@@ -6,11 +6,25 @@
 #' @noRd
 #' 
 #' 
+#' 
+
+assign_clusters <- function(alleles, threshold) {
+  if (length(alleles) == 0) return(character(0))
+  unique_sorted_alleles <- sort(unique(alleles))
+  if (length(unique_sorted_alleles) <= 1) {
+    cluster_ids <- rep(1, length(unique_sorted_alleles))
+  } else {
+    gaps <- diff(unique_sorted_alleles)
+    cluster_ids <- cumsum(c(1, gaps > threshold))
+  }
+  return(stats::setNames(cluster_ids, unique_sorted_alleles))
+}
+
 perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   
   # 1. Robustly generate patient IDs from the data
   ids <- unique(trimws(gsub(" .*", "", genotypedata_latefailures$Sample.ID)))
-
+  
   # 2. Identify all loci from the column names
   marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata_latefailures), value = TRUE)
   locinames <- unique(gsub("(_allele_\\d+|_\\d+)$", "", marker_cols))
@@ -35,13 +49,15 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   # Create lookup tables for efficiency
   type_lookup <- stats::setNames(marker_info$markertype, marker_info$marker_id)
   bin_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
+  bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
+  cluster_thresh_lookup <- stats::setNames(marker_info$cluster_gap_threshold, marker_info$marker_id)
   
   # 5. Loop through each unique patient
   for (i in 1:nids) {
     nmatches_temp <- 0
     nloci_temp <- 0
     current_id <- ids[i]
-
+    
     # Find the row indices for this patient's Day 0 and Day Failure entries
     day0_string_to_find <- paste(current_id, "Day 0")
     dayf_string_to_find <- paste(current_id, "Day Failure")
@@ -51,9 +67,9 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
     
     # Critical Safety Check: Ensure a unique D0/DF pair exists
     if (length(day0_idx) != 1 || length(dayf_idx) != 1) {
-        warning(paste("Could not find a unique Day 0/DF pair for patient", current_id, ". Skipping."))
-        match_output[i, ] <- "ERR" 
-        next
+      warning(paste("Could not find a unique Day 0/DF pair for patient", current_id, ". Skipping."))
+      match_output[i, ] <- "ERR" 
+      next
     }
     
     # Loop through each locus for this patient
@@ -61,16 +77,17 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
       current_locus <- locinames[j]
       current_marker_type <- type_lookup[current_locus]
       locus_cols <- grep(paste0("^", current_locus, "(_allele_\\d+|_\\d+)$"), colnames(genotypedata_latefailures), value = TRUE)
-
+      method <- bin_method_lookup[current_locus]
+      
       # Extract alleles using the validated row indices
-      if (current_marker_type == "microsatellite") {
+      if (!is.na(method) && (method == "microsatellite" || method == "cluster")) {
         day0_alleles <- as.numeric(unlist(genotypedata_latefailures[day0_idx, locus_cols]))
         dayf_alleles <- as.numeric(unlist(genotypedata_latefailures[dayf_idx, locus_cols]))
       } else {
         day0_alleles <- as.character(unlist(genotypedata_latefailures[day0_idx, locus_cols]))
         dayf_alleles <- as.character(unlist(genotypedata_latefailures[dayf_idx, locus_cols]))
       }
-
+      
       # Clean out any NA values
       day0_alleles <- day0_alleles[!is.na(day0_alleles)]
       dayf_alleles <- dayf_alleles[!is.na(dayf_alleles)]
@@ -79,16 +96,33 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
       if (length(day0_alleles) > 0 && length(dayf_alleles) > 0) {
         nloci_temp <- nloci_temp + 1
         is_match <- FALSE 
-
-        if (current_marker_type == "microsatellite") {
+        
+        
+        if (is.na(method)) {
+          warning("No binning method found for locus: ", current_locus, ". Skipping comparison.")
+          match_output[i, j] <- "NO_INFO"
+          next 
+        }
+        
+        if (method == "microsatellite") {
           current_bin_size <- bin_lookup[current_locus]
-          all_pairs <- expand.grid(day0_alleles, dayf_alleles)
-          min_distance <- min(abs(all_pairs$Var1 - all_pairs$Var2), na.rm = TRUE)
-          if (is.finite(min_distance) && min_distance <= current_bin_size) {
+          d0_in_df <- all(sapply(day0_alleles, function(d0) any(abs(d0 - dayf_alleles) <= current_bin_size)))
+          df_in_d0 <- all(sapply(dayf_alleles, function(df) any(abs(df - day0_alleles) <= current_bin_size)))
+          if (d0_in_df || df_in_d0) {
             is_match <- TRUE
           }
-        } else { 
-          if (any(day0_alleles %in% dayf_alleles)) {
+        } else if (method == "cluster") {
+          current_thresh <- cluster_thresh_lookup[current_locus]
+          all_locus_alleles <- unique(c(day0_alleles, dayf_alleles))
+          cluster_map <- assign_clusters(all_locus_alleles, current_thresh)
+          d0_clusters <- if(length(day0_alleles) > 0) unique(cluster_map[as.character(day0_alleles)]) else character(0)
+          df_clusters <- if(length(dayf_alleles) > 0) unique(cluster_map[as.character(dayf_alleles)]) else character(0)
+          
+          if (all(d0_clusters %in% df_clusters) || all(df_clusters %in% d0_clusters)) {
+            is_match <- TRUE
+          }
+        } else {
+          if (all(day0_alleles %in% dayf_alleles) || all(dayf_alleles %in% dayf_alleles)) {
             is_match <- TRUE
           }
         }
