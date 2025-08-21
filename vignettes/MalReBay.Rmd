@@ -16,78 +16,225 @@ color: grey
 </style>
 
 
-```{r setup, include = FALSE}
+```{r, include = FALSE}
 knitr::opts_chunk$set(
-    echo = TRUE,
-    collapse = TRUE,
-    comment = "#>"
+  collapse = TRUE,
+  comment = "#>"
 )
 ```
 
+## Introduction
 
-```{r load-packages}
+`MalReBay` package is designed to determine whether a recurrent malaria infection is a **recrudescence** (a relapse of the original infection) or a **reinfection** (a new infection from a separate mosquito bite). It uses a Bayesian MCMC (Markov chain Monte Carlo) framework to analyze paired genotyping data from a patient's initial infection (Day 0) and their subsequent day of recurrence (Day X).
+
+This tutorial provides a step-by-step guide to the main analysis workflow, from loading your data to interpreting the final results. We will first review the conceptual framework of the package and then walk through a practical example, from loading data to interpreting the final results.
+
+
+## 2. The MalReBay Conceptual Workflow
+Here we will have the conceptual steps that `MalReBay` takes to get from your raw data to the final classification. The main `classify_infections()` function automates this entire pipeline for you.
+
+![MalReBay Framework](figure/MalReBay_Framework.png){width=600px}
+
+The workflow consists of three main stages:
+
+#### Data Processing
+
+This initial stage is a sequential pipeline designed to prepare your data for analysis.
+
+1.  **Import Data**: The process begins with `import_data()`, which reads your Excel file, automatically detects the data type (length-polymorphic vs. amplicon sequencing), and performs initial cleaning.
+
+2.  **Define Alleles**: For length-polymorphic data, `define_alleles()` groups raw fragment lengths into discrete, well-defined allele bins.
+
+3.  **Calculate Frequencies**: `calculate_frequencies3()` computes the initial population-level frequency of each allele, which provides a starting point for the MCMC model.
+
+4.  **Recode Alleles**: Finally, `recode_alleles()` converts the raw allele measurements into integer-based codes corresponding to the defined bins.
+
+The output of this stage is a clean, structured dataset ready for the Bayesian engine.
+
+#### The Bayesian MCMC Algorithm
+
+This is the core of the package. It uses a Gibbs sampling approach to iteratively explore the probability space and find the most likely classification for each patient.
+
+1.  **Coordination**: The `run_all_sites()` function manages the analysis for each geographical site. For each site, it calls the MCMC engine (`run_one_chain()` or `run_one_chain_ampseq()`).
+
+2.  **Iteration**: The engine runs for many iterations, and in each step, it updates its estimates for:
+    *   The identity of unobserved ("hidden") alleles using `switch_hidden_length()` or `switch_hidden_ampseq()`.
+    *   The population-level allele frequencies using `findposteriorfrequencies()`.
+
+3.  **Convergence**: The simulation runs in parallel across multiple chains and automatically checks for convergence, ensuring the results are stable and reliable.
+
+#### Summarization and Output
+
+Once the MCMC has converged, the package summarizes the vast amount of data generated during the simulation into user-friendly outputs.
+
+*   **Posterior Probabilities**: The primary output is a table of posterior probabilities of recrudescence for each patient.
+
+*   **Diagnostic Reports**: The `generate_likelihood_diagnostics()` function creates plots (traceplots, Gelman-Rubin plots) to verify model convergence.
+
+*   **Allele Frequency Plots**: The `generate_allele_frequency_plot()` utility can be used to visualize the raw allele distributions.
+
+*   **Marker-Level Analysis**: A detailed table is generated showing the contribution of each genetic marker to the final classification.
+
+
+Here we will walk through a practical example of using the `MalReBay` package to classify recurrent malaria infections. This example will demonstrate how to set up the analysis, run the MCMC simulation, and interpret the results.
+
+
+
+## 1. Setup
+
+First, we need to load the `MalReBay` package, along with a couple of other useful packages for data handling and plotting.
+
+```{r required packages}
 library(MalReBay)
 library(future)
 library(dplyr)
+library(ggplot2)
 ```
 
-```{r define-inputs}
-# Input Excel file containing cleaned TES genotype data
-input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", 
+
+
+## 2. The Input Data
+
+The main input for MalReBay is an Excel file with genotyping data. It should include patient ID, sampling day, Day 0, Day of recurrence, site/region, and allele calls for each marker. If site information is missing, add it before analysis. While the first three columns are recommended, the code also accepts data where patient ID and sampling day are combined into one column. Including Day 0 samples from patients without recurrence is optional but helpful, as it improves estimation of allele frequencies and increases classification accuracy.
+
+The package includes an example dataset from Angola that we will use for this tutorial.
+
+The `classify_infections()` function expects this data to be in a 'wide' format, where:
+*   There is a `Sample.ID` column that uniquely identifies each sample and includes "Day 0" or "Day Failure".
+*   There is a `Site` column indicating the geographical origin.
+*   Allele calls for each marker are in columns named like `LocusName_AlleleNumber` (e.g., `TA40_1`, `TA40_2`, etc.).
+
+Let's get the file path to the example data included with the package.
+
+```{r get-data-path}
+# This command finds the example file within the installed MalReBay package
+input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
                           package = "MalReBay")
 
-imported_data <- MalReBay:::import_data(filepath = input_file)
-
-# MCMC configuration
-mcmc_params <- list(
-  n_chains = 4,
-  chunk_size = 2000,
-  max_iterations = 5000,
-  burn_in_frac = 0.25,
-  record_hidden_alleles = FALSE 
-)
-
-# Output folder
-output_dir <- file.path(tempdir(), "infection_classification_results")
-if (!dir.exists(output_dir)) dir.create(output_dir)
+print(input_file)
 ```
 
-# Run the classification
 
-```{r run-analysis}
-plan(multisession, workers = mcmc_params$n_chains)
 
-# Run the full pipeline
+## 3. Running the Analysis
+
+The entire workflow is managed by the main function `classify_infections()`. This function requires three main arguments:
+
+1.  `input_filepath`: The path to your Excel data.
+2.  `mcmc_config`: A list of settings for the MCMC simulation.
+3.  `output_folder`: A directory where results and diagnostic plots will be saved.
+
+
+### Step 3.1: Define MCMC Configuration
+
+For this example, we will use a minimal configuration for a quick run. **For a real analysis, you should consider using much larger values for `chunk_size` and `max_iterations` and increase or reduce the number of chains to ensure the model converges properly.** Please note running multiple chains (typically 3–4) is recommended as it allows you to check whether all chains converge to the same posterior distribution.
+
+```{r define-mcmc-config}
+# NOTE: These settings are for a quick demonstration only.
+quick_mcmc_config <- list(
+  n_chains = 2,          # Run two parallel chains
+  chunk_size = 1000,       # Check convergence every 1000 iterations
+  max_iterations = 1000,   # Stop after a maximum of 1000 total iterations
+  rhat_threshold = 1.1,  # A relaxed convergence threshold for the example
+  ess_threshold = 50     # A relaxed effective sample size for the example
+)
+```
+
+
+### Step 3.2: Define an Output Folder
+
+It's good practice to save results to a dedicated folder. For this tutorial, we'll create a temporary directory.
+
+```{r define-output-dir}
+output_dir <- file.path(tempdir(), "MalReBay_tutorial_results")
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+print(output_dir)
+```
+
+
+### Step 3.3: Execute the Main Function
+
+Now we can run the analysis. `classify_infections()` will print progress messages to the console, informing you about the data type it detected, the sites it is analyzing, and the status of the MCMC convergence.  The 'future' package is used in the background for parallel processing, so you can expect the analysis to run faster on multi-core machines.
+
+```{r run-analysis, cache=TRUE}
+plan(multisession, workers = 2)
+
 classification_summary <- classify_infections(
-  input_filepath = input_file, 
-  mcmc_config        = mcmc_params,
-  output_folder      = output_dir
+  input_filepath = input_file,
+  mcmc_config = quick_mcmc_config,
+  output_folder = output_dir
 )
 
 plan(sequential)
 ```
 
-# Classification summary output
-```{r view-results}
 
-final_summary <- classification_summary$summary
-marker_details <- classification_summary$marker_details
 
-# Ensure the Probability column is numeric for plotting
-final_summary$Probability <- as.numeric(as.character(final_summary$Probability))
+## 4. Interpreting the Output
 
-knitr::kable(head(final_summary), caption = "Top rows of the MCMC classification summary.")
+The `classify_infections()` function returns a list containing two key data frames: `summary` and `marker_details`. 
 
-# Histogram of posterior probabilities
-graphics::hist(final_summary$Probability, breaks = 10,
-     main = "Posterior Probability of Recrudescence",
-     xlab = "Probability")
+
+### 4.1 The Main Summary Table
+
+The `$summary` data frame provides the main result for each patient. Let's look at the first few rows.
+
+```{r view-summary}
+summary_df <- classification_summary$summary
+
+knitr::kable(head(summary_df), caption = "Top rows of the classification summary.")
 ```
 
-# Marker descriptive analysis
+The columns are:
+*   **Site**: The geographical site of the sample.
+*   **Sample.ID**: The unique patient identifier.
+*   **Probability**: The posterior probability that the infection is a **recrudescence**. A value near 1.0 suggests recrudescence, while a value near 0.0 suggests reinfection.
+*   **N_Available_D0 / N_Available_DF**: The number of loci with genetic data at Day 0 and Day of Failure, respectively.
+*   **N_Comparable_Loci**: The number of loci with data at *both* time points, which is the amount of data used for the classification.
+
+
+### 4.2 Detailed Marker-Level Results
+
+The `$marker_details` data frame provides locus-specific insights, which can be useful for diagnosing which markers are driving a classification towards reinfection or recrudescence.
+
+```{r view-marker-details}
+marker_details_df <- classification_summary$marker_details
+
+knitr::kable(head(marker_details_df), caption = "Top rows of the marker-level summary.")
+```
+
+This table shows the average likelihood ratio and genetic distance for each marker for each patient, which can help identify potential genotyping errors or unusual genetic patterns.
+
+
+
+## 5. Visualizing the Results
+
+A histogram of the posterior probabilities is an excellent way to visualize the overall results. A clear separation into two groups (one near 0 and one near 1) indicates high confidence in the classifications.
+
+```{r plot-histogram}
+ggplot(summary_df, aes(x = Probability)) +
+  geom_histogram(binwidth = 0.05, fill = "steelblue", color = "white", boundary = 0) +
+  labs(
+    title = "Distribution of Posterior Probabilities of Recrudescence",
+    x = "Posterior Probability",
+    y = "Number of Patients"
+  ) +
+  theme_bw()
+```
+
+<p class="caption">This histogram shows the distribution of posterior probabilities. In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
+
+
+## 6. Marker descriptive analysis
+
+The visualizing the allele frequency distributions helps us understand the genetic diversity of the markers and can reveal potential issues or interesting patterns in the data. The following code chunk will only run if the detected data type is `length_polymorphic`, as these frequency plots are most informative for numeric allele lengths. It uses the internal helper function `generate_allele_frequency_plot` to create two sets of plots, Site-Specific Plots and Overall Plot.
 
 ```{r}
-# markers diversisty plots 
+imported_data <- MalReBay:::import_data(filepath = input_file)
+
 if (imported_data$data_type == "length_polymorphic") {
   
   # OVERALL plot
@@ -113,30 +260,80 @@ if (imported_data$data_type == "length_polymorphic") {
 }
 ```
 
-# Run the match-counting function to produce a comparison table for Bayesian and match-counting results
-```{r}
+The resulting PDF files will be saved in the `output_dir` we defined earlier. The plots help answer the following questions about data quality and genetic diversity:
+
+*   "Is marker X highly diverse (many bars) or mostly monomorphic (one or two bars)?"
+*   "Are there differences in allele distributions between Day 0 and Day of Failure?"
+*   "Does the genetic diversity in Site A differ significantly from Site B?"
+
+
+## Files Saved to Output Folder
+
+Remember that `classify_infections()` also saved important files to the `output_folder` we defined. These include:
+
+1.  `probability_of_recrudescence_summary.csv`: The main summary table.
+2.  `marker_level_summary.csv`: The detailed marker-level table.
+3.  A subfolder named `convergence_diagnosis/` containing diagnostic plots (traceplots, Gelman-Rubin plots, etc.) for each site, which are crucial for verifying that the MCMC model converged correctly.
+
+
+
+## 7. Alternative Analysis: Comparing MCMC with Match-Counting
+
+While the Bayesian MCMC framework provides a robust probabilistic classification, it can be very insightful to compare its results to a traditional, deterministic **match-counting algorithm** as it the current method recommended by the WHO for TES. The `MalReBay` package includes a utility function `perform_match_counting()` that can be used to generate a comparison table between the MCMC results and the match-counting results.
+
+Here is the flow of the match-counting analysis:
+1.  Runs the `perform_match_counting()` algorithm on the imported data.
+2.  Prepares the MCMC summary table for merging by selecting key columns.
+3.  Creates a common patient ID to join the different datasets.
+4.  Performs a series of joins to create one wide table containing the original allele data, the detailed match-counting results, and the final MCMC probability.
+5.  Reorders the columns for clarity and saves the final table to a CSV file.
+
+```{r match-counting}
+imported_data <- MalReBay:::import_data(filepath = input_file)
+
 match_results_df <- MalReBay:::perform_match_counting(
   genotypedata_latefailures = imported_data$late_failures, 
   marker_info = imported_data$marker_info)
 
-mcmc_summary_for_merge <- final_summary[, c("Sample.ID", "Probability", "N_Comparable_Loci")]
-colnames(mcmc_summary_for_merge) <- c("Sample.ID", "Prob_Recrudescence", "N_Comparable_Loci")
-alleles_with_patient_id <- dplyr::mutate(imported_data$late_failures, Patient.ID = gsub(" (Day 0|Day Failure)$", "", Sample.ID))
+mcmc_summary_for_merge <- summary_df[, c("Sample.ID", "Probability", "N_Comparable_Loci")]
+colnames(mcmc_summary_for_merge) <- c("Sample.ID", "Prob_Recrudescence", "N_Comparable_Loci_MCMC")
+
+alleles_with_patient_id <- dplyr::mutate(imported_data$late_failures, 
+                                         Patient.ID = gsub(" (Day 0|Day Failure)$", "", Sample.ID))
+
 final_table <- dplyr::left_join(alleles_with_patient_id, match_results_df, by = c("Patient.ID" = "Sample.ID"))
-final_table <- dplyr::left_join(final_table, mcmc_summary_for_merge, by = c("Patient.ID" = "Sample.ID"))
+final_table <- dplyr::left_join(final_table, mcmc_summary_for_merge, by = c("Sample.ID" = "Sample.ID"))
+
 final_table_sorted <- dplyr::arrange(final_table, Patient.ID, Sample.ID)
 id_cols <- c("Sample.ID", "Site")
 original_allele_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(final_table_sorted), value = TRUE)
-
 analysis_cols <- c("Number_Matches", "Number_Loci_Compared", 
-                   setdiff(colnames(match_results_df), 
-                           c("Sample.ID", "Number_Matches", "Number_Loci_Compared")),
-                   "Prob_Recrudescence", "N_Comparable_Loci")
+                   setdiff(colnames(match_results_df), c("Sample.ID", "Number_Matches", "Number_Loci_Compared")),
+                   "Prob_Recrudescence", "N_Comparable_Loci_MCMC")
 
-final_cols_order <- c(id_cols, original_allele_cols, analysis_cols)
-final_comparison_table <- dplyr::select(final_table_sorted, all_of(final_cols_order))
-final_comparison_table$Patient.ID <- NULL 
+final_cols_order <- intersect(c(id_cols, original_allele_cols, analysis_cols), colnames(final_table_sorted))
+
+final_comparison_table <- dplyr::select(final_table_sorted, dplyr::all_of(final_cols_order))
+
 output_path <- file.path(output_dir, "algorithm_classification_comparison_table.csv")
 write.csv(final_comparison_table, output_path, row.names = FALSE, na = "")
+
+knitr::kable(
+  head(final_comparison_table[, 1:12]), 
+  caption = "First 12 columns of the final comparison table."
+)
 ```
 
+The final table contains the following columns:
+*   The raw allele data for each marker.
+*   The summary of the match-counting algorithm (`Number_Matches`, `Number_Loci_Compared`).
+*   The detailed per-locus result of the match-counting (`R` for match, `NI` for non-match, `IND` for indeterminate).
+*   The final posterior probability of recrudescence from the Bayesian MCMC analysis (`Prob_Recrudescence`).
+
+
+
+## Conclusion
+
+This tutorial has shown the main workflow of the `MalReBay` package. By using the `classify_infections()` function, you can efficiently analyze your genotyping data and obtain robust, probability-based classifications of recurrent malaria infections.
+
+For more details on the function's arguments and the underlying model, please consult the help file by running `?classify_infections`.

@@ -24,3 +24,4 @@ README.html
 .quarto
 /Meta/
 /doc/
+inst/doc
