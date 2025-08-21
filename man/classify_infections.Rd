@@ -2,62 +2,100 @@
 % Please edit documentation in R/MalReBay.R
 \name{classify_infections}
 \alias{classify_infections}
-\title{Classify infections using a Bayesian MCMC Framework}
+\title{Classify Infections Using a Bayesian MCMC Framework}
 \usage{
 classify_infections(input_filepath, mcmc_config, output_folder)
 }
 \arguments{
-\item{input_filepath}{A string containing the path to the input Excel file.}
+\item{input_filepath}{A character string. The full path to the input Excel file
+containing the cleaned genotyping data.}
 
-\item{mcmc_config}{A list containing MCMC configuration parameters. See Details.}
+\item{mcmc_config}{A list of MCMC configuration parameters. See Details for
+a full list of options and their defaults.}
 
-\item{output_folder}{The folder where the results will be saved.}
+\item{output_folder}{A character string specifying the path to the folder where
+all results (summary CSVs, diagnostic plots) will be saved. The folder
+will be created if it does not exist.}
 }
 \value{
-A data frame summarizing the posterior probability of recrudescence for
-each patient. Also writes a summary CSV file to the output folder.
+A list containing two data frames:
+\item{summary}{A data frame summarizing the main results for each patient,
+including the posterior probability of recrudescence and a summary of the
+genetic data available for comparison.}
+\item{marker_details}{A detailed data frame providing the mean likelihood ratio
+and mean allele distance for each genetic marker for each patient, offering
+locus-specific insights into the classification.}
+Two CSV files corresponding to these data frames are also saved to the
+\code{output_folder}.
 }
 \description{
-This is the main user-facing function to run the Bayesian analysis. It
-manages the entire workflow, including data import via its internal helper
-\code{import_data}, MCMC simulation, convergence assessment, and summarization
-of results.
+This is the main user-facing function of the \code{MalReBay} package. It runs the
+complete Bayesian analysis workflow to classify parasite infections as either
+recrudescence or reinfection based on genotyping data. The function handles
+data import, MCMC simulation with automatic convergence checking, and the
+summarization and saving of final results.
 }
 \details{
-The \code{mcmc_config} list can contain the following parameters:
+The function operates by first importing and validating the data from the
+provided Excel file. It automatically detects the data type (length-polymorphic
+or amplicon sequencing) and selects the appropriate MCMC engine. The MCMC simulation
+is run in parallel across multiple chains and proceeds in chunks, stopping
+automatically when convergence criteria are met or the maximum number of
+iterations is reached.
+
+The \code{mcmc_config} list provides fine-grained control over the simulation.
+Key parameters include:
 \itemize{
-\item \code{n_chains}: Number of parallel chains (Default: 4).
-\item \code{chunk_size}: Iterations per convergence check (Default: 2000).
-\item \code{max_iterations}: Max iterations before stopping (Default: 20000).
-\item \code{record_hidden_alleles}: Record hidden alleles in output (Default: FALSE).
-\item ... and other parameters like \code{rhat_threshold}, \code{ess_threshold}, etc.
+\item \strong{\code{n_chains}}: Number of parallel chains to run. (Default: 4).
+\item \strong{\code{chunk_size}}: Number of iterations per chunk. After each chunk,
+convergence is assessed. (Default: 10000).
+\item \strong{\code{max_iterations}}: The maximum total number of iterations before
+the simulation is forcibly stopped, even if not converged. (Default: 100000).
+\item \strong{\code{burn_in_frac}}: The fraction of initial samples to discard
+from each chain before summarizing results. (Default: 0.25).
+\item \strong{\code{rhat_threshold}}: The Gelman-Rubin diagnostic threshold for
+convergence. (Default: 1.01).
+\item \strong{\code{ess_threshold}}: The Effective Sample Size threshold for
+convergence. (Default: 400).
+\item \strong{\code{record_hidden_alleles}}: A logical flag. If \code{TRUE}, the full
+state of imputed hidden alleles is saved. This can generate very large
+output files and is mainly for debugging. (Default: FALSE).
 }
+Any parameters not specified in the list will use the default values.
 }
 \examples{
-# First, get the path to the example data file included with the package
-example_file <- system.file("extdata", "Haplotype_data.xlsx",
+# Get the path to the example data file included with the package
+example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
                             package = "MalReBay")
 
-# Create a temporary directory to save the results
-temp_output_dir <- tempdir()
+# Create a temporary directory to save the results for this example
+temp_output_dir <- file.path(tempdir(), "MalReBay_example")
+dir.create(temp_output_dir)
 
-# Define a minimal MCMC configuration for a quick example run
+# Define a minimal MCMC configuration for a quick and illustrative run
+# NOTE: These settings are for demonstration only and are not sufficient
+# for a real analysis.
 quick_mcmc_config <- list(
   n_chains = 2,
-  max_iterations = 500,
-  chunk_size = 500
+  chunk_size = 500,
+  max_iterations = 500, # Set max_iterations equal to chunk_size for one run
+  rhat_threshold = 1.1, # Relaxed for the example
+  ess_threshold = 50   # Relaxed for the example
 )
 
 \dontrun{
 # Run the full analysis
-final_summary <- classify_infections(
+results_list <- classify_infections(
   input_filepath = example_file,
   mcmc_config = quick_mcmc_config,
   output_folder = temp_output_dir
 )
 
-# View the results
-print(head(final_summary))
+# View the top rows of the main summary table
+print(head(results_list$summary))
+
+# View the top rows of the detailed marker-level table
+print(head(results_list$marker_details))
 }
 
 }

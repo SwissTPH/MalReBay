@@ -24,8 +24,6 @@ RoxygenNote: 7.3.2
 Suggests: 
     rJava,
     future,
-    dplyr,
-    tidyr,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
@@ -34,7 +32,11 @@ VignetteBuilder: knitr
 Imports: 
     abind,
     coda,
+    dplyr,
     future.apply,
+    ggplot2,
     gtools,
     magrittr,
-    readxl
+    readxl,
+    rlang,
+    tidyr

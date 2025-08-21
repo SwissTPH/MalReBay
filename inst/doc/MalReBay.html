@@ -389,7 +389,7 @@ color: grey
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plan</span>(multisession, <span class="at">workers =</span> mcmc_params<span class="sc">$</span>n_chains)</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co"># Run the full pipeline</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>final_summary <span class="ot">&lt;-</span> <span class="fu">classify_infections</span>(</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>classification_summary <span class="ot">&lt;-</span> <span class="fu">classify_infections</span>(</span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">input_filepath =</span> input_file, </span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">mcmc_config        =</span> mcmc_params,</span>
 <span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">output_folder      =</span> output_dir</span>
@@ -403,238 +403,301 @@ color: grey
 <span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
 <span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
 <span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; Warning in classify_infections(input_filepath = input_file, mcmc_config = mcmc_params, : The following</span></span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; requested markers were NOT found and will be ignored: TA42, TA81, TA87, TA40, ARAII, PFG377, TA60, K1,</span></span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; 3D7, FC27, MAD20, R033, RO33, glurp</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; requested markers were NOT found and will be ignored: PolyA, TA42, TA81, TA87, TA40, ARAII, PFG377, TA60,</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; K1, 3D7, MAD20, RO33, R033, FC27, IC, glurp</span></span>
 <span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt; Proceeding with analysis for these markers: 313, 383, TA1, POLYA, PFPK2, 2490, TA109</span></span>
 <span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; The model is running MCMC analysis...</span></span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Benguela</span></span>
-<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8310</span></span>
-<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8089</span></span>
-<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.7805</span></span>
-<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.7204</span></span>
-<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.5016</span></span>
-<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.4739</span></span>
-<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.4577</span></span>
-<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7647</span></span>
-<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.6478</span></span>
-<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6533</span></span>
-<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.6193</span></span>
-<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.5468</span></span>
-<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.6282</span></span>
-<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7480</span></span>
-<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.4650</span></span>
-<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7699</span></span>
-<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7831</span></span>
-<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7455</span></span>
-<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.5559</span></span>
-<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.7206</span></span>
-<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.4287</span></span>
-<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8174</span></span>
-<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.6819</span></span>
-<span id="cb3-46"><a href="#cb3-46" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8082</span></span>
-<span id="cb3-47"><a href="#cb3-47" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7866</span></span>
-<span id="cb3-48"><a href="#cb3-48" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8648</span></span>
-<span id="cb3-49"><a href="#cb3-49" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.5829</span></span>
-<span id="cb3-50"><a href="#cb3-50" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.5594</span></span>
-<span id="cb3-51"><a href="#cb3-51" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.4684</span></span>
-<span id="cb3-52"><a href="#cb3-52" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.3613</span></span>
-<span id="cb3-53"><a href="#cb3-53" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.4360</span></span>
-<span id="cb3-54"><a href="#cb3-54" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.6670</span></span>
-<span id="cb3-55"><a href="#cb3-55" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.7694</span></span>
-<span id="cb3-56"><a href="#cb3-56" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8079</span></span>
-<span id="cb3-57"><a href="#cb3-57" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7962</span></span>
-<span id="cb3-58"><a href="#cb3-58" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8911</span></span>
-<span id="cb3-59"><a href="#cb3-59" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6655</span></span>
-<span id="cb3-60"><a href="#cb3-60" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.6456</span></span>
-<span id="cb3-61"><a href="#cb3-61" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.7538</span></span>
-<span id="cb3-62"><a href="#cb3-62" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.5869</span></span>
-<span id="cb3-63"><a href="#cb3-63" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.6442</span></span>
-<span id="cb3-64"><a href="#cb3-64" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.7675</span></span>
-<span id="cb3-65"><a href="#cb3-65" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.6802</span></span>
-<span id="cb3-66"><a href="#cb3-66" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8000</span></span>
-<span id="cb3-67"><a href="#cb3-67" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.5231</span></span>
-<span id="cb3-68"><a href="#cb3-68" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8026</span></span>
-<span id="cb3-69"><a href="#cb3-69" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.6843</span></span>
-<span id="cb3-70"><a href="#cb3-70" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.7138</span></span>
-<span id="cb3-71"><a href="#cb3-71" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.4976</span></span>
-<span id="cb3-72"><a href="#cb3-72" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7560</span></span>
-<span id="cb3-73"><a href="#cb3-73" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.7266</span></span>
-<span id="cb3-74"><a href="#cb3-74" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.6018</span></span>
-<span id="cb3-75"><a href="#cb3-75" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.6376</span></span>
-<span id="cb3-76"><a href="#cb3-76" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7200</span></span>
-<span id="cb3-77"><a href="#cb3-77" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-78"><a href="#cb3-78" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Benguela </span></span>
-<span id="cb3-79"><a href="#cb3-79" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span id="cb3-80"><a href="#cb3-80" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span id="cb3-81"><a href="#cb3-81" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-82"><a href="#cb3-82" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span id="cb3-83"><a href="#cb3-83" tabindex="-1"></a><span class="co">#&gt; loglikelihood       1.01       1.03</span></span>
-<span id="cb3-84"><a href="#cb3-84" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-85"><a href="#cb3-85" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-86"><a href="#cb3-86" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span id="cb3-87"><a href="#cb3-87" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
-<span id="cb3-88"><a href="#cb3-88" tabindex="-1"></a><span class="co">#&gt;      766.0623</span></span>
-<span id="cb3-89"><a href="#cb3-89" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Lunda Sul</span></span>
-<span id="cb3-90"><a href="#cb3-90" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6613</span></span>
-<span id="cb3-91"><a href="#cb3-91" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.6415</span></span>
-<span id="cb3-92"><a href="#cb3-92" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.5893</span></span>
-<span id="cb3-93"><a href="#cb3-93" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8338</span></span>
-<span id="cb3-94"><a href="#cb3-94" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.6188</span></span>
-<span id="cb3-95"><a href="#cb3-95" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8515</span></span>
-<span id="cb3-96"><a href="#cb3-96" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7283</span></span>
-<span id="cb3-97"><a href="#cb3-97" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.6751</span></span>
-<span id="cb3-98"><a href="#cb3-98" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.5614</span></span>
-<span id="cb3-99"><a href="#cb3-99" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8644</span></span>
-<span id="cb3-100"><a href="#cb3-100" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.4262</span></span>
-<span id="cb3-101"><a href="#cb3-101" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.4598</span></span>
-<span id="cb3-102"><a href="#cb3-102" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.6776</span></span>
-<span id="cb3-103"><a href="#cb3-103" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.5844</span></span>
-<span id="cb3-104"><a href="#cb3-104" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.6430</span></span>
-<span id="cb3-105"><a href="#cb3-105" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7112</span></span>
-<span id="cb3-106"><a href="#cb3-106" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7148</span></span>
-<span id="cb3-107"><a href="#cb3-107" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7293</span></span>
-<span id="cb3-108"><a href="#cb3-108" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6760</span></span>
-<span id="cb3-109"><a href="#cb3-109" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.5851</span></span>
-<span id="cb3-110"><a href="#cb3-110" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.6271</span></span>
-<span id="cb3-111"><a href="#cb3-111" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.6369</span></span>
-<span id="cb3-112"><a href="#cb3-112" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.6812</span></span>
-<span id="cb3-113"><a href="#cb3-113" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.7551</span></span>
-<span id="cb3-114"><a href="#cb3-114" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7844</span></span>
-<span id="cb3-115"><a href="#cb3-115" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.6039</span></span>
-<span id="cb3-116"><a href="#cb3-116" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7314</span></span>
-<span id="cb3-117"><a href="#cb3-117" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.5487</span></span>
-<span id="cb3-118"><a href="#cb3-118" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.7007</span></span>
-<span id="cb3-119"><a href="#cb3-119" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.7432</span></span>
-<span id="cb3-120"><a href="#cb3-120" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.7257</span></span>
-<span id="cb3-121"><a href="#cb3-121" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7644</span></span>
-<span id="cb3-122"><a href="#cb3-122" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.6278</span></span>
-<span id="cb3-123"><a href="#cb3-123" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7276</span></span>
-<span id="cb3-124"><a href="#cb3-124" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7836</span></span>
-<span id="cb3-125"><a href="#cb3-125" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8123</span></span>
-<span id="cb3-126"><a href="#cb3-126" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.7767</span></span>
-<span id="cb3-127"><a href="#cb3-127" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.5969</span></span>
-<span id="cb3-128"><a href="#cb3-128" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.5599</span></span>
-<span id="cb3-129"><a href="#cb3-129" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.6664</span></span>
-<span id="cb3-130"><a href="#cb3-130" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7102</span></span>
-<span id="cb3-131"><a href="#cb3-131" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.6486</span></span>
-<span id="cb3-132"><a href="#cb3-132" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.6092</span></span>
-<span id="cb3-133"><a href="#cb3-133" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.6063</span></span>
-<span id="cb3-134"><a href="#cb3-134" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.5542</span></span>
-<span id="cb3-135"><a href="#cb3-135" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6825</span></span>
-<span id="cb3-136"><a href="#cb3-136" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.7289</span></span>
-<span id="cb3-137"><a href="#cb3-137" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.6055</span></span>
-<span id="cb3-138"><a href="#cb3-138" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.6167</span></span>
-<span id="cb3-139"><a href="#cb3-139" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7363</span></span>
-<span id="cb3-140"><a href="#cb3-140" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.5237</span></span>
-<span id="cb3-141"><a href="#cb3-141" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.5982</span></span>
-<span id="cb3-142"><a href="#cb3-142" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.6586</span></span>
-<span id="cb3-143"><a href="#cb3-143" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7140</span></span>
-<span id="cb3-144"><a href="#cb3-144" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-145"><a href="#cb3-145" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Lunda Sul </span></span>
-<span id="cb3-146"><a href="#cb3-146" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span id="cb3-147"><a href="#cb3-147" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span id="cb3-148"><a href="#cb3-148" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-149"><a href="#cb3-149" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span id="cb3-150"><a href="#cb3-150" tabindex="-1"></a><span class="co">#&gt; loglikelihood       1.01       1.03</span></span>
-<span id="cb3-151"><a href="#cb3-151" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-152"><a href="#cb3-152" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-153"><a href="#cb3-153" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span id="cb3-154"><a href="#cb3-154" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
-<span id="cb3-155"><a href="#cb3-155" tabindex="-1"></a><span class="co">#&gt;       631.527</span></span>
-<span id="cb3-156"><a href="#cb3-156" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Zaire</span></span>
-<span id="cb3-157"><a href="#cb3-157" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8863</span></span>
-<span id="cb3-158"><a href="#cb3-158" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8179</span></span>
-<span id="cb3-159"><a href="#cb3-159" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8342</span></span>
-<span id="cb3-160"><a href="#cb3-160" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8721</span></span>
-<span id="cb3-161"><a href="#cb3-161" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9408</span></span>
-<span id="cb3-162"><a href="#cb3-162" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8614</span></span>
-<span id="cb3-163"><a href="#cb3-163" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8975</span></span>
-<span id="cb3-164"><a href="#cb3-164" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8603</span></span>
-<span id="cb3-165"><a href="#cb3-165" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.9222</span></span>
-<span id="cb3-166"><a href="#cb3-166" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8547</span></span>
-<span id="cb3-167"><a href="#cb3-167" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8825</span></span>
-<span id="cb3-168"><a href="#cb3-168" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9064</span></span>
-<span id="cb3-169"><a href="#cb3-169" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9188</span></span>
-<span id="cb3-170"><a href="#cb3-170" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.8364</span></span>
-<span id="cb3-171"><a href="#cb3-171" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8859</span></span>
-<span id="cb3-172"><a href="#cb3-172" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8432</span></span>
-<span id="cb3-173"><a href="#cb3-173" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8650</span></span>
-<span id="cb3-174"><a href="#cb3-174" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8741</span></span>
-<span id="cb3-175"><a href="#cb3-175" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8557</span></span>
-<span id="cb3-176"><a href="#cb3-176" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8329</span></span>
-<span id="cb3-177"><a href="#cb3-177" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8374</span></span>
-<span id="cb3-178"><a href="#cb3-178" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8541</span></span>
-<span id="cb3-179"><a href="#cb3-179" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9149</span></span>
-<span id="cb3-180"><a href="#cb3-180" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8908</span></span>
-<span id="cb3-181"><a href="#cb3-181" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7470</span></span>
-<span id="cb3-182"><a href="#cb3-182" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8820</span></span>
-<span id="cb3-183"><a href="#cb3-183" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8427</span></span>
-<span id="cb3-184"><a href="#cb3-184" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8978</span></span>
-<span id="cb3-185"><a href="#cb3-185" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8541</span></span>
-<span id="cb3-186"><a href="#cb3-186" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8969</span></span>
-<span id="cb3-187"><a href="#cb3-187" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9166</span></span>
-<span id="cb3-188"><a href="#cb3-188" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9121</span></span>
-<span id="cb3-189"><a href="#cb3-189" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8793</span></span>
-<span id="cb3-190"><a href="#cb3-190" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8196</span></span>
-<span id="cb3-191"><a href="#cb3-191" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8657</span></span>
-<span id="cb3-192"><a href="#cb3-192" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8541</span></span>
-<span id="cb3-193"><a href="#cb3-193" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8481</span></span>
-<span id="cb3-194"><a href="#cb3-194" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.9154</span></span>
-<span id="cb3-195"><a href="#cb3-195" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8531</span></span>
-<span id="cb3-196"><a href="#cb3-196" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8667</span></span>
-<span id="cb3-197"><a href="#cb3-197" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9240</span></span>
-<span id="cb3-198"><a href="#cb3-198" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8565</span></span>
-<span id="cb3-199"><a href="#cb3-199" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8877</span></span>
-<span id="cb3-200"><a href="#cb3-200" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.9115</span></span>
-<span id="cb3-201"><a href="#cb3-201" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8352</span></span>
-<span id="cb3-202"><a href="#cb3-202" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.9160</span></span>
-<span id="cb3-203"><a href="#cb3-203" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8799</span></span>
-<span id="cb3-204"><a href="#cb3-204" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9352</span></span>
-<span id="cb3-205"><a href="#cb3-205" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9395</span></span>
-<span id="cb3-206"><a href="#cb3-206" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.8971</span></span>
-<span id="cb3-207"><a href="#cb3-207" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8817</span></span>
-<span id="cb3-208"><a href="#cb3-208" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8857</span></span>
-<span id="cb3-209"><a href="#cb3-209" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8292</span></span>
-<span id="cb3-210"><a href="#cb3-210" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8751</span></span>
-<span id="cb3-211"><a href="#cb3-211" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-212"><a href="#cb3-212" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Zaire </span></span>
-<span id="cb3-213"><a href="#cb3-213" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span id="cb3-214"><a href="#cb3-214" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span id="cb3-215"><a href="#cb3-215" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-216"><a href="#cb3-216" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span id="cb3-217"><a href="#cb3-217" tabindex="-1"></a><span class="co">#&gt; loglikelihood       1.01       1.04</span></span>
-<span id="cb3-218"><a href="#cb3-218" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-219"><a href="#cb3-219" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-220"><a href="#cb3-220" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span id="cb3-221"><a href="#cb3-221" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
-<span id="cb3-222"><a href="#cb3-222" tabindex="-1"></a><span class="co">#&gt;      1040.515</span></span>
-<span id="cb3-223"><a href="#cb3-223" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-224"><a href="#cb3-224" tabindex="-1"></a><span class="co">#&gt; --- Debug: Structure of MCMC results ---</span></span>
-<span id="cb3-225"><a href="#cb3-225" tabindex="-1"></a><span class="co">#&gt; List of 2</span></span>
-<span id="cb3-226"><a href="#cb3-226" tabindex="-1"></a><span class="co">#&gt;  $ classifications:List of 3</span></span>
-<span id="cb3-227"><a href="#cb3-227" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:1800] 0 0 1 1 0 0 0 0 0 0 ...</span></span>
-<span id="cb3-228"><a href="#cb3-228" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:1800] 0 1 0 0 0 1 1 1 0 0 ...</span></span>
-<span id="cb3-229"><a href="#cb3-229" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:1800] 1 0 0 0 0 0 0 1 0 0 ...</span></span>
-<span id="cb3-230"><a href="#cb3-230" tabindex="-1"></a><span class="co">#&gt;  $ ids            :List of 3</span></span>
-<span id="cb3-231"><a href="#cb3-231" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : chr [1:19] &quot;BD21-002&quot; &quot;BD21-040&quot; &quot;BD21-041&quot; &quot;BD21-053&quot; ...</span></span>
-<span id="cb3-232"><a href="#cb3-232" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: chr [1:13] &quot;LL21-008&quot; &quot;LL21-010&quot; &quot;LL21-027&quot; &quot;LL21-037&quot; ...</span></span>
-<span id="cb3-233"><a href="#cb3-233" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : chr [1:38] &quot;ZL21-203&quot; &quot;ZL21-204&quot; &quot;ZL21-209&quot; &quot;ZL21-218&quot; ...</span></span>
-<span id="cb3-234"><a href="#cb3-234" tabindex="-1"></a><span class="co">#&gt; NULL</span></span>
-<span id="cb3-235"><a href="#cb3-235" tabindex="-1"></a><span class="co">#&gt; ----------------------------------------</span></span>
-<span id="cb3-236"><a href="#cb3-236" tabindex="-1"></a><span class="co">#&gt; Summary table saved to: C:\Users\veron\AppData\Local\Temp\RtmpEPloNp/infection_classification_results/probability_of_recrudescence_summary.csv</span></span>
-<span id="cb3-237"><a href="#cb3-237" tabindex="-1"></a></span>
-<span id="cb3-238"><a href="#cb3-238" tabindex="-1"></a><span class="fu">plan</span>(sequential)</span></code></pre></div>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Ensure the Probability column is numeric for plotting</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>final_summary<span class="sc">$</span>Probability <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(final_summary<span class="sc">$</span>Probability))</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">head</span>(final_summary), <span class="at">caption =</span> <span class="st">&quot;Top rows of the MCMC classification summary.&quot;</span>)</span></code></pre></div>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; Number of patient pairs (nids) found: 19</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Benguela</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.7648</span></span>
+<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.9450</span></span>
+<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8634</span></span>
+<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.2824</span></span>
+<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.8493</span></span>
+<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.9315</span></span>
+<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.6818</span></span>
+<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8192</span></span>
+<span id="cb3-46"><a href="#cb3-46" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.7914</span></span>
+<span id="cb3-47"><a href="#cb3-47" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8604</span></span>
+<span id="cb3-48"><a href="#cb3-48" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.7158</span></span>
+<span id="cb3-49"><a href="#cb3-49" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8852</span></span>
+<span id="cb3-50"><a href="#cb3-50" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.8502</span></span>
+<span id="cb3-51"><a href="#cb3-51" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.8544</span></span>
+<span id="cb3-52"><a href="#cb3-52" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8314</span></span>
+<span id="cb3-53"><a href="#cb3-53" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8455</span></span>
+<span id="cb3-54"><a href="#cb3-54" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8020</span></span>
+<span id="cb3-55"><a href="#cb3-55" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8756</span></span>
+<span id="cb3-56"><a href="#cb3-56" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6992</span></span>
+<span id="cb3-57"><a href="#cb3-57" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8325</span></span>
+<span id="cb3-58"><a href="#cb3-58" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.8995</span></span>
+<span id="cb3-59"><a href="#cb3-59" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9289</span></span>
+<span id="cb3-60"><a href="#cb3-60" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9324</span></span>
+<span id="cb3-61"><a href="#cb3-61" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8906</span></span>
+<span id="cb3-62"><a href="#cb3-62" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8291</span></span>
+<span id="cb3-63"><a href="#cb3-63" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8655</span></span>
+<span id="cb3-64"><a href="#cb3-64" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8763</span></span>
+<span id="cb3-65"><a href="#cb3-65" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-66"><a href="#cb3-66" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Benguela </span></span>
+<span id="cb3-67"><a href="#cb3-67" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
+<span id="cb3-68"><a href="#cb3-68" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
+<span id="cb3-69"><a href="#cb3-69" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-70"><a href="#cb3-70" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
+<span id="cb3-71"><a href="#cb3-71" tabindex="-1"></a><span class="co">#&gt; loglikelihood          1       1.01</span></span>
+<span id="cb3-72"><a href="#cb3-72" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-73"><a href="#cb3-73" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-74"><a href="#cb3-74" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
+<span id="cb3-75"><a href="#cb3-75" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
+<span id="cb3-76"><a href="#cb3-76" tabindex="-1"></a><span class="co">#&gt;      803.8748</span></span>
+<span id="cb3-77"><a href="#cb3-77" tabindex="-1"></a><span class="co">#&gt; Number of patient pairs (nids) found: 13</span></span>
+<span id="cb3-78"><a href="#cb3-78" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Lunda Sul</span></span>
+<span id="cb3-79"><a href="#cb3-79" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-80"><a href="#cb3-80" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-81"><a href="#cb3-81" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-82"><a href="#cb3-82" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-83"><a href="#cb3-83" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-84"><a href="#cb3-84" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-85"><a href="#cb3-85" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-86"><a href="#cb3-86" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
+<span id="cb3-87"><a href="#cb3-87" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-88"><a href="#cb3-88" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-89"><a href="#cb3-89" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-90"><a href="#cb3-90" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-91"><a href="#cb3-91" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-92"><a href="#cb3-92" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-93"><a href="#cb3-93" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8981</span></span>
+<span id="cb3-94"><a href="#cb3-94" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8826</span></span>
+<span id="cb3-95"><a href="#cb3-95" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9447</span></span>
+<span id="cb3-96"><a href="#cb3-96" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9121</span></span>
+<span id="cb3-97"><a href="#cb3-97" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9824</span></span>
+<span id="cb3-98"><a href="#cb3-98" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8689</span></span>
+<span id="cb3-99"><a href="#cb3-99" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7065</span></span>
+<span id="cb3-100"><a href="#cb3-100" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7073</span></span>
+<span id="cb3-101"><a href="#cb3-101" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8880</span></span>
+<span id="cb3-102"><a href="#cb3-102" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.6832</span></span>
+<span id="cb3-103"><a href="#cb3-103" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.5146</span></span>
+<span id="cb3-104"><a href="#cb3-104" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9050</span></span>
+<span id="cb3-105"><a href="#cb3-105" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9050</span></span>
+<span id="cb3-106"><a href="#cb3-106" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.7959</span></span>
+<span id="cb3-107"><a href="#cb3-107" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.8044</span></span>
+<span id="cb3-108"><a href="#cb3-108" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.7818</span></span>
+<span id="cb3-109"><a href="#cb3-109" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.9196</span></span>
+<span id="cb3-110"><a href="#cb3-110" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8865</span></span>
+<span id="cb3-111"><a href="#cb3-111" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8001</span></span>
+<span id="cb3-112"><a href="#cb3-112" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.7275</span></span>
+<span id="cb3-113"><a href="#cb3-113" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.6386</span></span>
+<span id="cb3-114"><a href="#cb3-114" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.5301</span></span>
+<span id="cb3-115"><a href="#cb3-115" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.5260</span></span>
+<span id="cb3-116"><a href="#cb3-116" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.6427</span></span>
+<span id="cb3-117"><a href="#cb3-117" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8214</span></span>
+<span id="cb3-118"><a href="#cb3-118" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.7679</span></span>
+<span id="cb3-119"><a href="#cb3-119" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8732</span></span>
+<span id="cb3-120"><a href="#cb3-120" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-121"><a href="#cb3-121" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Lunda Sul </span></span>
+<span id="cb3-122"><a href="#cb3-122" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
+<span id="cb3-123"><a href="#cb3-123" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
+<span id="cb3-124"><a href="#cb3-124" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-125"><a href="#cb3-125" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
+<span id="cb3-126"><a href="#cb3-126" tabindex="-1"></a><span class="co">#&gt; loglikelihood       1.02       1.06</span></span>
+<span id="cb3-127"><a href="#cb3-127" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-128"><a href="#cb3-128" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-129"><a href="#cb3-129" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
+<span id="cb3-130"><a href="#cb3-130" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
+<span id="cb3-131"><a href="#cb3-131" tabindex="-1"></a><span class="co">#&gt;      248.2155</span></span>
+<span id="cb3-132"><a href="#cb3-132" tabindex="-1"></a><span class="co">#&gt; Number of patient pairs (nids) found: 38</span></span>
+<span id="cb3-133"><a href="#cb3-133" tabindex="-1"></a><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Zaire</span></span>
+<span id="cb3-134"><a href="#cb3-134" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-135"><a href="#cb3-135" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-136"><a href="#cb3-136" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-137"><a href="#cb3-137" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-138"><a href="#cb3-138" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-139"><a href="#cb3-139" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-140"><a href="#cb3-140" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-141"><a href="#cb3-141" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
+<span id="cb3-142"><a href="#cb3-142" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-143"><a href="#cb3-143" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-144"><a href="#cb3-144" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-145"><a href="#cb3-145" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
+<span id="cb3-146"><a href="#cb3-146" tabindex="-1"></a><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
+<span id="cb3-147"><a href="#cb3-147" tabindex="-1"></a><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
+<span id="cb3-148"><a href="#cb3-148" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8775</span></span>
+<span id="cb3-149"><a href="#cb3-149" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.9500</span></span>
+<span id="cb3-150"><a href="#cb3-150" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9114</span></span>
+<span id="cb3-151"><a href="#cb3-151" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9282</span></span>
+<span id="cb3-152"><a href="#cb3-152" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9191</span></span>
+<span id="cb3-153"><a href="#cb3-153" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.9582</span></span>
+<span id="cb3-154"><a href="#cb3-154" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.9152</span></span>
+<span id="cb3-155"><a href="#cb3-155" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8933</span></span>
+<span id="cb3-156"><a href="#cb3-156" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.9019</span></span>
+<span id="cb3-157"><a href="#cb3-157" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.8918</span></span>
+<span id="cb3-158"><a href="#cb3-158" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8957</span></span>
+<span id="cb3-159"><a href="#cb3-159" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9608</span></span>
+<span id="cb3-160"><a href="#cb3-160" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9253</span></span>
+<span id="cb3-161"><a href="#cb3-161" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.8201</span></span>
+<span id="cb3-162"><a href="#cb3-162" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.9459</span></span>
+<span id="cb3-163"><a href="#cb3-163" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8798</span></span>
+<span id="cb3-164"><a href="#cb3-164" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8940</span></span>
+<span id="cb3-165"><a href="#cb3-165" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.8657</span></span>
+<span id="cb3-166"><a href="#cb3-166" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 1: dposterior = 0.9093</span></span>
+<span id="cb3-167"><a href="#cb3-167" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 2: dposterior = 0.8428</span></span>
+<span id="cb3-168"><a href="#cb3-168" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 3: dposterior = 0.9387</span></span>
+<span id="cb3-169"><a href="#cb3-169" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 4: dposterior = 0.9171</span></span>
+<span id="cb3-170"><a href="#cb3-170" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 5: dposterior = 0.9367</span></span>
+<span id="cb3-171"><a href="#cb3-171" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 6: dposterior = 0.9198</span></span>
+<span id="cb3-172"><a href="#cb3-172" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 7: dposterior = 0.8280</span></span>
+<span id="cb3-173"><a href="#cb3-173" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 8: dposterior = 0.8931</span></span>
+<span id="cb3-174"><a href="#cb3-174" tabindex="-1"></a><span class="co">#&gt; Chain 1, Count 9: dposterior = 0.9475</span></span>
+<span id="cb3-175"><a href="#cb3-175" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-176"><a href="#cb3-176" tabindex="-1"></a><span class="co">#&gt; Generating convergence diagnostics for site: Zaire </span></span>
+<span id="cb3-177"><a href="#cb3-177" tabindex="-1"></a><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
+<span id="cb3-178"><a href="#cb3-178" tabindex="-1"></a><span class="co">#&gt; Potential scale reduction factors:</span></span>
+<span id="cb3-179"><a href="#cb3-179" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-180"><a href="#cb3-180" tabindex="-1"></a><span class="co">#&gt;               Point est. Upper C.I.</span></span>
+<span id="cb3-181"><a href="#cb3-181" tabindex="-1"></a><span class="co">#&gt; loglikelihood       1.01       1.04</span></span>
+<span id="cb3-182"><a href="#cb3-182" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-183"><a href="#cb3-183" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-184"><a href="#cb3-184" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
+<span id="cb3-185"><a href="#cb3-185" tabindex="-1"></a><span class="co">#&gt; loglikelihood </span></span>
+<span id="cb3-186"><a href="#cb3-186" tabindex="-1"></a><span class="co">#&gt;      789.8217</span></span>
+<span id="cb3-187"><a href="#cb3-187" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-188"><a href="#cb3-188" tabindex="-1"></a><span class="co">#&gt; --- Debug: Structure of MCMC results ---</span></span>
+<span id="cb3-189"><a href="#cb3-189" tabindex="-1"></a><span class="co">#&gt; List of 6</span></span>
+<span id="cb3-190"><a href="#cb3-190" tabindex="-1"></a><span class="co">#&gt;  $ classifications:List of 3</span></span>
+<span id="cb3-191"><a href="#cb3-191" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:1800] 0 0 1 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb3-192"><a href="#cb3-192" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:1800] 0 1 0 0 0 1 1 1 0 0 ...</span></span>
+<span id="cb3-193"><a href="#cb3-193" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:1800] 1 0 0 0 0 0 0 1 0 0 ...</span></span>
+<span id="cb3-194"><a href="#cb3-194" tabindex="-1"></a><span class="co">#&gt;  $ ids            :List of 3</span></span>
+<span id="cb3-195"><a href="#cb3-195" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : chr [1:19] &quot;BD21-002&quot; &quot;BD21-040&quot; &quot;BD21-041&quot; &quot;BD21-053&quot; ...</span></span>
+<span id="cb3-196"><a href="#cb3-196" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: chr [1:13] &quot;LL21-008&quot; &quot;LL21-010&quot; &quot;LL21-027&quot; &quot;LL21-037&quot; ...</span></span>
+<span id="cb3-197"><a href="#cb3-197" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : chr [1:38] &quot;ZL21-203&quot; &quot;ZL21-204&quot; &quot;ZL21-209&quot; &quot;ZL21-218&quot; ...</span></span>
+<span id="cb3-198"><a href="#cb3-198" tabindex="-1"></a><span class="co">#&gt;  $ locus_summary  :List of 3</span></span>
+<span id="cb3-199"><a href="#cb3-199" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela :&#39;data.frame&#39;:    19 obs. of  4 variables:</span></span>
+<span id="cb3-200"><a href="#cb3-200" tabindex="-1"></a><span class="co">#&gt;   .. ..$ patient_id       : chr [1:19] &quot;BD21-002&quot; &quot;BD21-040&quot; &quot;BD21-041&quot; &quot;BD21-053&quot; ...</span></span>
+<span id="cb3-201"><a href="#cb3-201" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:19] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
+<span id="cb3-202"><a href="#cb3-202" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_df   : num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
+<span id="cb3-203"><a href="#cb3-203" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
+<span id="cb3-204"><a href="#cb3-204" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul:&#39;data.frame&#39;:    13 obs. of  4 variables:</span></span>
+<span id="cb3-205"><a href="#cb3-205" tabindex="-1"></a><span class="co">#&gt;   .. ..$ patient_id       : chr [1:13] &quot;LL21-008&quot; &quot;LL21-010&quot; &quot;LL21-027&quot; &quot;LL21-037&quot; ...</span></span>
+<span id="cb3-206"><a href="#cb3-206" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:13] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
+<span id="cb3-207"><a href="#cb3-207" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_df   : num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
+<span id="cb3-208"><a href="#cb3-208" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
+<span id="cb3-209"><a href="#cb3-209" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    :&#39;data.frame&#39;:    38 obs. of  4 variables:</span></span>
+<span id="cb3-210"><a href="#cb3-210" tabindex="-1"></a><span class="co">#&gt;   .. ..$ patient_id       : chr [1:38] &quot;ZL21-203&quot; &quot;ZL21-204&quot; &quot;ZL21-209&quot; &quot;ZL21-218&quot; ...</span></span>
+<span id="cb3-211"><a href="#cb3-211" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:38] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
+<span id="cb3-212"><a href="#cb3-212" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_available_df   : num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
+<span id="cb3-213"><a href="#cb3-213" tabindex="-1"></a><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
+<span id="cb3-214"><a href="#cb3-214" tabindex="-1"></a><span class="co">#&gt;  $ locus_lrs      :List of 3</span></span>
+<span id="cb3-215"><a href="#cb3-215" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:1800] 4.82 3.00e-03 1.75 4.64 1.01e-06 ...</span></span>
+<span id="cb3-216"><a href="#cb3-216" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-217"><a href="#cb3-217" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-218"><a href="#cb3-218" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-219"><a href="#cb3-219" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-220"><a href="#cb3-220" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:1800] 1.07e-07 8.35 1.00 1.62e-07 4.84e-05 ...</span></span>
+<span id="cb3-221"><a href="#cb3-221" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-222"><a href="#cb3-222" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-223"><a href="#cb3-223" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-224"><a href="#cb3-224" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-225"><a href="#cb3-225" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:1800] 2.54 1.49e-10 2.65e-17 1.00 5.23e-04 ...</span></span>
+<span id="cb3-226"><a href="#cb3-226" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-227"><a href="#cb3-227" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-228"><a href="#cb3-228" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-229"><a href="#cb3-229" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-230"><a href="#cb3-230" tabindex="-1"></a><span class="co">#&gt;  $ locus_dists    :List of 3</span></span>
+<span id="cb3-231"><a href="#cb3-231" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:1800] 2 8 0 0 16 10 0 2 6 18 ...</span></span>
+<span id="cb3-232"><a href="#cb3-232" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-233"><a href="#cb3-233" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-234"><a href="#cb3-234" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-235"><a href="#cb3-235" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-236"><a href="#cb3-236" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:1800] 6 0 0 6 4 0 0 0 4 12 ...</span></span>
+<span id="cb3-237"><a href="#cb3-237" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-238"><a href="#cb3-238" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-239"><a href="#cb3-239" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-240"><a href="#cb3-240" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-241"><a href="#cb3-241" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:1800] 0 10 16 24 4 2 10 0 10 6 ...</span></span>
+<span id="cb3-242"><a href="#cb3-242" tabindex="-1"></a><span class="co">#&gt;   .. ..- attr(*, &quot;dimnames&quot;)=List of 3</span></span>
+<span id="cb3-243"><a href="#cb3-243" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-244"><a href="#cb3-244" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-245"><a href="#cb3-245" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
+<span id="cb3-246"><a href="#cb3-246" tabindex="-1"></a><span class="co">#&gt;  $ locinames      :List of 3</span></span>
+<span id="cb3-247"><a href="#cb3-247" tabindex="-1"></a><span class="co">#&gt;   ..$ Benguela : chr [1:7] &quot;313&quot; &quot;383&quot; &quot;TA1&quot; &quot;POLYA&quot; ...</span></span>
+<span id="cb3-248"><a href="#cb3-248" tabindex="-1"></a><span class="co">#&gt;   ..$ Lunda Sul: chr [1:7] &quot;313&quot; &quot;383&quot; &quot;TA1&quot; &quot;POLYA&quot; ...</span></span>
+<span id="cb3-249"><a href="#cb3-249" tabindex="-1"></a><span class="co">#&gt;   ..$ Zaire    : chr [1:7] &quot;313&quot; &quot;383&quot; &quot;TA1&quot; &quot;POLYA&quot; ...</span></span>
+<span id="cb3-250"><a href="#cb3-250" tabindex="-1"></a><span class="co">#&gt; NULL</span></span>
+<span id="cb3-251"><a href="#cb3-251" tabindex="-1"></a><span class="co">#&gt; ----------------------------------------</span></span>
+<span id="cb3-252"><a href="#cb3-252" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-253"><a href="#cb3-253" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-254"><a href="#cb3-254" tabindex="-1"></a><span class="co">#&gt; --- Debug: Names in results$ids ---</span></span>
+<span id="cb3-255"><a href="#cb3-255" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Benguela&quot;  &quot;Lunda Sul&quot; &quot;Zaire&quot;    </span></span>
+<span id="cb3-256"><a href="#cb3-256" tabindex="-1"></a><span class="co">#&gt; --- Debug: Names in results$classifications ---</span></span>
+<span id="cb3-257"><a href="#cb3-257" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Benguela&quot;  &quot;Lunda Sul&quot; &quot;Zaire&quot;    </span></span>
+<span id="cb3-258"><a href="#cb3-258" tabindex="-1"></a><span class="co">#&gt; ----------------------------------</span></span>
+<span id="cb3-259"><a href="#cb3-259" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-260"><a href="#cb3-260" tabindex="-1"></a><span class="co">#&gt; --- Processing site: &#39;Benguela&#39; ---</span></span>
+<span id="cb3-261"><a href="#cb3-261" tabindex="-1"></a><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
+<span id="cb3-262"><a href="#cb3-262" tabindex="-1"></a><span class="co">#&gt; Length of site_ids:  19 </span></span>
+<span id="cb3-263"><a href="#cb3-263" tabindex="-1"></a><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
+<span id="cb3-264"><a href="#cb3-264" tabindex="-1"></a><span class="co">#&gt; Dimensions of site_probs_matrix:  19x1800 </span></span>
+<span id="cb3-265"><a href="#cb3-265" tabindex="-1"></a><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
+<span id="cb3-266"><a href="#cb3-266" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-267"><a href="#cb3-267" tabindex="-1"></a><span class="co">#&gt; --- Processing site: &#39;Lunda Sul&#39; ---</span></span>
+<span id="cb3-268"><a href="#cb3-268" tabindex="-1"></a><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
+<span id="cb3-269"><a href="#cb3-269" tabindex="-1"></a><span class="co">#&gt; Length of site_ids:  13 </span></span>
+<span id="cb3-270"><a href="#cb3-270" tabindex="-1"></a><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
+<span id="cb3-271"><a href="#cb3-271" tabindex="-1"></a><span class="co">#&gt; Dimensions of site_probs_matrix:  13x1800 </span></span>
+<span id="cb3-272"><a href="#cb3-272" tabindex="-1"></a><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
+<span id="cb3-273"><a href="#cb3-273" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-274"><a href="#cb3-274" tabindex="-1"></a><span class="co">#&gt; --- Processing site: &#39;Zaire&#39; ---</span></span>
+<span id="cb3-275"><a href="#cb3-275" tabindex="-1"></a><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
+<span id="cb3-276"><a href="#cb3-276" tabindex="-1"></a><span class="co">#&gt; Length of site_ids:  38 </span></span>
+<span id="cb3-277"><a href="#cb3-277" tabindex="-1"></a><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
+<span id="cb3-278"><a href="#cb3-278" tabindex="-1"></a><span class="co">#&gt; Dimensions of site_probs_matrix:  38x1800 </span></span>
+<span id="cb3-279"><a href="#cb3-279" tabindex="-1"></a><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
+<span id="cb3-280"><a href="#cb3-280" tabindex="-1"></a><span class="co">#&gt; Summary table saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/probability_of_recrudescence_summary.csv</span></span>
+<span id="cb3-281"><a href="#cb3-281" tabindex="-1"></a><span class="co">#&gt; Detailed marker-level summary saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/marker_level_summary.csv</span></span>
+<span id="cb3-282"><a href="#cb3-282" tabindex="-1"></a></span>
+<span id="cb3-283"><a href="#cb3-283" tabindex="-1"></a><span class="fu">plan</span>(sequential)</span></code></pre></div>
+</div>
+<div id="classification-summary-output" class="section level1">
+<h1>Classification summary output</h1>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>final_summary <span class="ot">&lt;-</span> classification_summary<span class="sc">$</span>summary</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>marker_details <span class="ot">&lt;-</span> classification_summary<span class="sc">$</span>marker_details</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co"># Ensure the Probability column is numeric for plotting</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>final_summary<span class="sc">$</span>Probability <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(final_summary<span class="sc">$</span>Probability))</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">head</span>(final_summary), <span class="at">caption =</span> <span class="st">&quot;Top rows of the MCMC classification summary.&quot;</span>)</span></code></pre></div>
 <table>
 <caption>Top rows of the MCMC classification summary.</caption>
+<colgroup>
+<col width="11%" />
+<col width="12%" />
+<col width="15%" />
+<col width="18%" />
+<col width="18%" />
+<col width="22%" />
+</colgroup>
 <thead>
 <tr class="header">
 <th align="left">Site</th>
 <th align="left">Sample.ID</th>
 <th align="right">Probability</th>
+<th align="right">N_Available_D0</th>
+<th align="right">N_Available_DF</th>
+<th align="right">N_Comparable_Loci</th>
 </tr>
 </thead>
 <tbody>
@@ -642,31 +705,49 @@ color: grey
 <td align="left">Benguela</td>
 <td align="left">BD21-002</td>
 <td align="right">0.0000000</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">7</td>
 </tr>
 <tr class="even">
 <td align="left">Benguela</td>
 <td align="left">BD21-040</td>
 <td align="right">0.0000000</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">7</td>
 </tr>
 <tr class="odd">
 <td align="left">Benguela</td>
 <td align="left">BD21-041</td>
-<td align="right">0.9966667</td>
+<td align="right">0.9944444</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">7</td>
 </tr>
 <tr class="even">
 <td align="left">Benguela</td>
 <td align="left">BD21-053</td>
-<td align="right">0.8644444</td>
+<td align="right">0.3722222</td>
+<td align="right">7</td>
+<td align="right">5</td>
+<td align="right">5</td>
 </tr>
 <tr class="odd">
 <td align="left">Benguela</td>
 <td align="left">BD21-075</td>
 <td align="right">0.0000000</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">7</td>
 </tr>
 <tr class="even">
 <td align="left">Benguela</td>
 <td align="left">BD21-099</td>
-<td align="right">0.0050000</td>
+<td align="right">0.0000000</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">7</td>
 </tr>
 </tbody>
 </table>
@@ -675,145 +756,69 @@ color: grey
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>graphics<span class="sc">::</span><span class="fu">hist</span>(final_summary<span class="sc">$</span>Probability, <span class="at">breaks =</span> <span class="dv">10</span>,</span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Posterior Probability of Recrudescence&quot;</span>,</span>
 <span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;Probability&quot;</span>)</span></code></pre></div>
-<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+</div>
+<div id="marker-descriptive-analysis" class="section level1">
+<h1>Marker descriptive analysis</h1>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># markers diversisty plots </span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="cf">if</span> (imported_data<span class="sc">$</span>data_type <span class="sc">==</span> <span class="st">&quot;length_polymorphic&quot;</span>) {</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  </span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="co"># OVERALL plot</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  overall_plot_data <span class="ot">&lt;-</span> <span class="fu">rbind</span>(imported_data<span class="sc">$</span>late_failures, imported_data<span class="sc">$</span>additional)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  MalReBay<span class="sc">:::</span><span class="fu">generate_allele_frequency_plot</span>(</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="at">raw_data_df   =</span> overall_plot_data,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    <span class="at">site_name     =</span> <span class="cn">NULL</span>, </span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>    <span class="at">output_folder =</span> output_dir</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>  )</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>  </span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>  <span class="co"># Site-specific plots</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>  site_names <span class="ot">&lt;-</span> <span class="fu">unique</span>(imported_data<span class="sc">$</span>late_failures<span class="sc">$</span>Site)</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>  <span class="cf">for</span> (site <span class="cf">in</span> site_names) {</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>    site_data <span class="ot">&lt;-</span> imported_data<span class="sc">$</span>late_failures[imported_data<span class="sc">$</span>late_failures<span class="sc">$</span>Site <span class="sc">==</span> site, ]</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>    additional_site_data <span class="ot">&lt;-</span> imported_data<span class="sc">$</span>additional[imported_data<span class="sc">$</span>additional<span class="sc">$</span>Site <span class="sc">==</span> site, ]</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>    </span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>    MalReBay<span class="sc">:::</span><span class="fu">generate_allele_frequency_plot</span>(</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>      <span class="at">raw_data_df =</span> <span class="fu">rbind</span>(site_data, additional_site_data),</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>      <span class="at">site_name =</span> site,</span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>      <span class="at">output_folder =</span> output_dir</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>    )</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  }</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>}</span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt; Generating OVERALL raw allele frequency plot for all sites.</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt; Plot saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/allele_freq_plot_Overall.pdf</span></span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="co">#&gt; Generating raw allele frequency plot for site: Benguela</span></span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co">#&gt; Plot saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/allele_freq_plot_Benguela.pdf</span></span>
+<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="co">#&gt; Generating raw allele frequency plot for site: Lunda Sul</span></span>
+<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a><span class="co">#&gt; Plot saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/allele_freq_plot_Lunda_Sul.pdf</span></span>
+<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a><span class="co">#&gt; Generating raw allele frequency plot for site: Zaire</span></span>
+<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a><span class="co">#&gt; Plot saved to: C:\Users\veron\AppData\Local\Temp\Rtmp8sB7wi/infection_classification_results/allele_freq_plot_Zaire.pdf</span></span></code></pre></div>
 </div>
 <div id="run-the-match-counting-function-to-produce-a-comparison-table-for-bayesian-and-match-counting-results" class="section level1">
 <h1>Run the match-counting function to produce a comparison table for
 Bayesian and match-counting results</h1>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>match_results_df <span class="ot">&lt;-</span> MalReBay<span class="sc">:::</span><span class="fu">perform_match_counting</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">genotypedata_latefailures =</span> imported_data<span class="sc">$</span>late_failures, </span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">marker_info =</span> imported_data<span class="sc">$</span>marker_info</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>mcmc_summary_for_merge <span class="ot">&lt;-</span> final_summary[, <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Probability&quot;</span>)]</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="fu">colnames</span>(mcmc_summary_for_merge) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Prob_Recrudescence&quot;</span>)</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>alleles_with_patient_id <span class="ot">&lt;-</span> <span class="fu">mutate</span>(</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>  imported_data<span class="sc">$</span>late_failures, </span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>  <span class="at">Patient.ID =</span> <span class="fu">gsub</span>(<span class="st">&quot; (Day 0|Day Failure)$&quot;</span>, <span class="st">&quot;&quot;</span>, Sample.ID)</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>)</span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>final_table <span class="ot">&lt;-</span> <span class="fu">left_join</span>(</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>  alleles_with_patient_id, </span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>  match_results_df, </span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>  <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Patient.ID&quot;</span> <span class="ot">=</span> <span class="st">&quot;Sample.ID&quot;</span>)</span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>)</span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a></span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>final_table <span class="ot">&lt;-</span> <span class="fu">left_join</span>(</span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>  final_table, </span>
-<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>  mcmc_summary_for_merge, </span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Patient.ID&quot;</span> <span class="ot">=</span> <span class="st">&quot;Sample.ID&quot;</span>)</span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>)</span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>final_table_sorted <span class="ot">&lt;-</span> <span class="fu">arrange</span>(final_table, Patient.ID, Sample.ID)</span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a></span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a>  <span class="fu">head</span>(final_table_sorted[, <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>]), </span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">&quot;Snapshot of the final combined data table.&quot;</span></span>
-<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a>)</span></code></pre></div>
-<table style="width:100%;">
-<caption>Snapshot of the final combined data table.</caption>
-<colgroup>
-<col width="26%" />
-<col width="11%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-<col width="7%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="left">Sample.ID</th>
-<th align="left">Site</th>
-<th align="right">313_1</th>
-<th align="right">313_2</th>
-<th align="right">313_3</th>
-<th align="right">383_1</th>
-<th align="right">383_2</th>
-<th align="right">383_3</th>
-<th align="right">TA1_1</th>
-<th align="right">TA1_2</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">BD21-002 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">248</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">133</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">174</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-002 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">246</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-</tr>
-<tr class="odd">
-<td align="left">BD21-040 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">230</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">137</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">162</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-040 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">222</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">171</td>
-<td align="right">NA</td>
-</tr>
-<tr class="odd">
-<td align="left">BD21-041 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">238</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">139</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-041 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">238</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">141</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-</tr>
-</tbody>
-</table>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>match_results_df <span class="ot">&lt;-</span> MalReBay<span class="sc">:::</span><span class="fu">perform_match_counting</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">genotypedata_latefailures =</span> imported_data<span class="sc">$</span>late_failures, </span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">marker_info =</span> imported_data<span class="sc">$</span>marker_info)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>mcmc_summary_for_merge <span class="ot">&lt;-</span> final_summary[, <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Probability&quot;</span>, <span class="st">&quot;N_Comparable_Loci&quot;</span>)]</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">colnames</span>(mcmc_summary_for_merge) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Prob_Recrudescence&quot;</span>, <span class="st">&quot;N_Comparable_Loci&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>alleles_with_patient_id <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">mutate</span>(imported_data<span class="sc">$</span>late_failures, <span class="at">Patient.ID =</span> <span class="fu">gsub</span>(<span class="st">&quot; (Day 0|Day Failure)$&quot;</span>, <span class="st">&quot;&quot;</span>, Sample.ID))</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>final_table <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(alleles_with_patient_id, match_results_df, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Patient.ID&quot;</span> <span class="ot">=</span> <span class="st">&quot;Sample.ID&quot;</span>))</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>final_table <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(final_table, mcmc_summary_for_merge, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Patient.ID&quot;</span> <span class="ot">=</span> <span class="st">&quot;Sample.ID&quot;</span>))</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>final_table_sorted <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">arrange</span>(final_table, Patient.ID, Sample.ID)</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>id_cols <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Site&quot;</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>original_allele_cols <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">&quot;(_allele_</span><span class="sc">\\</span><span class="st">d+|_</span><span class="sc">\\</span><span class="st">d+)$&quot;</span>, <span class="fu">colnames</span>(final_table_sorted), <span class="at">value =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>analysis_cols <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Number_Matches&quot;</span>, <span class="st">&quot;Number_Loci_Compared&quot;</span>, </span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>                   <span class="fu">setdiff</span>(<span class="fu">colnames</span>(match_results_df), </span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>                           <span class="fu">c</span>(<span class="st">&quot;Sample.ID&quot;</span>, <span class="st">&quot;Number_Matches&quot;</span>, <span class="st">&quot;Number_Loci_Compared&quot;</span>)),</span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>                   <span class="st">&quot;Prob_Recrudescence&quot;</span>, <span class="st">&quot;N_Comparable_Loci&quot;</span>)</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>final_cols_order <span class="ot">&lt;-</span> <span class="fu">c</span>(id_cols, original_allele_cols, analysis_cols)</span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>final_comparison_table <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">select</span>(final_table_sorted, <span class="fu">all_of</span>(final_cols_order))</span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>final_comparison_table<span class="sc">$</span>Patient.ID <span class="ot">&lt;-</span> <span class="cn">NULL</span> </span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a>output_path <span class="ot">&lt;-</span> <span class="fu">file.path</span>(output_dir, <span class="st">&quot;algorithm_classification_comparison_table.csv&quot;</span>)</span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="fu">write.csv</span>(final_comparison_table, output_path, <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">na =</span> <span class="st">&quot;&quot;</span>)</span></code></pre></div>
 </div>
 
 

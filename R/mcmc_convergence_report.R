@@ -1,3 +1,41 @@
+#' Generate an Allele Frequency Distribution Plot
+#'
+#' @description
+#' Creates and saves a faceted bar plot visualizing the frequency distribution
+#' of raw allele lengths. The plot compares samples from "Day 0" against
+#' "Day of Failure" for each genetic marker.
+#'
+#' @details
+#' This function serves as an internal utility for exploratory data analysis. It
+#' processes a wide-format data frame, calculates allele frequencies, and uses
+#' `ggplot2` to generate a comprehensive visualization. It can operate in either
+#' a site-specific or an overall mode. The resulting plot is saved as a PDF.
+#'
+#' @param raw_data_df A data frame in a 'wide' format. It must contain:
+#'   \itemize{
+#'     \item A `Sample.ID` column where entries contain the strings "Day 0" or "Day Failure".
+#'     \item Marker columns named in the format `LocusName_AlleleNumber` (e.g.,
+#'       `TA40_1`, `TA40_2`).
+#'   }
+#' @param site_name A character string. The name of the site for the plot title
+#'   and filename. If `NULL`, an "Overall" plot is generated.
+#' @param output_folder A character string specifying the directory where the
+#'   plot PDF will be saved.
+#' @param plots_per_row An integer setting the number of marker plots to display
+#'   per row in the faceted plot.
+#' @param plot_width,plot_height Numeric values for the width and height of the
+#'   output PDF file in inches.
+#'
+#' @return Invisibly returns the `ggplot` object, allowing for further customization.
+#'
+#' @importFrom dplyr mutate across all_of if_else group_by summarise n ungroup
+#' @importFrom tidyr pivot_longer
+#' @importFrom ggplot2 ggplot aes geom_bar facet_wrap scale_fill_manual labs theme_bw theme element_rect element_text ggsave
+#'
+#' @keywords internal
+#' @noRd
+#'
+
 generate_likelihood_diagnostics <- function(all_chains_loglikelihood = full_loglik_history,
                                             site_name = site,
                                             output_folder = output_folder) {
@@ -81,7 +119,7 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood = full_logl
   # Gelman-Rubin plot
   plot_base("gelman_loglikelihood.png", {
     coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE, ask = FALSE)
-    graphics::title(main = paste(site_name, "- Gelman-Rubin for "), line = 2.5)
+    graphics::title(main = paste(site_name, "- Gelman-Rubin for Log-Likelihood"), line = 2.5)
   })
   
   
@@ -93,7 +131,9 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood = full_logl
   
   # Autocorrelation plots per chain
   plot_base("loglikelihood_acf.png", {
-    graphics::par(mfrow = c(2, 2))
+    n_chains <- length(clean_chains)
+    plot_dims <- grDevices::n2mfrow(n_chains) 
+    graphics::par(mfrow = plot_dims)
     for (i in seq_along(clean_chains)) {
       stats::acf(clean_chains[[i]], main = paste("ACF - Chain", i), lag.max = 50)
     }
@@ -108,6 +148,3 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood = full_logl
     range      = sapply(clean_chains, function(x) range(x, na.rm = TRUE))
   ))
 }
-
-
-

@@ -1,4 +1,48 @@
-
+#' Calculate Allele Frequencies and Genetic Variability
+#'
+#' @description
+#' This function computes the frequency of each defined allele for every locus
+#' in the provided genotyping data. It also calculates a measure of genetic
+#' variability and counts the number of unique alleles per locus.
+#'
+#' @details
+#' The function processes each locus according to the `binning_method` specified
+#' in `marker_info`.
+#' \itemize{
+#'   \item For **length polymorphism** data (`microsatellite`, `cluster`), it
+#'     uses the pre-defined allele bins to tabulate allele counts and calculate
+#'     frequencies. Variability is calculated as the mean of the within-bin
+#'     standard deviations.
+#'   \item For **amplicon sequencing** data (`exact`), it calculates frequencies
+#'     based on exact allele matching. Variability is calculated as the expected
+#'     heterozygosity (He).
+#' }
+#' The results are compiled into a standardized list, including a frequency
+#' matrix padded to accommodate the locus with the maximum number of alleles.
+#'
+#' @param genotypedata A data frame containing all raw allele observations from
+#'   all samples (from both `late_failures` and `additional` data).
+#' @param alleles_definitions A list where each element corresponds to a locus
+#'   and contains the allele bin definitions for that locus, as created by
+#'   the `define_alleles` function.
+#' @param marker_info A data frame containing marker metadata, used to determine
+#'   the appropriate calculation method for each locus.
+#'
+#' @return A list containing the following four elements:
+#' \item{n_alleles}{A named integer vector with the total number of unique
+#'   alleles identified for each locus.}
+#' \item{freq_matrix}{A matrix where rows represent loci and columns represent
+#'   alleles. Each cell contains the calculated frequency of an allele at a
+#'   given locus.}
+#' \item{variability}{A named numeric vector containing the calculated genetic
+#'   variability (or error) for each locus.}
+#' \item{allele_codes}{A named list that serves as a lookup table, mapping the
+#'   integer-based column index of `freq_matrix` back to its true allele
+#'   meaning (e.g., bin number or sequence).}
+#'
+#' @keywords internal
+#' @noRd
+#'
 calculate_frequencies3 <- function(genotypedata, alleles_definitions, marker_info) {
   
   locus_names <- marker_info$marker_id
@@ -60,9 +104,6 @@ calculate_frequencies3 <- function(genotypedata, alleles_definitions, marker_inf
       # Calculate variability as Genetic Diversity (He = 1 - sum(p_i^2))
       variability[locus_name] <- 1 - sum(current_freqs^2)
       n_alleles_per_locus[locus_name] <- length(allele_counts)
-      variability[locus_name] <- 1 - sum(current_freqs^2)
-      n_alleles_per_locus[locus_name] <- length(allele_counts)
-      # allele_codes_list[[locus_name]] <- as.numeric(names(allele_counts))
       allele_codes_list[[locus_name]] <- names(allele_counts)
     } else {
       stop("Unknown binning_method '", binning_method, "' for locus: ", locus_name)

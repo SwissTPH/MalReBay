@@ -1,13 +1,72 @@
-
-# Define the chain function for parallel processing
+#' MCMC Chain for Length-Polymorphic Data
+#'
+#' @description
+#' Implements the full Gibbs sampling algorithm for a single MCMC chain to
+#' classify infections, specifically tailored for length-polymorphic data such as
+#' microsatellites or clustered MSP markers.
+#'
+#' @details
+#' This function is the core engine for the Bayesian classification model for
+#' numeric allele data. It initializes the model's state and iteratively updates
+#' each component within a Gibbs sampling framework. Key steps include:
+#' \enumerate{
+#'   \item **Data Recoding and Discretization:** Raw allele fragment lengths are
+#'     converted ("recoded") into discrete integer bins based on the definitions
+#'     provided in `alleles_definitions_RR`. This is a critical step for binned data.
+#'   \item **MOI Calculation & State Initialization:** Determines the Multiplicity of
+#'     Infection (MOI) and creates matrices to hold the model's state.
+#'   \item **Initial Imputation:** Guesses the identity of unobserved ("hidden")
+#'     alleles for infections where the MOI is greater than the number of observed
+#'     alleles, sampling from the population allele frequencies.
+#'   \item **Classification Update:** Iteratively updates the classification
+#'     (recrudescence vs. reinfection) for each patient by calculating a
+#'     likelihood ratio. This ratio accounts for the probability of observing the
+#'     measured distance between alleles under different scenarios (e.g., genotyping error
+#'     vs. new infection).
+#'   \item **Hidden Allele and Parameter Updates:** Re-samples the identity of
+#'     hidden alleles and updates model hyperparameters (e.g., `qq`, `dposterior`)
+#'     based on their full conditional posterior distributions.
+#' }
+#' The function records the chain's state after the burn-in period. It is
+#' designed to be run in parallel with other independent chains.
+#'
+#' @param chain_id An integer identifying the chain.
+#' @param nruns,burnin,record_interval Standard MCMC configuration: total
+#'   iterations, burn-in period, and recording frequency.
+#' @param nids,ids,nloci,maxMOI,locinames Core dimensions and metadata for the
+#'   analysis.
+#' @param genotypedata_RR,additional_neutral Data frames with primary paired
+#'   samples and additional baseline samples.
+#' @param alleles_definitions_RR A list containing the allele bin definitions
+#'   (lower and upper bounds) for each locus. Crucial for recoding raw data.
+#' @param marker_info A data frame containing metadata for each genetic marker.
+#' @param record_hidden_alleles A logical flag. If `TRUE`, the full state of
+#'   imputed hidden raw allele values is saved.
+#' @param is_locus_comparable A logical matrix indicating for each patient and
+#'   locus whether data exists for both Day 0 and Day of Failure.
+#'
+#' @return A list containing the full history of the MCMC chain after burn-in.
+#'   The list includes the following components:
+#'   \item{state_classification}{Matrix of classification states (1 for
+#'     recrudescence, 0 for reinfection).}
+#'   \item{state_parameters}{Matrix of key model hyperparameters over time.}
+#'   \item{state_alleles0, state_allelesf}{Optional arrays of the imputed raw
+#'     allele values for Day 0 and Day of Failure samples.}
+#'   \item{state_loglikelihood}{Vector of the overall log-likelihood at each
+#'     recorded step.}
+#'   \item{locus_lrs, locus_dists}{Arrays containing the per-locus likelihood
+#'     ratios and allele distances for each patient at each recorded step.}
+#'
+#' @keywords internal
+#' @noRd
+#'
 run_one_chain <- function(chain_id,
                           nruns, burnin, record_interval,
                           nids, ids, nloci, maxMOI, locinames,
                           genotypedata_RR, additional_neutral, alleles_definitions_RR,
-                          marker_info,
-                          record_hidden_alleles = FALSE
-) 
-{
+                          marker_info, record_hidden_alleles = FALSE, is_locus_comparable ) 
+{  
+
   ##### calculate MOI
   MOI0 <- rep(0, nids)
   MOIf <- rep(0, nids)
@@ -119,9 +178,10 @@ run_one_chain <- function(chain_id,
   ## assign random hidden alleles and classifications
   for (i in 1:nids) {
     for (j in 1:nloci) {
-      nalleles0 = sum(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j))] != 0); nmissing0 = MOI0[i] - nalleles0; whichnotmissing0 =
-        ((maxMOI*(j-1)+1) : (maxMOI*(j)))[which(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j-1)+MOI0[i])] != 0)]; whichmissing0 =
-          ((maxMOI*(j-1)+1) : (maxMOI*(j)))[which(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j-1)+MOI0[i])] == 0)];
+      nalleles0 = sum(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j))] != 0) 
+      nmissing0 = MOI0[i] - nalleles0
+      whichnotmissing0 = ((maxMOI*(j-1)+1) : (maxMOI*(j)))[which(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j-1)+MOI0[i])] != 0)]; 
+      whichmissing0 = ((maxMOI*(j-1)+1) : (maxMOI*(j)))[which(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j-1)+MOI0[i])] == 0)];
         if (nalleles0 > 0) { hidden0[i,whichnotmissing0] = 0 }
         if (nmissing0 > 0) { 
           n_alleles_locus <- frequencies_RR$n_alleles[j]
@@ -156,9 +216,7 @@ run_one_chain <- function(chain_id,
   qq <- mean(c(hidden0, hiddenf), na.rm = TRUE)
   if (is.na(qq)) qq <- 0.1 
   dvect <- stats::dgeom(0:(round(max(sapply(1:nloci, function(x) diff(range(c(alleles_definitions_RR[[x]]))))))), 0.75)
-
   qq_crossfamily <- 10^-3 
-  thresholddistance <- 15 
 
   getmode <- function(v) {
     v_clean <- v[!is.na(v)]
@@ -183,7 +241,7 @@ run_one_chain <- function(chain_id,
     }
   }
   ## randomly assign recrudescences/reinfections for this chain
-  
+   
   classification <- ifelse(stats::runif(nids) < 0.5, 1, 0)
 
   marker_info <- marker_info[match(locinames, marker_info$marker_id), ]
@@ -233,6 +291,10 @@ run_one_chain <- function(chain_id,
   n_params_to_record <- 3 + (2 * nloci)
   state_parameters <- matrix(NA, n_params_to_record, num_records)
   state_loglikelihood <- rep(NA_real_, num_records)
+
+  # Per-Locus Information
+  state_locus_lr <- array(NA, c(nids, nloci, num_records))
+  state_locus_dist <- array(NA, c(nids, nloci, num_records))
   
   if (record_hidden_alleles) {
     state_alleles0 <- array(NA, c(nids, maxMOI * nloci, num_records))
@@ -242,6 +304,7 @@ run_one_chain <- function(chain_id,
     state_allelesf <- NULL
   }
   
+ 
   # Define ALL variables needed by runmcmc() before it's defined.
   count <- 1
   dposterior <- 0.75
@@ -250,8 +313,12 @@ run_one_chain <- function(chain_id,
   runmcmc <- function() {
     current_marker_info <- marker_info 
     calculate_single_locus <- function(x, y) {
+      if (!is_locus_comparable[x, y]) {
+        return(1)
+      }
       should_print_debug <- (count < 5)
       distances <- round(alldistance[x, y, ])
+      
       valid <- !is.na(distances) & distances >= 0 & distances < length(dvect)
       if (!any(valid)) {
         if (should_print_debug) {
@@ -280,27 +347,15 @@ run_one_chain <- function(chain_id,
           numerator <- ifelse(distances[valid] == 0, prob_match, prob_mismatch)
       }
       
-        denominators <- sapply(which(valid), function(z) {
+   
+      denominators <- sapply(which(valid), function(z) {
         recr_allele <- allrecrf[x, y, z]
-        if (is.na(recr_allele)) {
-          return(NA) 
+        if (is.na(recr_allele) || recr_allele == 0) {
+          return(NA)
         }
-      
-      if (method == "microsatellite") {
-          distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
-          probs <- dvect[distances_to_pop + 1]
-      } else if (method == "cluster") {
-          threshold <- current_marker_info$cluster_gap_threshold[y]
-          distances_to_pop <- correction_distance_matrix[[y]][, recr_allele]
-          probs <- ifelse(distances_to_pop <= threshold, 1 - qq_crossfamily, qq_crossfamily)
-      } else { # For "exact" markers
-          all_allele_types <- 1:frequencies_RR$n_alleles[y]
-          distances_to_pop <- ifelse(all_allele_types == recr_allele, 0, 1)
-          probs <- ifelse(distances_to_pop == 0, 1 - qq_crossfamily, qq_crossfamily)
-      }
-
-      sum(frequencies_RR$freq_matrix[y, 1:frequencies_RR$n_alleles[y]] * probs, na.rm = TRUE)
-    })
+        # The probability is just the frequency of that allele type.
+        return(frequencies_RR$freq_matrix[y, recr_allele])
+      })
       epsilon <- 1e-10
       ratios <- numerator / (denominators + epsilon)
       
@@ -318,12 +373,18 @@ run_one_chain <- function(chain_id,
         return(1) 
       }
       
-      return(mean(final_ratios))
+      
+      recrud_locus_lr <- mean(final_ratios)
+      return(recrud_locus_lr)
     }
     
+    # storing  Per-Locus Information
+    locus_lrs_this_step <- matrix(NA, nrow = nids, ncol = nloci)
+
     likelihoodratio <- sapply(1:nids, function(x) {
-      loc_results <- sapply(1:nloci, function(y) calculate_single_locus(x, y))
-      exp(sum(log(pmax(loc_results, 1e-10))))
+    loc_results <- sapply(1:nloci, function(y) calculate_single_locus(x, y))
+    locus_lrs_this_step[x, ] <<- loc_results
+    exp(sum(log(pmax(loc_results, 1e-10))))
     })
     z = stats::runif(nids); newclassification = classification; newclassification[classification == 0 & z < likelihoodratio] = 1; newclassification[classification == 1 & z < 1/likelihoodratio] = 0; classification <<- newclassification
     
@@ -342,10 +403,10 @@ run_one_chain <- function(chain_id,
         correction_distance_matrix = correction_distance_matrix,
         marker_info = marker_info,
         mode_allele_lengths = mode_allele_lengths,
-        thresholddistance = thresholddistance,
         qq_crossfamily = qq_crossfamily,
         hidden_crossfamily0 = hidden_crossfamily0,
-        hidden_crossfamilyf = hidden_crossfamilyf
+        hidden_crossfamilyf = hidden_crossfamilyf,
+        is_locus_comparable = is_locus_comparable
       )
       
       hidden0       <<- updated_states$hidden0
@@ -365,43 +426,45 @@ run_one_chain <- function(chain_id,
       hidden_crossfamilyf <<- updated_states$hidden_crossfamilyf
     }
     
-    q_prior_alpha = 0; 
-    q_prior_beta = 0; 
+    q_prior_alpha = 1; 
+    q_prior_beta = 1; 
     q_posterior_alpha = q_prior_alpha + sum(c(hidden0,hiddenf) == 1,na.rm=TRUE); 
     q_posterior_beta = q_prior_beta + sum(c(hidden0,hiddenf)==0,na.rm=TRUE); 
     if (q_posterior_alpha == 0) { q_posterior_alpha =1 }; 
     qq <<- stats::rbeta(1, q_posterior_alpha , q_posterior_beta)
 
-    q_cross_prior_alpha <- 1
-    q_cross_prior_beta <- 999 # Prior belief: cross-family jumps are rare
+    q_cross_prior_alpha <- 9
+    q_cross_prior_beta <- 39 # Prior belief: cross-family jumps are rare
     q_cross_posterior_alpha <- q_cross_prior_alpha + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 1, na.rm=TRUE)
     q_cross_posterior_beta <- q_cross_prior_beta + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 0, na.rm=TRUE)
     qq_crossfamily <<- stats::rbeta(1, q_cross_posterior_alpha, q_cross_posterior_beta)
+        
+    # updating microsatellite-specific parameters
+    microsat_indices <- which(marker_info$binning_method == "microsatellite")
     
     if (sum(classification == 1) >= 1) {
       d_prior_alpha <- 2
-      d_prior_beta <- 5 
-      valid_distances <- mindistance[classification == 1, ]
+      d_prior_beta <- 2 
+      
+      valid_distances <- mindistance[classification == 1, microsat_indices, drop = FALSE]
       valid_distances <- valid_distances[!is.na(valid_distances)]
       
       d_posterior_alpha <- d_prior_alpha + length(valid_distances)
       d_posterior_beta <- d_prior_beta + sum(valid_distances)
       if (d_posterior_beta <= 0) { d_posterior_beta <- 1 }
       dposterior <<- stats::rbeta(1, d_posterior_alpha, d_posterior_beta)
-      # if (chain_id == 1 && count < 10) {
-        # message(sprintf("Chain 1, Count %d: dposterior = %.4f", count, dposterior))
-      # }
+      if (chain_id == 1 && count < 10) {
+        message(sprintf("Chain 1, Count %d: dposterior = %.4f", count, dposterior))
+      }
       dvect_new <- (1 - dposterior) ^ (seq_along(dvect) - 1) * dposterior
       dvect <<- dvect_new / sum(dvect_new)
     }
     
-    tempdata <- recoded0
-    recrudescence_indices <- which(classification == 1)
-    if (length(recrudescence_indices) > 0) {
-      for (idx in recrudescence_indices) { tempdata[idx, recr0[idx,]] <- 0 }
-    }
-    tempdata <- rbind(tempdata, recodedf)
-    full_data <- rbind(tempdata, recoded_additional_neutral)
+    
+    reinfection_indices <- which(classification == 0)
+    reinfection_d0_data <- recoded0[reinfection_indices, , drop = FALSE]
+    
+    full_data <- rbind(reinfection_d0_data, recodedf, recoded_additional_neutral)
     
     new_freq_matrix <- frequencies_RR$freq_matrix
     
@@ -429,6 +492,9 @@ run_one_chain <- function(chain_id,
       state_parameters[4:(4+nloci-1), record_idx] <<- apply(frequencies_RR$freq_matrix, 1, max)
       state_parameters[(4+nloci):(4+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(frequencies_RR$freq_matrix[x, 1:frequencies_RR$n_alleles[x]]^2))
       state_loglikelihood[record_idx] <<- ifelse(is.finite(loglik_val), loglik_val, NA)
+      # Per-Locus Information
+      state_locus_lr[,, record_idx] <<- locus_lrs_this_step
+      state_locus_dist[,, record_idx] <<- mindistance
       if (record_hidden_alleles) {
         state_alleles0[,, record_idx] <<- alleles0
         state_allelesf[,, record_idx] <<- allelesf
@@ -441,11 +507,13 @@ run_one_chain <- function(chain_id,
   
   return(
     list(
-      classification = state_classification,
-      parameters     = state_parameters,
-      alleles0       = state_alleles0,
-      allelesf       = state_allelesf,
-      loglikelihood  = state_loglikelihood
+      state_classification = state_classification,
+      state_parameters     = state_parameters,
+      state_alleles0       = state_alleles0,
+      allelstate_allelesfesf       = state_allelesf,
+      state_loglikelihood  = state_loglikelihood,
+      locus_lrs      = state_locus_lr,
+      locus_dists    = state_locus_dist
     )
   )
   

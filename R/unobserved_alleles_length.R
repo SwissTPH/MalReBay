@@ -1,12 +1,75 @@
-# Unobserved alleles 
+#' Update a Single Hidden Allele Using a Metropolis-Hastings Step
+#'
+#' @description
+#' A core MCMC sampler step that updates the imputed identity of a single, randomly
+#' chosen hidden allele for one patient. This function is specifically for
+#' length-polymorphic data and uses a Metropolis-Hastings algorithm because the
+#' full conditional distribution of a hidden allele is not straightforward to sample
+#' from directly.
+#'
+#' @details
+#' This function executes one update for a single patient (`x`) within a Gibbs
+#' sampling iteration. Its workflow is as follows:
+#' \enumerate{
+#'   \item **Selection:** Randomly selects one "hidden" (unobserved) allele
+#'     slot from either the Day 0 or Day of Failure sample of the specified patient.
+#'   \item **Proposal:** Proposes a new allele identity (a new bin index) for
+#'     this slot by sampling from the population-level allele frequency distribution.
+#'   \item **Likelihood Calculation:** The heart of the function. It calculates
+#'     the Metropolis-Hastings acceptance ratio, with the likelihood logic
+#'     diverging completely based on the patient's current `classification`:
+#'     \itemize{
+#'       \item **If Reinfection:** The likelihood is based on how well the
+#'         proposed allele fits with the overall population frequencies,
+#'         penalizing alleles that are very different from observed alleles.
+#'       \item **If Recrudescence:** The likelihood is based on how the proposed
+#'         allele changes the *distance* between the Day 0 and Day of Failure
+#'         allele sets. The goal is to favor proposed alleles that make the two
+#'         sets more similar, according to the model's error structure (`dvect`).
+#'     }
+#'   \item **Decision & Update:** The proposed change is accepted or rejected based
+#'     on the calculated acceptance ratio. If accepted, the state variables—
+#'     including the recoded allele ID (`recoded0/f`), the continuous allele
+#'     value (`alleles0/f`), and all dependent distance calculations
+#'     (`mindistance`, `alldistance`, etc.)—are updated.
+#' }
+#'
+#' @param x The integer index of the patient to be updated.
+#' @param hidden0,hiddenf The current state matrices of boolean flags indicating
+#'   which allele slots are imputed (hidden).
+#' @param recoded0,recodedf The current state matrices of recoded integer allele
+#'   IDs for all samples.
+#' @param alleles0,allelesf The current state matrices of continuous (raw)
+#'   allele values for all samples.
+#' @param classification A vector of the current classification state for all patients.
+#' @param mindistance,alldistance,allrecrf,recr0,recrf,recr_repeats0,recr_repeatsf
+#'   Intermediate state variables storing calculations about distances and pairings
+#'   between Day 0 and Day F alleles.
+#' @param nloci,maxMOI,MOI0,MOIf Core dimensions and metadata for the analysis.
+#' @param qq,dvect,qq_crossfamily Current values of model hyperparameters related
+#'   to error rates and distance probabilities.
+#' @param alleles_definitions_RR,frequencies_RR,correction_distance_matrix,mode_allele_lengths
+#'   Data-derived parameters and lookup tables (allele bin definitions,
+#'   population frequencies, etc.) used in likelihood calculations.
+#' @param marker_info A data frame with marker metadata.
+#' @param is_locus_comparable A logical matrix indicating if a locus has data
+#'   for both time points for a given patient.
+#'
+#' @return A list containing the full set of MCMC state variables for all
+#'   patients. If the proposed switch was accepted for patient `x`, the returned
+#'   variables will reflect this update; otherwise, they are returned unchanged.
+#'
+#' @keywords internal
+#' @noRd
+#'
 
 switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles0, allelesf,
                                 classification, mindistance, alldistance, allrecrf,
                                 recr0, recrf, recr_repeats0, recr_repeatsf,
                                 nloci, maxMOI, MOI0, MOIf, qq, dvect,
                                 alleles_definitions_RR, frequencies_RR, correction_distance_matrix,
-                                marker_info, mode_allele_lengths, thresholddistance, qq_crossfamily,
-                                hidden_crossfamily0, hidden_crossfamilyf) {
+                                marker_info, mode_allele_lengths, qq_crossfamily,
+                                hidden_crossfamily0, hidden_crossfamilyf, is_locus_comparable) {
   
   if (MOI0[x] == 0 || MOIf[x] == 0) {
     return(list(
@@ -31,11 +94,12 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         chosenlocus = ceiling(chosen/maxMOI)
         old = recoded0[x,chosen]
         n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
-        if(is.na(n_alleles_locus) || n_alleles_locus == 0) return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
-                                                                       alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
-                                                                       allrecrf=allrecrf, recr0=recr0, recrf=recrf, 
-                                                                       recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
-                                                                       hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf)) # Safety first
+        if(is.na(n_alleles_locus) || n_alleles_locus == 0) 
+        return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
+                    alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
+                    allrecrf=allrecrf, recr0=recr0, recrf=recrf, 
+                    recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
+                    hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
         new = sample(1:n_alleles_locus, 1)
         oldalleles = recoded0[x,intersect(((chosenlocus-1)*maxMOI+1):((chosenlocus)*maxMOI),which(hidden0[x,] == 0))]
         repeatedold = qq
@@ -51,16 +115,6 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         crossfamily_new_flag <- 0
         penalty_numerator <- 1
         penalty_denominator <- qq_crossfamily^hidden_crossfamily0[x, chosen] 
-        
-        # if (marker_info$markertype[chosenlocus] %in% c("msp1", "msp2", "glurp")) {
-          # obs_lengths <- alleles0[x, which(hidden0[x,] == 0 & ((1:ncol(alleles0)) %/% maxMOI) + 1 == chosenlocus)]
-          # if (sum(!is.na(obs_lengths)) > 0) {
-            # if (min(abs(mode_allele_lengths[[chosenlocus]][new] - obs_lengths), na.rm=TRUE) > thresholddistance) {
-              # penalty_numerator <- qq_crossfamily
-              # crossfamily_new_flag <- 1
-            # }
-          # }
-        # }
 
         method <- marker_info$binning_method[chosenlocus]
         if (method == "cluster") {
@@ -74,8 +128,6 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
           }
         }
         
-        # numerator <- (sum(frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,new]+1]) * repeatednew) * penalty_numerator
-        # denominator <- (sum(frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,old]+1]) * repeatedold) * penalty_denominator
         method <- marker_info$binning_method[chosenlocus]
         
         if (method == "microsatellite") {
@@ -144,16 +196,6 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         crossfamily_new_flag <- 0
         penalty_numerator <- 1
         penalty_denominator <- qq_crossfamily^hidden_crossfamilyf[x, chosen]
-        
-        # if (marker_info$markertype[chosenlocus] %in% c("msp1", "msp2", "glurp")) {
-          # obs_lengths <- allelesf[x, which(hiddenf[x,] == 0 & ((1:ncol(allelesf)) %/% maxMOI) + 1 == chosenlocus)]
-          # if (sum(!is.na(obs_lengths)) > 0) {
-            # if (min(abs(mode_allele_lengths[[chosenlocus]][new] - obs_lengths), na.rm=TRUE) > thresholddistance) {
-              # penalty_numerator <- qq_crossfamily
-              # crossfamily_new_flag <- 1
-            # }
-          # }
-        # }
 
         method <- marker_info$binning_method[chosenlocus]
         if (method == "cluster") {
@@ -167,8 +209,6 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
           }
         }
         
-        # numerator <- (sum(frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,new]+1]) * repeatednew) * penalty_numerator
-        # denominator <- (sum(frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,old]+1]) * repeatedold) * penalty_denominator
         method <- marker_info$binning_method[chosenlocus]
         
         if (method == "microsatellite") {
@@ -220,282 +260,154 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
     } else { # recrudescence
       if (chosen <= nloci*maxMOI) { # day 0 hidden allele
         chosenlocus = ceiling(chosen/maxMOI)
-        old = recoded0[x,chosen]
-        n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
-        if(is.na(n_alleles_locus) || n_alleles_locus == 0) return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
-                                                                       alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
-                                                                       allrecrf=allrecrf, recr0=recr0, recrf=recrf, 
-                                                                       recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
-                                                                       hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
-        new = sample(1:n_alleles_locus, 1)
-        sd_val <- frequencies_RR$variability[chosenlocus]
-        newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val)
-        oldalleles = recoded0[x,intersect(((chosenlocus-1)*maxMOI+1):((chosenlocus)*maxMOI),which(hidden0[x,] == 0))]
-        repeatedold = qq
-        repeatednew = qq
-        if (sum(oldalleles == old) >= 1) { # if old allele is a repeat, don't penalize with missing probability
-          repeatedold = 1;
-        }
-        if (sum(oldalleles == new) >= 1) { # if new allele is a repeat, don't penalize with missing probability
-          repeatednew = 1;
-        }
         
-        crossfamily_new_flag <- 0
-        penalty_numerator <- 1
-        penalty_denominator <- qq_crossfamily^hidden_crossfamily0[x, chosen]
-        
-        # if (marker_info$markertype[chosenlocus] %in% c("msp1", "msp2", "glurp")) {
-          # obs_lengths <- alleles0[x, which(hidden0[x,] == 0 & floor((0:(ncol(alleles0)-1))/maxMOI)+1 == chosenlocus)]
-          # if (sum(!is.na(obs_lengths)) > 0) {
-            # if (min(abs(mode_allele_lengths[[chosenlocus]][new] - obs_lengths), na.rm=TRUE) > thresholddistance) {
-              # penalty_numerator <- qq_crossfamily
-              # crossfamily_new_flag <- 1
-            # }
-          # }
-        #}
-
-        method <- marker_info$binning_method[chosenlocus]
-        if (method == "cluster") {
-          current_threshold <- marker_info$cluster_gap_threshold[chosenlocus]
-          obs_lengths <- allelesf[x, which(hiddenf[x,] == 0 & floor((0:(ncol(allelesf)-1))/maxMOI)+1 == chosenlocus)]
-          if (sum(!is.na(obs_lengths)) > 0) {
-            if (min(abs(mode_allele_lengths[[chosenlocus]][new] - obs_lengths), na.rm=TRUE) > current_threshold) {
-              penalty_numerator <- qq_crossfamily
-              crossfamily_new_flag <- 1
-            }
+        if (is_locus_comparable[x, chosenlocus]) {
+          old = recoded0[x,chosen]
+          n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
+          if(is.na(n_alleles_locus) || n_alleles_locus == 0) 
+          return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, alleles0=alleles0, 
+                      allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, allrecrf=allrecrf, 
+                      recr0=recr0, recrf=recrf, recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
+                      hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
+          new = sample(1:n_alleles_locus, 1)
+          sd_val <- frequencies_RR$variability[chosenlocus]
+          newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val)
+          oldalleles = recoded0[x,intersect(((chosenlocus-1)*maxMOI+1):((chosenlocus)*maxMOI),which(hidden0[x,] == 0))]
+          repeatedold = qq; repeatednew = qq
+          if (sum(oldalleles == old) >= 1) { repeatedold = 1 }
+          if (sum(oldalleles == new) >= 1) { repeatednew = 1 }
+          
+          crossfamily_new_flag <- 0; penalty_numerator <- 1
+          penalty_denominator <- qq_crossfamily^hidden_crossfamily0[x, chosen]
+          
+          allpossiblerecrud = expand.grid(1:MOI0[x],1:MOIf[x])
+          tempalleles = alleles0[x,maxMOI*(chosenlocus-1)+1:maxMOI]; tempalleles[chosen-(chosenlocus-1)*maxMOI] = newallele_length 
+          temprecoded = recoded0[x,maxMOI*(chosenlocus-1)+1:maxMOI]; temprecoded[chosen-(chosenlocus-1)*maxMOI] = new
+          
+          newclosestrecrud = which.min(sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,2]])))
+          newmindistance = abs(tempalleles[allpossiblerecrud[newclosestrecrud,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]])
+          newalldistance = sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,2]]))
+          newallrecrf = recodedf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[,2]]
+          epsilon <- 1e-9; method <- marker_info$binning_method[chosenlocus]
+          calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
+              if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "cluster") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
+              den_probs <- sapply(recrf_vec, function(recr_allele) { if (is.na(recr_allele)) return(NA); if (method == "microsatellite") { pop_probs <- dvect[correction_mat[, recr_allele] + 1] } else if (method == "cluster") { pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily) }; sum(freq_mat * pop_probs, na.rm = TRUE) })
+              mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
           }
-        }
-        
-        allpossiblerecrud = expand.grid(1:MOI0[x],1:MOIf[x])
-        tempalleles = alleles0[x,maxMOI*(chosenlocus-1)+1:maxMOI]
-        tempalleles[chosen-(chosenlocus-1)*maxMOI] = newallele_length 
-        temprecoded = recoded0[x,maxMOI*(chosenlocus-1)+1:maxMOI]
-        temprecoded[chosen-(chosenlocus-1)*maxMOI] = new
-        
-        newclosestrecrud = which.min(sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,2]])))
-        newmindistance = abs(tempalleles[allpossiblerecrud[newclosestrecrud,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]])
-        newalldistance = sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,1]] - allelesf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,2]]))
-        newallrecrf = recodedf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[,2]]
-        
-        # calculate new multiple-comparisons coefficient
-        newrecr0 = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]
-        newrecrf = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]
-        newrecr_repeats0 = sum(temprecoded == temprecoded[allpossiblerecrud[newclosestrecrud,1]],na.rm=TRUE)
-        newrecr_repeatsf = sum(recodedf[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recodedf[x,newrecrf])
-        
-        epsilon <- 1e-9
-        # likelihoodnew <- mean(dvect[round(newalldistance)+1]/sapply(1:length(newallrecrf), function (z) sum(frequencies_RR$freq_matrix[chosenlocus,1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,newallrecrf[z]]+1])),na.rm=TRUE) * repeatednew * penalty_numerator
-        # likelihoodold <- mean(dvect[round(alldistance[x,chosenlocus,])+1]/(sapply(1:(maxMOI*maxMOI), function (z) sum(frequencies_RR$freq_matrix[chosenlocus,1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,allrecrf[x,chosenlocus,z]]+1])) + epsilon),na.rm=TRUE) * repeatedold * penalty_denominator
-        
-        method <- marker_info$binning_method[chosenlocus]
-        calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
-            if (method == "microsatellite") {
-                num_probs <- dvect[round(distances_vec) + 1]
-            } else if (method == "cluster") {
-                num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily)
-            } else { 
-                num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily)
-            }
-
-            den_probs <- sapply(recrf_vec, function(recr_allele) {
-                if (is.na(recr_allele)) return(NA)
-                
-                if (method == "microsatellite") {
-                    pop_probs <- dvect[correction_mat[, recr_allele] + 1]
-                } else if (method == "cluster") {
-                    pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily)
-                } else {
-                    pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily)
-                }
-                sum(freq_mat * pop_probs, na.rm = TRUE)
-            })
-
-            mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
-        }
-        
-        threshold <- if(method == "cluster") marker_info$cluster_gap_threshold[chosenlocus] else NA
-        likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, 
-                                              frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], 
-                                              correction_distance_matrix[[chosenlocus]], 
-                                              method, threshold) * repeatednew * penalty_numerator
-                                              
-        likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], 
-                                              frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], 
-                                              correction_distance_matrix[[chosenlocus]], 
-                                              method, threshold) * repeatedold * penalty_denominator
-
-        if (is.na(likelihoodnew) | is.na(likelihoodold)) { # debug
-          utils::write.csv(alleles0,"alleles0.csv")
-          utils::write.csv(allelesf,"allelesf.csv")
-          utils::write.csv(hidden0,"hidden0.csv")
-          utils::write.csv(hiddenf,"hiddenf.csv")
-          utils::write.csv(dvect,"dvect.csv")
-          print(chosen)
-          print(chosenlocus)
-          print(chosenlocus)
-          print(old)
-          print(new)
-          print(newallele_length)
-          print(tempalleles)
-          utils::write.csv(newalldistance,"newalldistance.csv")
-          utils::write.csv(alldistance,"alldistance.csv")
-        }
-        
-        alpha <- 0
-        if (!is.na(likelihoodold) && is.finite(likelihoodold) && likelihoodold > 0) {
-          alpha <- likelihoodnew / likelihoodold
-        } else if (!is.na(likelihoodnew) && likelihoodnew > 0) {
-          alpha <- 2.0 
-        }
-        if (is.na(alpha) || !is.finite(alpha)) {
+          threshold <- if(method == "cluster") marker_info$cluster_gap_threshold[chosenlocus] else NA
+          likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatednew * penalty_numerator
+          likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatedold * penalty_denominator
+          
           alpha <- 0
-        }
-        
-        if (z < alpha) { # switch made
-          recoded0[x,chosen] = new
-          alleles0[x,chosen] = newallele_length
-          hidden_crossfamily0[x, chosen] <- crossfamily_new_flag
-          mindistance[x,chosenlocus] = newmindistance
-          alldistance[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newalldistance
-          allrecrf[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newallrecrf
-          recr0[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]
-          recrf[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud, 2]
-          recr_repeats0[x,chosenlocus] = sum(recoded0[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recoded0[x,recr0[x,chosenlocus]])
-          recr_repeatsf[x,chosenlocus] = sum(recodedf[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recodedf[x,recrf[x,chosenlocus]])
+          if (!is.na(likelihoodold) && is.finite(likelihoodold) && likelihoodold > 0) { alpha <- likelihoodnew / likelihoodold } else if (!is.na(likelihoodnew) && likelihoodnew > 0) { alpha <- 2.0 }
+          if (is.na(alpha) || !is.finite(alpha)) { alpha <- 0 }
+          
+          if (z < alpha) { # switch made
+            recoded0[x,chosen] = new; alleles0[x,chosen] = newallele_length; hidden_crossfamily0[x, chosen] <- crossfamily_new_flag
+            mindistance[x,chosenlocus] = newmindistance; alldistance[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newalldistance
+            allrecrf[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newallrecrf
+            recr0[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]; 
+            recrf[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud, 2]
+            recr_repeats0[x,chosenlocus] = sum(recoded0[x,(maxMOI*(chosenlocus-1)+1):(maxMOI*chosenlocus)] == recoded0[x,recr0[x,chosenlocus]])
+            recr_repeatsf[x,chosenlocus] = sum(recodedf[x,(maxMOI*(chosenlocus-1)+1):(maxMOI*chosenlocus)] == recodedf[x,recrf[x,chosenlocus]])
+          }
+        } else {
+          old = recoded0[x,chosen]
+          n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
+          if(is.na(n_alleles_locus) || n_alleles_locus == 0) 
+          return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
+                      alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
+                      allrecrf=allrecrf, recr0=recr0, recrf=recrf, recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
+                      hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
+          new = sample(1:n_alleles_locus, 1)
+          numerator <- frequencies_RR$freq_matrix[chosenlocus, new]
+          denominator <- frequencies_RR$freq_matrix[chosenlocus, old]
+          
+          alpha <- if (!is.na(denominator) && denominator > 0) { numerator / denominator } else { 0 }
+          
+          if (z < alpha) { # switch made
+            recoded0[x,chosen] = new
+            sd_val <- frequencies_RR$variability[chosenlocus]
+            newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val)
+            alleles0[x,chosen] = newallele_length        
+          }
         }
       } else { # day f hidden allele
         chosen = chosen - nloci*maxMOI
         chosenlocus = ceiling(chosen/maxMOI)
-        old = recodedf[x,chosen]
-        n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
-        if(is.na(n_alleles_locus) || n_alleles_locus == 0) return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
-                                                                       alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
-                                                                       allrecrf=allrecrf, recr0=recr0, recrf=recrf, 
-                                                                       recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,
-                                                                       hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
-        new = sample(1:n_alleles_locus, 1)
-        sd_val <- frequencies_RR$variability[chosenlocus]
-        newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val)        
-        oldalleles = recodedf[x,intersect(((chosenlocus-1)*maxMOI+1):((chosenlocus)*maxMOI),which(hiddenf[x,] == 0))]
-        repeatedold = qq
-        repeatednew = qq
-        if (sum(oldalleles == old) >= 1) { # if old allele is a repeat, don't penalize with missing probability
-          repeatedold = 1;
-        }
-        if (sum(oldalleles == new) >= 1) { # if new allele is a repeat, don't penalize with missing probability
-          repeatednew = 1;
-        }
-        
-        crossfamily_new_flag <- 0 
-        penalty_numerator <- 1
-        penalty_denominator <- qq_crossfamily^hidden_crossfamilyf[x, chosen]
-        
-        # if (marker_info$markertype[chosenlocus] %in% c("msp1", "msp2", "glurp")) {
-          # obs_lengths <- allelesf[x, which(hiddenf[x,] == 0 & floor((0:(ncol(allelesf)-1))/maxMOI)+1 == chosenlocus)]
-          # if (sum(!is.na(obs_lengths)) > 0) {
-            # if (min(abs(mode_allele_lengths[[chosenlocus]][new] - obs_lengths), na.rm=TRUE) > thresholddistance) {
-              # penalty_numerator <- qq_crossfamily
-              # crossfamily_new_flag <- 1
-            # }
-          # }
-        # }
-        
-        allpossiblerecrud = expand.grid(1:MOI0[x],1:MOIf[x])
-        tempalleles = allelesf[x,maxMOI*(chosenlocus-1)+1:maxMOI]
-        tempalleles[chosen-(chosenlocus-1)*maxMOI] = newallele_length 
-        temprecoded = recodedf[x,maxMOI*(chosenlocus-1)+1:maxMOI]
-        temprecoded[chosen-(chosenlocus-1)*maxMOI] = new
-        newclosestrecrud = which.min(sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,1]])))
-        newmindistance = abs(tempalleles[allpossiblerecrud[newclosestrecrud,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]])
-        newalldistance = sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,1]]))
-        newallrecrf = temprecoded[allpossiblerecrud[,2]]
-        
-        # calculate new multiple-comparisons coefficient
-        newrecr0 = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]
-        newrecrf = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]
-        newrecr_repeats0 = sum(recoded0[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recoded0[x,newrecr0])
-        newrecr_repeatsf = sum(temprecoded == temprecoded[allpossiblerecrud[newclosestrecrud,2]],na.rm=TRUE)
-        
-        epsilon <- 1e-9
-        # likelihoodnew <- mean(dvect[round(newalldistance)+1]/sapply(1:length(newallrecrf), function (z) sum(frequencies_RR$freq_matrix[chosenlocus,1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,newallrecrf[z]]+1])),na.rm=TRUE) * repeatednew * penalty_numerator
-        # likelihoodold <- mean(dvect[round(alldistance[x,chosenlocus,])+1]/(sapply(1:(maxMOI*maxMOI), function (z) sum(frequencies_RR$freq_matrix[chosenlocus,1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,allrecrf[x,chosenlocus,z]]+1])) + epsilon),na.rm=TRUE) * repeatedold * penalty_denominator
-        
-        method <- marker_info$binning_method[chosenlocus]
-        calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
-            if (method == "microsatellite") {
-                num_probs <- dvect[round(distances_vec) + 1]
-            } else if (method == "cluster") {
-                num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily)
-            } else { 
-                num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily)
-            }
-
-            den_probs <- sapply(recrf_vec, function(recr_allele) {
-                if (is.na(recr_allele)) return(NA)
-                
-                if (method == "microsatellite") {
-                    pop_probs <- dvect[correction_mat[, recr_allele] + 1]
-                } else if (method == "cluster") {
-                    pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily)
-                } else {
-                    pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily)
-                }
-                sum(freq_mat * pop_probs, na.rm = TRUE)
-            })
-
-            mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
-        }
-        
-        threshold <- if(method == "cluster") marker_info$cluster_gap_threshold[chosenlocus] else NA
-        likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, 
-                                              frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], 
-                                              correction_distance_matrix[[chosenlocus]], 
-                                              method, threshold) * repeatednew * penalty_numerator
-                                              
-        likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], 
-                                              frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], 
-                                              correction_distance_matrix[[chosenlocus]], 
-                                              method, threshold) * repeatedold * penalty_denominator
-
-        if (is.na(likelihoodnew) | is.na(likelihoodold)) { # debug
-          utils::write.csv(alleles0,"alleles0.csv")
-          utils::write.csv(allelesf,"allelesf.csv")
-          utils::write.csv(hidden0,"hidden0.csv")
-          utils::write.csv(hiddenf,"hiddenf.csv")
-          utils::write.csv(dvect,"dvect.csv")
-          print(chosen)
-          print(chosenlocus)
-          print(chosenlocus)
-          print(old)
-          print(new)
-          print(newallele_length)
-          print(tempalleles)
-          utils::write.csv(newalldistance,"newalldistance.csv")
-          utils::write.csv(alldistance,"alldistance.csv")
-        }
-        
-        
-        alpha <- 
-          if (!is.na(likelihoodold) && is.finite(likelihoodold) && likelihoodold > 0) {
-            alpha <- likelihoodnew / likelihoodold
-          } else if (!is.na(likelihoodnew) && likelihoodnew > 0) {
-            alpha <- 2.0
+        if (is_locus_comparable[x, chosenlocus]) {
+           old = recodedf[x,chosen]; 
+           n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
+           if(is.na(n_alleles_locus) || n_alleles_locus == 0) 
+           return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, 
+                      alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, 
+                      allrecrf=allrecrf, recr0=recr0, recrf=recrf, recr_repeats0=recr_repeats0, 
+                      recr_repeatsf=recr_repeatsf,hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
+           new = sample(1:n_alleles_locus, 1); sd_val <- frequencies_RR$variability[chosenlocus]; 
+           newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val); 
+           oldalleles = recodedf[x,intersect(((chosenlocus-1)*maxMOI+1):((chosenlocus)*maxMOI),which(hiddenf[x,] == 0))]; 
+           repeatedold = qq; 
+           repeatednew = qq
+           if (sum(oldalleles == old) >= 1) { repeatedold = 1; }; if (sum(oldalleles == new) >= 1) { repeatednew = 1; }
+           crossfamily_new_flag <- 0; penalty_numerator <- 1; 
+           penalty_denominator <- qq_crossfamily^hidden_crossfamilyf[x, chosen]
+           allpossiblerecrud = expand.grid(1:MOI0[x],1:MOIf[x]); 
+           tempalleles = allelesf[x,maxMOI*(chosenlocus-1)+1:maxMOI]; 
+           tempalleles[chosen-(chosenlocus-1)*maxMOI] = newallele_length; 
+           temprecoded = recodedf[x,maxMOI*(chosenlocus-1)+1:maxMOI]; 
+           temprecoded[chosen-(chosenlocus-1)*maxMOI] = new
+           newclosestrecrud = which.min(sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,1]])))
+           newmindistance = abs(tempalleles[allpossiblerecrud[newclosestrecrud,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]])
+           newalldistance = sapply(1:dim(allpossiblerecrud)[1], function (y) abs(tempalleles[allpossiblerecrud[y,2]] - alleles0[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[y,1]])); 
+           newallrecrf = temprecoded[allpossiblerecrud[,2]]
+           epsilon <- 1e-9; 
+           method <- marker_info$binning_method[chosenlocus]
+           calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
+               if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "cluster") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
+               den_probs <- sapply(recrf_vec, function(recr_allele) { if (is.na(recr_allele)) return(NA); 
+               if (method == "microsatellite") { 
+                pop_probs <- dvect[correction_mat[, recr_allele] + 1] 
+                } else if (method == "cluster") { 
+                  pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily) 
+                  } else { 
+                    pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily) }; 
+                    sum(freq_mat * pop_probs, na.rm = TRUE) })
+               mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
+           }
+           threshold <- if(method == "cluster") marker_info$cluster_gap_threshold[chosenlocus] else NA
+           likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatednew * penalty_numerator
+           likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], frequencies_RR$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatedold * penalty_denominator
+           alpha <- 0
+           if (!is.na(likelihoodold) && is.finite(likelihoodold) && likelihoodold > 0) { 
+            alpha <- likelihoodnew / likelihoodold 
+            } else if (!is.na(likelihoodnew) && likelihoodnew > 0) 
+            { alpha <- 2.0 }
+           if (is.na(alpha) || !is.finite(alpha)) { alpha <- 0 }
+           if (z < alpha) {
+            recodedf[x,chosen] = new; allelesf[x,chosen] = newallele_length; hidden_crossfamilyf[x, chosen] <- crossfamily_new_flag
+            mindistance[x,chosenlocus] = newmindistance; alldistance[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newalldistance
+            allrecrf[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newallrecrf
+            recr0[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]; 
+            recrf[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]
+             recr_repeats0[x,chosenlocus] = sum(recoded0[x,(maxMOI*(chosenlocus-1)+1):(maxMOI*chosenlocus)] == recoded0[x,recr0[x,chosenlocus]])
+            recr_repeatsf[x,chosenlocus] = sum(recodedf[x,(maxMOI*(chosenlocus-1)+1):(maxMOI*chosenlocus)] == recodedf[x,recrf[x,chosenlocus]])
+           }
+        } else {
+          old = recodedf[x,chosen]
+          n_alleles_locus <- frequencies_RR$n_alleles[chosenlocus]
+          if(is.na(n_alleles_locus) || n_alleles_locus == 0) return(list(hidden0=hidden0, hiddenf=hiddenf, recoded0=recoded0, recodedf=recodedf, alleles0=alleles0, allelesf=allelesf, mindistance=mindistance, alldistance=alldistance, allrecrf=allrecrf, recr0=recr0, recrf=recrf, recr_repeats0=recr_repeats0, recr_repeatsf=recr_repeatsf,hidden_crossfamily0=hidden_crossfamily0, hidden_crossfamilyf=hidden_crossfamilyf))
+          new = sample(1:n_alleles_locus, 1)
+          numerator <- frequencies_RR$freq_matrix[chosenlocus, new]
+          denominator <- frequencies_RR$freq_matrix[chosenlocus, old]
+          
+          alpha <- if (!is.na(denominator) && denominator > 0) { numerator / denominator } else { 0 }
+          
+          if (z < alpha) { # switch made
+            recodedf[x,chosen] = new
+            sd_val <- frequencies_RR$variability[chosenlocus]
+            newallele_length = mean(alleles_definitions_RR[[chosenlocus]][new,]) + stats::rnorm(1,mean=0,sd=sd_val)
+            allelesf[x,chosen] = newallele_length
           }
-        if (is.na(alpha) || !is.finite(alpha)) {
-          alpha <- 0
-        }
-        
-        if (z < alpha) { # switch made
-          recodedf[x,chosen] = new
-          allelesf[x,chosen] = newallele_length
-          hidden_crossfamilyf[x, chosen] <- crossfamily_new_flag
-          mindistance[x,chosenlocus] = newmindistance
-          alldistance[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newalldistance
-          allrecrf[x,chosenlocus,1:dim(allpossiblerecrud)[1]] = newallrecrf
-          recr0[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,1]
-          recrf[x,chosenlocus] = maxMOI*(chosenlocus-1)+allpossiblerecrud[newclosestrecrud,2]
-          recr_repeats0[x,chosenlocus] = sum(recoded0[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recoded0[x,recr0[x,chosenlocus]])
-          recr_repeatsf[x,chosenlocus] = sum(recodedf[x,(maxMOI*(chosenlocus-1)+1) : (maxMOI*(chosenlocus))] == recodedf[x,recrf[x,chosenlocus]])
         }
       }
     }

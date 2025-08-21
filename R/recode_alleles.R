@@ -1,16 +1,88 @@
-
-recodeallele <- function(alleles_definitions_subset, proposed) {
-  if (is.na(proposed) || nrow(alleles_definitions_subset) == 0) {
+#' Recode a Single Allele Value to its Bin Index
+#'
+#' @description
+#' Categorizes a single, raw, numeric allele value (e.g., a fragment length)
+#' by finding the allele bin with the closest center point.
+#'
+#' @details
+#' This function calculates the center of each provided allele bin and identifies
+#' the bin whose center is numerically closest to the `proposed` allele value. An
+#' optional `max_distance_allowed` can be used to invalidate matches that are
+#' too far from any bin center, which is useful for handling outliers or clear
+#' genotyping errors.
+#'
+#' @param alleles_definitions_subset A two-column matrix (`lower`, `upper`)
+#'   defining the allele bins for a *single* genetic marker.
+#' @param proposed A single, raw numeric allele value to be categorized.
+#' @param max_distance_allowed A numeric threshold. If the absolute distance
+#'   between `proposed` and the closest bin center exceeds this value,
+#'   `NA_integer_` is returned. Default is `Inf` (no limit).
+#'
+#' @return An integer representing the row index of the best-matching bin in
+#'   `alleles_definitions_subset`. Returns `NA_integer_` if the input is `NA`
+#'   or if the match is invalidated by `max_distance_allowed`.
+#'
+#' @keywords internal
+#' @noRd
+#'
+#'
+recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allowed = Inf) {
+  if (is.na(proposed) || is.null(alleles_definitions_subset) || nrow(alleles_definitions_subset) == 0) {
     return(NA_integer_)
   }
-  # Find which bin 'proposed' falls into
-  ret <- which(proposed > alleles_definitions_subset[, 1] & proposed <= alleles_definitions_subset[, 2])
-  if (length(ret) == 0) {
-    ret <- NA_integer_
+
+  bin_centers <- rowMeans(alleles_definitions_subset, na.rm = TRUE)
+  closest_bin_index <- which.min(abs(proposed - bin_centers))
+  min_distance <- abs(proposed - bin_centers[closest_bin_index])
+  if (min_distance > max_distance_allowed) {
+    return(NA_integer_)
   }
-  return(ret[1]) 
+
+  return(closest_bin_index)
 }
 
+
+#' Recode and Summarize an Entire Genotyping Dataset
+#'
+#' @description
+#' Processes a full genotyping dataset, recoding raw allele values into their
+#' discrete representations based on the marker type, and then summarizes the
+#' results for each patient into a standardized format.
+#'
+#' @details
+#' This function serves as a major pre-processing step. Its workflow is as follows:
+#' \enumerate{
+#'   \item It first calculates the Multiplicity of Infection (MOI) for each
+#'     patient's Day 0 and Day of Failure samples.
+#'   \item It then iterates through each genetic locus, applying the correct
+#'     recoding strategy based on the `binning_method` in `marker_info`:
+#'     \itemize{
+#'       \item **`microsatellite`** or **`cluster`**: Calls the `recodeallele`
+#'         helper for each observed allele to convert its raw value into an
+#'         integer bin index.
+#'       \item **`exact`**: Uses the raw allele values (e.g., character sequences
+#'         from ampseq data) directly without transformation.
+#'     }
+#'   \item Finally, for each patient at each locus, it creates a summary string
+#'     of the unique, sorted alleles in the format "D0-allele1-D0-allele2/DF-allele1".
+#' }
+#'
+#' @param genotypedata A data frame containing the combined genotyping data for all samples.
+#' @param alleles_definitions A named list where each element corresponds to a
+#'   locus and contains the allele bin definitions matrix for that locus.
+#' @param marker_info A data frame containing marker metadata, used to determine
+#'   the `binning_method` for each locus.
+#'
+#' @return A list containing two elements:
+#' \item{observeddatamatrix}{A list where each element is a named locus. Each
+#'   of these contains a character vector (one entry per patient) summarizing
+#'   their recoded Day 0 and Day of Failure alleles in the "D0/DF" format.}
+#' \item{MOI}{A matrix with patient IDs as rownames, containing the calculated
+#'   MOI for Day 0 (`MOI0`) and Day of Failure (`MOIf`).}
+#'
+#' @keywords internal
+#' @noRd
+#'
 recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
   ids <- unique(gsub(" Day 0", "", genotypedata$Sample.ID[grepl(" Day 0", genotypedata$Sample.ID)]))
   locinames <- names(alleles_definitions)
