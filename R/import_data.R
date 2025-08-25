@@ -90,7 +90,7 @@ import_data <- function(filepath) {
       markertype = c(rep("microsatellite", 15), "msp1", "msp1", "msp1", "msp1", "msp1", "msp2", "msp2", "glurp"),
       repeatlength = c(2, 2, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, NA, NA, NA, NA, NA, NA, NA, NA), 
       binning_method = c(rep("microsatellite", 15), rep("cluster", 8)),
-      cluster_gap_threshold = c(rep(NA, 15), 10, 10, 10, 10, 10, 10, 10, 15)
+      cluster_gap_threshold = c(rep(NA, 15), 10, 10, 10, 10, 10, 10, 10, 50)
     )
   } else { # data_type == "ampseq"
     allele_cols <- grep("_allele_\\d+$", colnames(temp_df), value = TRUE)

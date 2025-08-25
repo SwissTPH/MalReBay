@@ -101,7 +101,6 @@ calculate_frequencies3 <- function(genotypedata, alleles_definitions, marker_inf
       current_freqs <- as.vector(allele_counts) / total_alleles
       freq_list[[locus_name]] <- current_freqs
       
-      # Calculate variability as Genetic Diversity (He = 1 - sum(p_i^2))
       variability[locus_name] <- 1 - sum(current_freqs^2)
       n_alleles_per_locus[locus_name] <- length(allele_counts)
       allele_codes_list[[locus_name]] <- names(allele_counts)

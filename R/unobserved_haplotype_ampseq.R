@@ -52,7 +52,7 @@
 #'
 
 switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
-                                 classification, qq, frequencies_RR, nloci, maxMOI) { 
+                                 classification, qq, q_loss, frequencies_RR, nloci, maxMOI) { 
   
   z <- stats::runif(1)
   hidden_positions <- which(c(hidden0[x,], hiddenf[x,]) == 1)
@@ -79,29 +79,35 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   
   new_id <- sample(possible_alleles, 1)
 
-  # Define a function that calculates the log-likelihood for a given state
+  # log-likelihood for a given state
   calculate_log_lik <- function(patient_recoded0, patient_recodedf) {
     log_lik_total <- 0
     for (locus_idx in 1:nloci) {
-      d0_alleles <- patient_recoded0[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)]
-      df_alleles <- patient_recodedf[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)]
+      d0_alleles <- unique(patient_recoded0[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)])
       d0_alleles <- d0_alleles[!is.na(d0_alleles)]
+      
+      df_alleles <- unique(patient_recodedf[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)])
       df_alleles <- df_alleles[!is.na(df_alleles)]
       
       if (length(d0_alleles) == 0 || length(df_alleles) == 0) next
 
-      # --- THIS IS THE CORRECTED MATCH LOGIC ---
-      is_match <- any(df_alleles %in% d0_alleles)
-      
       if (classification[x] == 1) { # RECRUDESCENCE
-        log_lik_total <- log_lik_total + log(if(is_match) 1 - qq else qq + 1e-10)
+        log_probs_per_allele <- sapply(df_alleles, function(allele) {
+          log(ifelse(allele %in% d0_alleles, 1 - qq, qq) + 1e-10)
+        })
+        log_lik_total <- log_lik_total + sum(log_probs_per_allele)
+
+        lost_alleles <- d0_alleles[!d0_alleles %in% df_alleles]
+        if (length(lost_alleles) > 0) {
+            log_lik_total <- log_lik_total + (length(lost_alleles) * log(q_loss + 1e-10))
+        }  
       } else { # REINFECTION
         freqs <- frequencies_RR$freq_matrix[locus_idx, ]
         allele_codes <- frequencies_RR$allele_codes[[locus_idx]]
         matched_indices <- match(df_alleles, allele_codes)
         
         if (any(is.na(matched_indices))) {
-          log_lik_total <- log_lik_total - 1e6
+          log_lik_total <- log_lik_total - 1e6 
         } else {
           log_lik_total <- log_lik_total + sum(log(freqs[matched_indices] + 1e-10))
         }

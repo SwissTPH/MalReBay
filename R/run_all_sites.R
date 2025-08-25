@@ -101,8 +101,6 @@ run_all_sites <- function(
     
     if (data_type == "ampseq") {
       message("INFO: Preparing AMPSEQ MCMC engine for site: ", site)
-      
-      # For ampseq, we don't need 'alleles_definitions' or complex MOI calcs here
       marker_cols <- grep("_allele_\\d+$", colnames(genotypedata_RR), value = TRUE)
       maxMOI <- if (length(marker_cols) > 0) max(as.numeric(gsub(".*_allele_", "", marker_cols)), na.rm = TRUE) else 0
       locinames <- unique(gsub("_allele_\\d+$", "", marker_cols))
@@ -138,7 +136,7 @@ run_all_sites <- function(
       local_sites_locinames[[site]] <- locinames
       nloci <- length(locinames)
       
-      mcmc_engine_function <- run_one_chain # Your original, updated function
+      mcmc_engine_function <- run_one_chain
       engine_args <- list(
         nids = nids, ids = ids, nloci = nloci, maxMOI = maxMOI, locinames = locinames,
         genotypedata_RR = genotypedata_RR[, -which(names(genotypedata_RR) == "Site")],
@@ -168,8 +166,6 @@ run_all_sites <- function(
       patient_id <- locus_summary$patient_id[i]
       pattern_d0 <- paste0("\\b", patient_id, " Day 0\\b")
       pattern_df <- paste0("\\b", patient_id, " Day Failure\\b")
-      # d0_row <- genotypedata_RR[grepl(paste0(patient_id, " Day 0"), genotypedata_RR$Sample.ID), ]
-      # df_row <- genotypedata_RR[grepl(paste0(patient_id, " Day Failure"), genotypedata_RR$Sample.ID), ]
       d0_row <- genotypedata_RR[grepl(pattern_d0, genotypedata_RR$Sample.ID), ]
       df_row <- genotypedata_RR[grepl(pattern_df, genotypedata_RR$Sample.ID), ]
       
@@ -217,7 +213,6 @@ run_all_sites <- function(
       
       if (length(full_chain_results) == 0) {
         full_chain_results <- chunk_results
-        # full_loglik_history <- lapply(chunk_results, `[[`, "loglikelihood")
         full_loglik_history <- lapply(chunk_results, `[[`, "state_loglikelihood")
       } else {
         for (i in 1:n_chains) {

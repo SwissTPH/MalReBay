@@ -453,9 +453,6 @@ run_one_chain <- function(chain_id,
       d_posterior_beta <- d_prior_beta + sum(valid_distances)
       if (d_posterior_beta <= 0) { d_posterior_beta <- 1 }
       dposterior <<- stats::rbeta(1, d_posterior_alpha, d_posterior_beta)
-      if (chain_id == 1 && count < 10) {
-        message(sprintf("Chain 1, Count %d: dposterior = %.4f", count, dposterior))
-      }
       dvect_new <- (1 - dposterior) ^ (seq_along(dvect) - 1) * dposterior
       dvect <<- dvect_new / sum(dvect_new)
     }

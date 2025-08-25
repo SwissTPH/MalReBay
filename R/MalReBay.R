@@ -212,7 +212,6 @@ classify_infections <- function(input_filepath,
     site_ids <- results$ids[[site_name]]
     site_probs_matrix <- results$classifications[[site_name]]
     
-    # Print the values of the variables we are checking
     cat("Is site_ids NULL? ", is.null(site_ids), "\n")
     if(!is.null(site_ids)) cat("Length of site_ids: ", length(site_ids), "\n")
     

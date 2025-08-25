@@ -27,13 +27,10 @@ generate_allele_frequency_plot <- function(raw_data_df,
                                            plot_width = 12,
                                            plot_height = 10) {
   
-  # Set up plot title and filename based on whether it's overall or site-specific
   if (is.null(site_name)) {
-    message("Generating OVERALL raw allele frequency plot for all sites.")
     plot_title <- "Overall Raw Allele Frequency Distribution (All Sites)"
     plot_filename_part <- "Overall"
   } else {
-    message(paste("Generating raw allele frequency plot for site:", site_name))
     plot_title <- paste("Raw Allele Frequency Distribution for Site:", site_name)
     plot_filename_part <- gsub("[^a-zA-Z0-9_]", "_", site_name) # Sanitize site name for filename
   }

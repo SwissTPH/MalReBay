@@ -167,12 +167,13 @@ run_one_chain_ampseq <- function(chain_id,
 
   # Initialize parameters and classification
   qq <- mean(c(hidden0, hiddenf), na.rm = TRUE); if (is.na(qq)) qq <- 0.1
+  q_loss <- 0.1
   prob_recrud <- 0.5
   classification <- ifelse(stats::runif(nids) < prob_recrud, 1, 0)
   num_records <- floor((nruns - burnin) / record_interval)
   
   classification_history <- matrix(NA, nids, num_records)
-  parameters_history <- matrix(NA, 3 + (2 * nloci), num_records)
+  parameters_history <- matrix(NA, 4 + (2 * nloci), num_records)
   loglikelihood_history <- rep(NA_real_, num_records)
   locus_lrs_history <- array(NA, c(nids, nloci, num_records))
   locus_dists_history <- array(NA, c(nids, nloci, num_records))
@@ -187,38 +188,32 @@ run_one_chain_ampseq <- function(chain_id,
 
     for (i in 1:nids) {
       for (j in 1:nloci) {
-        d0_alleles <- recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)]
-        d0_alleles <- d0_alleles[!is.na(d0_alleles)] 
-        df_alleles <- recodedf[i, (maxMOI*(j-1)+1):(maxMOI*j)]
+        d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
+        d0_alleles <- d0_alleles[!is.na(d0_alleles)]
+        df_alleles <- unique(recodedf[i, (maxMOI*(j-1)+1):(maxMOI*j)])
         df_alleles <- df_alleles[!is.na(df_alleles)]
-        
-        if (length(d0_alleles) == 0 || length(df_alleles) == 0) {
-            mindistance[i, j] <- NA
-            locus_lrs_this_step[i, j] <- 1.0 
-            next
+        if (length(d0_alleles) == 0 || length(df_alleles) == 0 || !is_locus_comparable[i, j]) {
+          next
         }
-        if (!is_locus_comparable[i, j]) {
-            mindistance[i, j] <- NA 
-            locus_lrs_this_step[i, j] <- 1.0 
-            next
-        }
-        mindistance[i, j] <- ifelse(any(df_alleles %in% d0_alleles), 0, 1)
+        probs_per_failure_allele <- sapply(df_alleles, function(allele) {
+          ifelse(allele %in% d0_alleles, 1 - qq, qq)
+        })
+        prob_part1 <- prod(probs_per_failure_allele)
+        lost_alleles <- d0_alleles[!d0_alleles %in% df_alleles]
+        prob_part2 <- q_loss ^ length(lost_alleles)
+        prob_recrud_locus <- prob_part1 * prob_part2
+
+        matched_indices <- match(df_alleles, frequencies_RR$allele_codes[[j]])
+        valid_indices <- !is.na(matched_indices)
         
-        prob_recrud_locus <- ifelse(mindistance[i, j] == 0, 1 - qq, qq)
-        
-        if (length(df_alleles) == 0) {
-            prob_reinfect_locus <- 1.0
+        if (!any(valid_indices)) {
+          prob_reinfect_locus <- 1e-10
         } else {
-            matched_indices <- match(df_alleles, frequencies_RR$allele_codes[[j]])
-            valid_indices <- !is.na(matched_indices)
-            if (!any(valid_indices)) {
-                prob_reinfect_locus <- 1.0 
-            } else {
-                freqs <- frequencies_RR$freq_matrix[j, matched_indices[valid_indices]]
-                prob_reinfect_locus <- prod(freqs, na.rm = TRUE)
-            }
+          freqs <- frequencies_RR$freq_matrix[j, matched_indices[valid_indices]]
+          prob_reinfect_locus <- prod(freqs, na.rm = TRUE)
         }
         locus_lrs_this_step[i, j] <- prob_recrud_locus / (prob_reinfect_locus + 1e-10)
+        mindistance[i, j] <- ifelse(any(df_alleles %in% d0_alleles), 0, 1)
       }
     }
 
@@ -232,7 +227,7 @@ run_one_chain_ampseq <- function(chain_id,
     for (i in 1:nids) {
         updated_states <- switch_hidden_ampseq(x = i, hidden0 = hidden0, hiddenf = hiddenf, 
                                                recoded0 = recoded0, recodedf = recodedf,
-                                               classification = classification, qq = qq, 
+                                               classification = classification, qq = qq, q_loss = q_loss,
                                                frequencies_RR = frequencies_RR, nloci = nloci, maxMOI = maxMOI)
         temp_recoded0 <- updated_states$recoded0
         temp_recodedf <- updated_states$recodedf
@@ -245,6 +240,28 @@ run_one_chain_ampseq <- function(chain_id,
     q_posterior_alpha <- 1 + sum(c(hidden0, hiddenf) == 1, na.rm = TRUE)
     q_posterior_beta  <- 1 + sum(c(hidden0, hiddenf) == 0, na.rm = TRUE)
     qq <- stats::rbeta(1, q_posterior_alpha, q_posterior_beta)
+    
+    n_lost <- 0
+    n_retained <- 0
+    recrud_indices <- which(classification == 1)
+    if(length(recrud_indices) > 0){
+        for (i in recrud_indices) {
+            for (j in 1:nloci) {
+                d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
+                d0_alleles <- d0_alleles[!is.na(d0_alleles)]
+                df_alleles <- unique(recodedf[i, (maxMOI*(j-1)+1):(maxMOI*j)])
+                df_alleles <- df_alleles[!is.na(df_alleles)]
+                
+                if (length(d0_alleles) == 0) next
+                
+                n_lost <- n_lost + sum(!d0_alleles %in% df_alleles)
+                n_retained <- n_retained + sum(d0_alleles %in% df_alleles)
+            }
+        }
+    }
+    q_loss_posterior_alpha <- 1 + n_lost
+    q_loss_posterior_beta <- 1 + n_retained
+    q_loss <- stats::rbeta(1, q_loss_posterior_alpha, q_loss_posterior_beta)
 
     tempdata <- rbind(recoded0, recodedf)
     new_freq_matrix <- frequencies_RR$freq_matrix
@@ -264,8 +281,9 @@ run_one_chain_ampseq <- function(chain_id,
       classification_history[, record_idx] <- classification
       parameters_history[1, record_idx] <- qq
       parameters_history[2, record_idx] <- prob_recrud
+      parameters_history[3, record_idx] <- q_loss 
       he_per_locus <- 1 - rowSums(frequencies_RR$freq_matrix^2, na.rm = TRUE)
-      parameters_history[(4 + nloci):(4 + 2 * nloci - 1), record_idx] <- he_per_locus
+      parameters_history[(5 + nloci):(5 + 2 * nloci - 1), record_idx] <- he_per_locus
       
       locus_lrs_history[,, record_idx] <- locus_lrs_this_step
       locus_dists_history[,, record_idx] <- mindistance
