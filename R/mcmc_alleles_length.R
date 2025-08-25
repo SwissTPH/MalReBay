@@ -149,7 +149,6 @@ run_one_chain <- function(chain_id,
       ncolumns = ncol(oldalleles)
       newalleles = matrix(NA, nrow = nrow(oldalleles), ncol = ncolumns)
       
-      # Robust recoding loop (replaces the second sapply)
       for (i in 1:ncolumns) {
         temp_recode_col <- numeric(nrow(oldalleles))
         for (row_index in 1:nrow(oldalleles)) {
@@ -185,7 +184,6 @@ run_one_chain <- function(chain_id,
         if (nalleles0 > 0) { hidden0[i,whichnotmissing0] = 0 }
         if (nmissing0 > 0) { 
           n_alleles_locus <- frequencies_RR$n_alleles[j]
-          ### UPDATED ###
           allele_freqs = frequencies_RR$freq_matrix[j, 1:n_alleles_locus]
           if(is.na(n_alleles_locus) || n_alleles_locus == 0 || length(allele_freqs) == 0) next
 
@@ -388,8 +386,7 @@ run_one_chain <- function(chain_id,
     })
     z = stats::runif(nids); newclassification = classification; newclassification[classification == 0 & z < likelihoodratio] = 1; newclassification[classification == 1 & z < 1/likelihoodratio] = 0; classification <<- newclassification
     
-    loglik_val <- sum(log(pmax(pmin(likelihoodratio, 1e100), 1e-100)))  # Clamp values
-    # loglikelihood_chain[count] <<- ifelse(is.finite(loglik_val), loglik_val, NA)
+    loglik_val <- sum(log(pmax(pmin(likelihoodratio, 1e100), 1e-100)))  
     
     for (i in 1:nids) {
       updated_states <- switch_hidden_length(
@@ -433,8 +430,8 @@ run_one_chain <- function(chain_id,
     if (q_posterior_alpha == 0) { q_posterior_alpha =1 }; 
     qq <<- stats::rbeta(1, q_posterior_alpha , q_posterior_beta)
 
-    q_cross_prior_alpha <- 9
-    q_cross_prior_beta <- 39 # Prior belief: cross-family jumps are rare
+    q_cross_prior_alpha <- 1
+    q_cross_prior_beta <- 1000
     q_cross_posterior_alpha <- q_cross_prior_alpha + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 1, na.rm=TRUE)
     q_cross_posterior_beta <- q_cross_prior_beta + sum(c(hidden_crossfamily0, hidden_crossfamilyf) == 0, na.rm=TRUE)
     qq_crossfamily <<- stats::rbeta(1, q_cross_posterior_alpha, q_cross_posterior_beta)
@@ -489,7 +486,6 @@ run_one_chain <- function(chain_id,
       state_parameters[4:(4+nloci-1), record_idx] <<- apply(frequencies_RR$freq_matrix, 1, max)
       state_parameters[(4+nloci):(4+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(frequencies_RR$freq_matrix[x, 1:frequencies_RR$n_alleles[x]]^2))
       state_loglikelihood[record_idx] <<- ifelse(is.finite(loglik_val), loglik_val, NA)
-      # Per-Locus Information
       state_locus_lr[,, record_idx] <<- locus_lrs_this_step
       state_locus_dist[,, record_idx] <<- mindistance
       if (record_hidden_alleles) {

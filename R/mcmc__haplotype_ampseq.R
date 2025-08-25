@@ -78,7 +78,6 @@ run_one_chain_ampseq <- function(chain_id,
   hiddenf <- matrix(NA_integer_, nids, maxMOI * nloci)
   mindistance <- matrix(NA_integer_, nids, nloci)
 
-  # Data extraction from wide format (remains the same)
   for (i in 1:nids) {
     patient_id <- ids[i]
     row_idx_d0 <- which(genotypedata_RR$Sample.ID == paste(patient_id, "Day 0"))
@@ -118,7 +117,6 @@ run_one_chain_ampseq <- function(chain_id,
 
   recoded_additional_neutral <- matrix(NA_character_, 0, maxMOI * nloci)
   if (!is.null(additional_neutral) && nrow(additional_neutral) > 0) {
-    # Logic to process additional_neutral would go here if needed
   }
 
   frequencies_RR <- calculate_frequencies3(
