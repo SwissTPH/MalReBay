@@ -13,3 +13,6 @@
 ^MalReBay\.Rproj$
 ^Meta$
 ^doc$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

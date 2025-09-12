@@ -12,9 +12,10 @@ Authors@R: c(
            role = "aut"),
     person(given = "Monica",
            family = "Golumbeanu",
+           email = "monica.golumbeanu@swisstph.ch",
            role = "aut")
   )
-Description: Classification of malaria infection recurrence using Bayesian algorithm.
+Description: Classification of malaria infection recurrence using a Bayesian algorithm.
 URL: https://github.com/SwissTPH/MalReBay
 BugReports: https://github.com/SwissTPH/MalReBay/issues
 License: GPL (>= 3) + file LICENSE
