@@ -77,8 +77,15 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
     return(list(recoded0=recoded0, recodedf=recodedf))
   }
   
-  new_id <- sample(possible_alleles, 1)
-
+  # new_id <- sample(possible_alleles, 1)
+  
+  allele_freqs <- frequencies_RR$freq_matrix[chosenlocus, 1:length(possible_alleles)]
+  if(any(is.na(allele_freqs)) || sum(allele_freqs) == 0) {
+    new_id <- sample(possible_alleles, 1)
+  } else {
+    new_id <- sample(possible_alleles, 1, prob = allele_freqs)
+  }
+  
   # log-likelihood for a given state
   calculate_log_lik <- function(patient_recoded0, patient_recodedf) {
     log_lik_total <- 0
@@ -90,16 +97,16 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
       df_alleles <- df_alleles[!is.na(df_alleles)]
       
       if (length(d0_alleles) == 0 || length(df_alleles) == 0) next
-
+      
       if (classification[x] == 1) { # RECRUDESCENCE
         log_probs_per_allele <- sapply(df_alleles, function(allele) {
           log(ifelse(allele %in% d0_alleles, 1 - qq, qq) + 1e-10)
         })
         log_lik_total <- log_lik_total + sum(log_probs_per_allele)
-
+        
         lost_alleles <- d0_alleles[!d0_alleles %in% df_alleles]
         if (length(lost_alleles) > 0) {
-            log_lik_total <- log_lik_total + (length(lost_alleles) * log(q_loss + 1e-10))
+          log_lik_total <- log_lik_total + (length(lost_alleles) * log(q_loss + 1e-10))
         }  
       } else { # REINFECTION
         freqs <- frequencies_RR$freq_matrix[locus_idx, ]
@@ -115,7 +122,7 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
     }
     return(log_lik_total)
   }
-
+  
   log_lik_old <- calculate_log_lik(recoded0[x,], recodedf[x,])
   recoded0_new <- recoded0[x,]
   recodedf_new <- recodedf[x,]
@@ -130,8 +137,8 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   if(length(old_freq)==0) old_freq <- 0
   new_freq <- frequencies_RR$freq_matrix[chosenlocus, which(possible_alleles == new_id)]
   if(length(new_freq)==0) new_freq <- 0
-  log_acceptance_ratio <- (log_lik_new - log_lik_old) + (log(old_freq + 1e-10) - log(new_freq + 1e-10))
-
+  log_acceptance_ratio <- log_lik_new - log_lik_old
+  
   alpha <- min(1, exp(log_acceptance_ratio))
   
   if (z < alpha) {
@@ -141,6 +148,6 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
       recodedf[x, chosen - ncol(hidden0)] <- new_id
     }
   }
-
+  
   return(list(recoded0=recoded0, recodedf=recodedf))
 }

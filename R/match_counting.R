@@ -63,103 +63,75 @@ assign_clusters <- function(alleles, threshold) {
   return(stats::setNames(cluster_ids, unique_sorted_alleles))
 }
 
+#' @importFrom dplyr mutate filter
+#' @importFrom stats setNames
+
 perform_match_counting <- function(genotypedata_latefailures, marker_info) {
-  ids <- unique(trimws(gsub(" .*", "", genotypedata_latefailures$Sample.ID)))
-  marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata_latefailures), value = TRUE)
+  
+  # Universal ID parsing that handles both formats
+  id_pattern <- "(D[0-9]+| Day 0| Day Failure)$"
+  
+  paired_data <- genotypedata_latefailures %>%
+    dplyr::mutate(
+      Patient.ID = trimws(gsub(id_pattern, "", .data$Sample.ID)),
+      Day = ifelse(grepl("D0|Day 0", .data$Sample.ID), "Day 0", "Day X")
+    )
+  
+  patient_ids <- unique(paired_data$Patient.ID)
+  nids <- length(patient_ids)
+  
+  marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(paired_data), value = TRUE)
   locinames <- unique(gsub("(_allele_\\d+|_\\d+)$", "", marker_cols))
   nloci <- length(locinames)
-  nids <- length(ids)
-  
-  if (!all(locinames %in% marker_info$marker_id)) {
-    missing_loci <- locinames[!locinames %in% marker_info$marker_id]
-    warning("Loci in data but not in marker_info (will be ignored): ", paste(missing_loci, collapse=", "))
-    locinames <- intersect(locinames, marker_info$marker_id)
-    nloci <- length(locinames)
-  }
   
   number_matches <- rep(NA, nids)
   match_output <- matrix("", nids, nloci) 
   colnames(match_output) <- locinames
   number_loci_compared <- rep(NA, nids)
-  
-  type_lookup <- stats::setNames(marker_info$markertype, marker_info$marker_id)
-  bin_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
   bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
-  cluster_thresh_lookup <- stats::setNames(marker_info$cluster_gap_threshold, marker_info$marker_id)
   
-  # Loop through each unique patient
   for (i in 1:nids) {
-    nmatches_temp <- 0
-    nloci_temp <- 0
-    current_id <- ids[i]
+    current_patient_id <- patient_ids[i]
     
-    day0_string_to_find <- paste(current_id, "Day 0")
-    dayf_string_to_find <- paste(current_id, "Day Failure")
+    day0_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day 0")
+    dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day X")
     
-    day0_idx <- which(trimws(genotypedata_latefailures$Sample.ID) == day0_string_to_find)
-    dayf_idx <- which(trimws(genotypedata_latefailures$Sample.ID) == dayf_string_to_find)
-    
-    if (length(day0_idx) != 1 || length(dayf_idx) != 1) {
-      warning(paste("Could not find a unique Day 0/DF pair for patient", current_id, ". Skipping."))
-      match_output[i, ] <- "ERR" 
+    if (nrow(day0_row) != 1 || nrow(dayf_row) != 1) {
       next
     }
     
-    # Loop through each locus for this patient
+    nmatches_temp <- 0
+    nloci_temp <- 0
+    
     for (j in 1:nloci) {
       current_locus <- locinames[j]
-      locus_cols <- grep(paste0("^", current_locus, "(_allele_\\d+|_\\d+)$"), colnames(genotypedata_latefailures), value = TRUE)
-      method <- bin_method_lookup[current_locus]
+      locus_cols <- grep(paste0("^", current_locus, "(_allele_\\d+|_\\d+)$"), colnames(paired_data), value = TRUE)
       
-      if (!is.na(method) && (method == "microsatellite" || method == "cluster")) {
-        day0_alleles <- as.numeric(unlist(genotypedata_latefailures[day0_idx, locus_cols]))
-        dayf_alleles <- as.numeric(unlist(genotypedata_latefailures[dayf_idx, locus_cols]))
-      } else { # amplicon sequencing
-        day0_alleles <- as.character(unlist(genotypedata_latefailures[day0_idx, locus_cols]))
-        dayf_alleles <- as.character(unlist(genotypedata_latefailures[dayf_idx, locus_cols]))
-      }
-      
+      day0_alleles <- as.character(unlist(day0_row[, locus_cols]))
+      dayf_alleles <- as.character(unlist(dayf_row[, locus_cols]))
       day0_alleles <- day0_alleles[!is.na(day0_alleles)]
       dayf_alleles <- dayf_alleles[!is.na(dayf_alleles)]
       
       if (length(day0_alleles) > 0 && length(dayf_alleles) > 0) {
         nloci_temp <- nloci_temp + 1
-        is_match <- FALSE 
-        if (is.na(method)) {
-          warning("No binning method found for locus: ", current_locus, ". Skipping comparison.")
-          match_output[i, j] <- "NO_INFO"
-          next 
-        }
-        
-        if (method == "microsatellite") {
-          current_bin_size <- bin_lookup[current_locus]
-          is_match <- all(sapply(dayf_alleles, function(df) any(abs(df - day0_alleles) <= current_bin_size)))
-        } else if (method == "cluster") {
-          current_thresh <- cluster_thresh_lookup[current_locus]
-          all_locus_alleles <- unique(c(day0_alleles, dayf_alleles))
-          cluster_map <- assign_clusters(all_locus_alleles, current_thresh)
-          d0_clusters <- if(length(day0_alleles) > 0) unique(cluster_map[as.character(day0_alleles)]) else character(0)
-          df_clusters <- if(length(dayf_alleles) > 0) unique(cluster_map[as.character(dayf_alleles)]) else character(0)
-          is_match <- all(df_clusters %in% d0_clusters)
-        } else { # amplicon sequencing
-          is_match <- all(dayf_alleles %in% day0_alleles)
-        }
+        is_match <- all(dayf_alleles %in% day0_alleles)
         
         if (is_match) {
           nmatches_temp <- nmatches_temp + 1
-          match_output[i, j] <- "R" # Recrudescence
+          match_output[i, j] <- "R"
         } else {
-          match_output[i, j] <- "NI" # New Infection
+          match_output[i, j] <- "NI"
         }
       } else {
-        match_output[i, j] <- "IND" # Indeterminate
+        match_output[i, j] <- "IND"
       }
     }
     number_matches[i] <- nmatches_temp
     number_loci_compared[i] <- nloci_temp
   }
+  
   match_results_df <- as.data.frame(match_output)
-  match_results_df$Sample.ID <- ids
+  match_results_df$Sample.ID <- patient_ids
   match_results_df$Number_Matches <- number_matches
   match_results_df$Number_Loci_Compared <- number_loci_compared
   match_results_df <- match_results_df[, c("Sample.ID", "Number_Matches", "Number_Loci_Compared", locinames)]

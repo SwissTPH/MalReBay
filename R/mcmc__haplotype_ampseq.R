@@ -69,7 +69,7 @@ run_one_chain_ampseq <- function(chain_id,
                                  is_locus_comparable,
                                  record_hidden_alleles = FALSE)
 {
- 
+  
   MOI0 <- rep(0, nids)
   MOIf <- rep(0, nids)
   recoded0 <- matrix(NA_character_, nids, maxMOI * nloci)
@@ -77,7 +77,8 @@ run_one_chain_ampseq <- function(chain_id,
   hidden0 <- matrix(NA_integer_, nids, maxMOI * nloci)
   hiddenf <- matrix(NA_integer_, nids, maxMOI * nloci)
   mindistance <- matrix(NA_integer_, nids, nloci)
-
+  
+  # Data extraction from wide format (remains the same)
   for (i in 1:nids) {
     patient_id <- ids[i]
     row_idx_d0 <- which(genotypedata_RR$Sample.ID == paste(patient_id, "Day 0"))
@@ -86,85 +87,87 @@ run_one_chain_ampseq <- function(chain_id,
     if (length(row_idx_d0) == 0 || length(row_idx_df) == 0) { next }
     patient_max_moi0 <- 0
     patient_max_moif <- 0
-  
+    
     for (j in 1:nloci) {
-        locus <- locinames[j]
-        locicolumns <- grepl(paste0("^", locus, "_"), colnames(genotypedata_RR))
-
-        d0_alleles <- as.character(genotypedata_RR[row_idx_d0[1], locicolumns])
-        d0_alleles <- d0_alleles[!is.na(d0_alleles) & d0_alleles != "NA"]
-        patient_max_moi0 <- max(patient_max_moi0, length(d0_alleles))
-        if (length(d0_alleles) > 0) {
-          recoded0[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(d0_alleles))] <- d0_alleles
-        }
-
-        df_alleles <- as.character(genotypedata_RR[row_idx_df[1], locicolumns])
-        df_alleles <- df_alleles[!is.na(df_alleles) & df_alleles != "NA"]
-        patient_max_moif <- max(patient_max_moif, length(df_alleles))
-        if (length(df_alleles) > 0) {
-          recodedf[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(df_alleles))] <- df_alleles
-        }
+      locus <- locinames[j]
+      locicolumns <- grepl(paste0("^", locus, "_"), colnames(genotypedata_RR))
+      
+      d0_alleles <- as.character(genotypedata_RR[row_idx_d0[1], locicolumns])
+      d0_alleles <- d0_alleles[!is.na(d0_alleles) & d0_alleles != "NA"]
+      patient_max_moi0 <- max(patient_max_moi0, length(d0_alleles))
+      if (length(d0_alleles) > 0) {
+        recoded0[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(d0_alleles))] <- d0_alleles
+      }
+      
+      df_alleles <- as.character(genotypedata_RR[row_idx_df[1], locicolumns])
+      df_alleles <- df_alleles[!is.na(df_alleles) & df_alleles != "NA"]
+      patient_max_moif <- max(patient_max_moif, length(df_alleles))
+      if (length(df_alleles) > 0) {
+        recodedf[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(df_alleles))] <- df_alleles
+      }
     }
     MOI0[i] <- patient_max_moi0
     MOIf[i] <- patient_max_moif
   }
-
+  
   is_observed0 <- !is.na(recoded0)
   is_observedf <- !is.na(recodedf)
   original_recoded0 <- recoded0
   original_recodedf <- recodedf
-
-
+  
+  
   recoded_additional_neutral <- matrix(NA_character_, 0, maxMOI * nloci)
   if (!is.null(additional_neutral) && nrow(additional_neutral) > 0) {
+    # Logic to process additional_neutral would go here if needed
   }
-
+  
   frequencies_RR <- calculate_frequencies3(
     genotypedata = rbind(genotypedata_RR, additional_neutral),
     alleles_definitions = NULL,
     marker_info = marker_info
   )
-
+  
   hidden0 <- matrix(NA_integer_, nids, maxMOI * nloci)
   hiddenf <- matrix(NA_integer_, nids, maxMOI * nloci)
-
+  
   # Initial imputation of hidden alleles
   for (i in 1:nids) {
     for (j in 1:nloci) {
-        d0_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
-        n_observed_d0 <- sum(!is.na(recoded0[i, d0_cols]))
-        n_to_impute_d0 <- MOI0[i] - n_observed_d0
-        if (n_to_impute_d0 > 0) {
-            indices_to_fill_d0 <- d0_cols[is.na(recoded0[i, d0_cols])][1:n_to_impute_d0]
-            hidden0[i, indices_to_fill_d0] <- 1
-            possible_alleles <- frequencies_RR$allele_codes[[j]]
-            if (length(possible_alleles) > 0) {
-                allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
-                new_alleles <- sample(possible_alleles, n_to_impute_d0, replace=TRUE, prob=allele_freqs)
-                recoded0[i, indices_to_fill_d0] <- new_alleles
-            }
+      d0_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
+      n_observed_d0 <- sum(!is.na(recoded0[i, d0_cols]))
+      n_to_impute_d0 <- MOI0[i] - n_observed_d0
+      if (n_to_impute_d0 > 0) {
+        indices_to_fill_d0 <- d0_cols[is.na(recoded0[i, d0_cols])][1:n_to_impute_d0]
+        hidden0[i, indices_to_fill_d0] <- 1
+        possible_alleles <- frequencies_RR$allele_codes[[j]]
+        if (length(possible_alleles) > 0) {
+          allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
+          new_alleles <- sample(possible_alleles, n_to_impute_d0, replace=TRUE, prob=allele_freqs)
+          recoded0[i, indices_to_fill_d0] <- new_alleles
         }
-        hidden0[i, d0_cols[!is.na(recoded0[i, d0_cols])]] <- 0
-        
-        df_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
-        n_observed_df <- sum(!is.na(recodedf[i, df_cols]))
-        n_to_impute_df <- MOIf[i] - n_observed_df
-        if(n_to_impute_df > 0) {
-            indices_to_fill_df <- df_cols[is.na(recodedf[i, df_cols])][1:n_to_impute_df]
-            hiddenf[i, indices_to_fill_df] <- 1
-            possible_alleles <- frequencies_RR$allele_codes[[j]]
-            if (length(possible_alleles) > 0) {
-                allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
-                new_alleles <- sample(possible_alleles, n_to_impute_df, replace=TRUE, prob=allele_freqs)
-                recodedf[i, indices_to_fill_df] <- new_alleles
-            }
+      }
+      hidden0[i, d0_cols[!is.na(recoded0[i, d0_cols])]] <- 0
+      
+      df_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
+      n_observed_df <- sum(!is.na(recodedf[i, df_cols]))
+      n_to_impute_df <- MOIf[i] - n_observed_df
+      if(n_to_impute_df > 0) {
+        indices_to_fill_df <- df_cols[is.na(recodedf[i, df_cols])][1:n_to_impute_df]
+        hiddenf[i, indices_to_fill_df] <- 1
+        possible_alleles <- frequencies_RR$allele_codes[[j]]
+        if (length(possible_alleles) > 0) {
+          allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
+          new_alleles <- sample(possible_alleles, n_to_impute_df, replace=TRUE, prob=allele_freqs)
+          recodedf[i, indices_to_fill_df] <- new_alleles
         }
-        hiddenf[i, df_cols[!is.na(recodedf[i, df_cols])]] <- 0
+      }
+      hiddenf[i, df_cols[!is.na(recodedf[i, df_cols])]] <- 0
     }
   }
-
+  
   # Initialize parameters and classification
-  qq <- mean(c(hidden0, hiddenf), na.rm = TRUE); if (is.na(qq)) qq <- 0.1
+  # qq <- mean(c(hidden0, hiddenf), na.rm = TRUE); if (is.na(qq)) 
+  qq <- 0.05
   q_loss <- 0.1
   prob_recrud <- 0.5
   classification <- ifelse(stats::runif(nids) < prob_recrud, 1, 0)
@@ -178,12 +181,12 @@ run_one_chain_ampseq <- function(chain_id,
   
   alleles0_history <- if (record_hidden_alleles) array(NA, c(nids, maxMOI * nloci, num_records)) else NULL
   allelesf_history <- if (record_hidden_alleles) array(NA, c(nids, maxMOI * nloci, num_records)) else NULL
-
+  
   # Main MCMC loop
   for (iter in 1:nruns) {
     mindistance <- matrix(NA_integer_, nids, nloci)
     locus_lrs_this_step <- matrix(1.0, nrow = nids, ncol = nloci)
-
+    
     for (i in 1:nids) {
       for (j in 1:nloci) {
         d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
@@ -200,7 +203,7 @@ run_one_chain_ampseq <- function(chain_id,
         lost_alleles <- d0_alleles[!d0_alleles %in% df_alleles]
         prob_part2 <- q_loss ^ length(lost_alleles)
         prob_recrud_locus <- prob_part1 * prob_part2
-
+        
         matched_indices <- match(df_alleles, frequencies_RR$allele_codes[[j]])
         valid_indices <- !is.na(matched_indices)
         
@@ -214,7 +217,7 @@ run_one_chain_ampseq <- function(chain_id,
         mindistance[i, j] <- ifelse(any(df_alleles %in% d0_alleles), 0, 1)
       }
     }
-
+    
     likelihoodratio <- apply(locus_lrs_this_step, 1, function(r) prod(pmax(r, 1e-10)))
     prior_odds <- prob_recrud / (1 - prob_recrud + 1e-10)
     posterior_odds <- likelihoodratio * prior_odds    
@@ -223,44 +226,44 @@ run_one_chain_ampseq <- function(chain_id,
     classification <- ifelse(stats::runif(nids) < prob_is_recrudescence, 1, 0)
     
     for (i in 1:nids) {
-        updated_states <- switch_hidden_ampseq(x = i, hidden0 = hidden0, hiddenf = hiddenf, 
-                                               recoded0 = recoded0, recodedf = recodedf,
-                                               classification = classification, qq = qq, q_loss = q_loss,
-                                               frequencies_RR = frequencies_RR, nloci = nloci, maxMOI = maxMOI)
-        temp_recoded0 <- updated_states$recoded0
-        temp_recodedf <- updated_states$recodedf
-        temp_recoded0[is_observed0] <- original_recoded0[is_observed0]
-        temp_recodedf[is_observedf] <- original_recodedf[is_observedf]
-        recoded0 <- temp_recoded0
-        recodedf <- temp_recodedf
+      updated_states <- switch_hidden_ampseq(x = i, hidden0 = hidden0, hiddenf = hiddenf, 
+                                             recoded0 = recoded0, recodedf = recodedf,
+                                             classification = classification, qq = qq, q_loss = q_loss,
+                                             frequencies_RR = frequencies_RR, nloci = nloci, maxMOI = maxMOI)
+      temp_recoded0 <- updated_states$recoded0
+      temp_recodedf <- updated_states$recodedf
+      temp_recoded0[is_observed0] <- original_recoded0[is_observed0]
+      temp_recodedf[is_observedf] <- original_recodedf[is_observedf]
+      recoded0 <- temp_recoded0
+      recodedf <- temp_recodedf
     }
-
-    q_posterior_alpha <- 1 + sum(c(hidden0, hiddenf) == 1, na.rm = TRUE)
-    q_posterior_beta  <- 1 + sum(c(hidden0, hiddenf) == 0, na.rm = TRUE)
-    qq <- stats::rbeta(1, q_posterior_alpha, q_posterior_beta)
+    
+    # q_posterior_alpha <- 1 + sum(c(hidden0, hiddenf) == 1, na.rm = TRUE)
+    # q_posterior_beta  <- 1 + sum(c(hidden0, hiddenf) == 0, na.rm = TRUE)
+    # qq <- stats::rbeta(1, q_posterior_alpha, q_posterior_beta)
     
     n_lost <- 0
     n_retained <- 0
     recrud_indices <- which(classification == 1)
     if(length(recrud_indices) > 0){
-        for (i in recrud_indices) {
-            for (j in 1:nloci) {
-                d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
-                d0_alleles <- d0_alleles[!is.na(d0_alleles)]
-                df_alleles <- unique(recodedf[i, (maxMOI*(j-1)+1):(maxMOI*j)])
-                df_alleles <- df_alleles[!is.na(df_alleles)]
-                
-                if (length(d0_alleles) == 0) next
-                
-                n_lost <- n_lost + sum(!d0_alleles %in% df_alleles)
-                n_retained <- n_retained + sum(d0_alleles %in% df_alleles)
-            }
+      for (i in recrud_indices) {
+        for (j in 1:nloci) {
+          d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
+          d0_alleles <- d0_alleles[!is.na(d0_alleles)]
+          df_alleles <- unique(recodedf[i, (maxMOI*(j-1)+1):(maxMOI*j)])
+          df_alleles <- df_alleles[!is.na(df_alleles)]
+          
+          if (length(d0_alleles) == 0) next
+          
+          n_lost <- n_lost + sum(!d0_alleles %in% df_alleles)
+          n_retained <- n_retained + sum(d0_alleles %in% df_alleles)
         }
+      }
     }
     q_loss_posterior_alpha <- 1 + n_lost
     q_loss_posterior_beta <- 1 + n_retained
     q_loss <- stats::rbeta(1, q_loss_posterior_alpha, q_loss_posterior_beta)
-
+    
     tempdata <- rbind(recoded0, recodedf)
     new_freq_matrix <- frequencies_RR$freq_matrix
     for (locus_idx in 1:nloci) {

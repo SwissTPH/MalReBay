@@ -4,7 +4,7 @@
 \alias{classify_infections}
 \title{Classify Infections Using a Bayesian MCMC Framework}
 \usage{
-classify_infections(input_filepath, mcmc_config, output_folder)
+classify_infections(input_filepath, mcmc_config, output_folder, verbose = TRUE)
 }
 \arguments{
 \item{input_filepath}{A character string. The full path to the input Excel file
@@ -16,6 +16,11 @@ a full list of options and their defaults.}
 \item{output_folder}{A character string specifying the path to the folder where
 all results (summary CSVs, diagnostic plots) will be saved. The folder
 will be created if it does not exist.}
+
+\item{verbose}{A logical. If \code{TRUE} (the default), the function will print
+progress messages, warnings about missing markers, and other information
+to the console. If \code{FALSE}, it will run silently, only showing critical
+errors.}
 }
 \value{
 A list containing two data frames:
@@ -69,7 +74,7 @@ example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
                             package = "MalReBay")
 
 # Create a temporary directory to save the results for this example
-temp_output_dir <- file.path(tempdir(), "MalReBay_example")
+temp_output_dir <- file.path(tempdir(), "MalReBay_example_silent")
 dir.create(temp_output_dir)
 
 # Define a minimal MCMC configuration for a quick and illustrative run
@@ -84,18 +89,24 @@ quick_mcmc_config <- list(
 )
 
 \dontrun{
-# Run the full analysis
+# Run the analysis silently
 results_list <- classify_infections(
   input_filepath = example_file,
   mcmc_config = quick_mcmc_config,
-  output_folder = temp_output_dir
+  output_folder = temp_output_dir,
+  verbose = FALSE # Set to FALSE to suppress messages
 )
+
+# Run the analysis with full messages (the default behavior)
+# results_list_verbose <- classify_infections(
+#   input_filepath = example_file,
+#   mcmc_config = quick_mcmc_config,
+#   output_folder = temp_output_dir,
+#   verbose = TRUE
+# )
 
 # View the top rows of the main summary table
 print(head(results_list$summary))
-
-# View the top rows of the detailed marker-level table
-print(head(results_list$marker_details))
 }
 
 }

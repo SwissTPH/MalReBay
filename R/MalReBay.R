@@ -42,6 +42,10 @@
 #' @param output_folder A character string specifying the path to the folder where
 #'   all results (summary CSVs, diagnostic plots) will be saved. The folder
 #'   will be created if it does not exist.
+#' @param verbose A logical. If `TRUE` (the default), the function will print
+#'   progress messages, warnings about missing markers, and other information
+#'   to the console. If `FALSE`, it will run silently, only showing critical
+#'   errors.
 #'
 #' @return
 #' A list containing two data frames:
@@ -54,7 +58,7 @@
 #' Two CSV files corresponding to these data frames are also saved to the
 #' `output_folder`.
 #'
-#' @importFrom utils modifyList write.csv str
+#' @importFrom utils modifyList write.csv
 #' @importFrom dplyr bind_rows rename left_join full_join
 #'
 #' @export
@@ -65,7 +69,7 @@
 #'                             package = "MalReBay")
 #'
 #' # Create a temporary directory to save the results for this example
-#' temp_output_dir <- file.path(tempdir(), "MalReBay_example")
+#' temp_output_dir <- file.path(tempdir(), "MalReBay_example_silent")
 #' dir.create(temp_output_dir)
 #'
 #' # Define a minimal MCMC configuration for a quick and illustrative run
@@ -80,48 +84,54 @@
 #' )
 #'
 #' \dontrun{
-#' # Run the full analysis
+#' # Run the analysis silently
 #' results_list <- classify_infections(
 #'   input_filepath = example_file,
 #'   mcmc_config = quick_mcmc_config,
-#'   output_folder = temp_output_dir
+#'   output_folder = temp_output_dir,
+#'   verbose = FALSE # Set to FALSE to suppress messages
 #' )
+#'
+#' # Run the analysis with full messages (the default behavior)
+#' # results_list_verbose <- classify_infections(
+#' #   input_filepath = example_file,
+#' #   mcmc_config = quick_mcmc_config,
+#' #   output_folder = temp_output_dir,
+#' #   verbose = TRUE
+#' # )
 #'
 #' # View the top rows of the main summary table
 #' print(head(results_list$summary))
-#'
-#' # View the top rows of the detailed marker-level table
-#' print(head(results_list$marker_details))
 #' }
 #'
 classify_infections <- function(input_filepath,
                                 mcmc_config,
-                                output_folder) {
+                                output_folder,
+                                verbose = TRUE) {
   
-  # Data import function
+  # Data Import and Validation ---
   imported_data <- import_data(filepath = input_filepath)
   genotypedata_latefailures <- imported_data$late_failures
   additional_genotypedata <- imported_data$additional
   marker_information <- imported_data$marker_info
   data_type <- imported_data$data_type
   
+  # Clean column names
   colnames(genotypedata_latefailures) <- trimws(colnames(genotypedata_latefailures))
   if (nrow(additional_genotypedata) > 0) {
     colnames(additional_genotypedata) <- trimws(colnames(additional_genotypedata))
   }
   colnames(genotypedata_latefailures) <- gsub("R033_", "RO33_", colnames(genotypedata_latefailures))
   colnames(additional_genotypedata) <- gsub("R033_", "RO33_", colnames(additional_genotypedata))
-
-  defaults <- list(n_chains = 4, 
-                   rhat_threshold = 1.01, 
-                   ess_threshold = 400,    
-                   chunk_size = 10000, 
-                   max_iterations = 100000, 
+  
+  defaults <- list(n_chains = 4,
+                   rhat_threshold = 1.01,
+                   ess_threshold = 400,
+                   chunk_size = 10000,
+                   max_iterations = 100000,
                    burn_in_frac = 0.25,
                    record_hidden_alleles = FALSE)
-  
   config <- utils::modifyList(defaults, mcmc_config)
-  
   
   if (data_type == "length_polymorphic") {
     data_marker_columns <- grep("_\\d+$", colnames(genotypedata_latefailures), value = TRUE)
@@ -133,31 +143,32 @@ classify_infections <- function(input_filepath,
       stop("None of the markers specified in `marker_information` were found in the input data.")
     }
     missing_markers <- setdiff(requested_base_markers, available_base_markers)
-    if (length(missing_markers) > 0) {
+    if (length(missing_markers) > 0 && verbose) {
       warning("The following requested markers were NOT found and will be ignored: ",
-              paste(missing_markers, collapse = ", "))
-    }
-
-    extra_markers_in_data <- setdiff(available_base_markers, requested_base_markers)
-    if (length(extra_markers_in_data) > 0) {
-      message("INFO: The following markers were found in your data but are not on the package's predefined list: ",
-              paste(extra_markers_in_data, collapse = ", "))
+              paste(missing_markers, collapse = ", "), call. = FALSE)
     }
     
-    message("Proceeding with analysis for these markers: ", paste(markers_to_use, collapse = ", "))
-
+    extra_markers_in_data <- setdiff(available_base_markers, requested_base_markers)
+    if (length(extra_markers_in_data) > 0 && verbose) {
+      message("INFO: The following markers were found in your data but not requested: ",
+              paste(extra_markers_in_data, collapse = ", "))
+    }
+    if (verbose) message("Proceeding with analysis for these markers: ", paste(markers_to_use, collapse = ", "))
+    
   } else if (data_type == "ampseq") {
     data_marker_columns <- grep("_allele_\\d+$", colnames(genotypedata_latefailures), value = TRUE)
     available_base_markers <- unique(gsub("_allele_\\d+$", "", data_marker_columns))
     requested_base_markers <- marker_information$marker_id
     markers_to_use <- intersect(requested_base_markers, available_base_markers)
-
+    
     if (length(markers_to_use) == 0) {
       stop("None of the markers from the ampseq data were found in the marker_information sheet.")
     }
-    message("Amplicon sequencing data detected. The following haplotype markers will be used for analysis: ",
-            paste(available_base_markers, collapse = ", "))
-  }else {
+    if (verbose) {
+      message("Amplicon sequencing data detected. The following haplotype markers will be used for analysis: ",
+              paste(markers_to_use, collapse = ", "))
+    }
+  } else {
     stop("Unknown data type detected: ", data_type)
   }
   
@@ -165,32 +176,31 @@ classify_infections <- function(input_filepath,
   all_marker_base_names <- if (data_type == "ampseq") {
     gsub("_allele_\\d+$", "", data_marker_columns)
   } else {
-      gsub("_\\d+$", "", data_marker_columns)
+    gsub("_\\d+$", "", data_marker_columns)
   }
   final_marker_cols <- data_marker_columns[all_marker_base_names %in% markers_to_use]
-
-
+  
   id_cols <- setdiff(colnames(genotypedata_latefailures), grep("_allele_\\d+|_\\d+$", colnames(genotypedata_latefailures), value = TRUE))
   latefailures_subset <- genotypedata_latefailures[, c(id_cols, final_marker_cols)]
-  additional_subset <- additional_genotypedata[, c(id_cols, final_marker_cols)]
+  additional_subset <- if (nrow(additional_genotypedata) > 0) {
+    additional_genotypedata[, c(id_cols, final_marker_cols)]
+  } else {
+    additional_genotypedata
+  }
   
-  message("The model is running MCMC analysis...")
+  if (verbose) message("The model is running MCMC analysis...")
   results <- run_all_sites(
     genotypedata_latefailures = latefailures_subset,
     additional_genotypedata = additional_subset,
     marker_info_subset = final_marker_info,
     mcmc_config = config,
-    data_type = data_type, 
-    output_folder = output_folder
+    data_type = data_type,
+    output_folder = output_folder,
+    verbose = verbose
   )
   
-  
-  cat("\n--- Debug: Structure of MCMC results ---\n")
-  print(utils::str(results))
-  cat("----------------------------------------\n\n")
-  
   if (is.null(results) || length(results$ids) == 0) {
-    warning("MCMC results are empty. No summary table can be generated.")
+    warning("MCMC results are empty. No summary table can be generated.", call. = FALSE)
     return(
       list(
         summary = data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()),
@@ -199,108 +209,97 @@ classify_infections <- function(input_filepath,
     )
   }
   
-  summary_list_probs <- list() 
-
-  cat("\n--- Debug: Names in results$ids ---\n")
-  print(names(results$ids))
-  cat("--- Debug: Names in results$classifications ---\n")
-  print(names(results$classifications))
-  cat("----------------------------------\n\n")
-
+  summary_list_probs <- list()
   for (site_name in names(results$ids)) {
-    cat(sprintf("--- Processing site: '%s' ---\n", site_name))
     site_ids <- results$ids[[site_name]]
     site_probs_matrix <- results$classifications[[site_name]]
     
-    cat("Is site_ids NULL? ", is.null(site_ids), "\n")
-    if(!is.null(site_ids)) cat("Length of site_ids: ", length(site_ids), "\n")
-    
-    cat("Is site_probs_matrix NULL? ", is.null(site_probs_matrix), "\n")
-    if(!is.null(site_probs_matrix)) cat("Dimensions of site_probs_matrix: ", paste(dim(site_probs_matrix), collapse="x"), "\n")
-
     if (is.null(site_ids) || is.null(site_probs_matrix) || length(site_ids) == 0 || nrow(site_probs_matrix) == 0) {
-      cat(sprintf("INFO: CHECK FAILED for site '%s'. Skipping.\n\n", site_name))
       next
     }
-
-    cat("Check passed. Calculating probabilities...\n\n")
-
+    
     probabilities <- rowMeans(site_probs_matrix, na.rm = TRUE)
     summary_list_probs[[site_name]] <- data.frame(
-      Site = site_name, 
-      Sample.ID = site_ids, 
+      Site = site_name,
+      Sample.ID = site_ids,
       Probability = probabilities,
       stringsAsFactors = FALSE
     )
   }
   
   if (length(summary_list_probs) == 0) {
-     warning("No probability data was successfully summarized across all sites.")
-     return(data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), 
-                       N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()))
+    warning("No probability data was successfully summarized across all sites.", call. = FALSE)
+    return(
+      list(
+        summary = data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()),
+        marker_details = NULL
+      )
+    )
   }
   
   probabilities_df <- dplyr::bind_rows(summary_list_probs)
   locus_summary_df <- dplyr::bind_rows(results$locus_summary, .id = "Site")
-  locus_summary_df <- dplyr::rename(locus_summary_df, 
+  locus_summary_df <- dplyr::rename(locus_summary_df,
                                     Sample.ID = "patient_id",
                                     N_Available_D0 = "n_available_d0",
                                     N_Available_DF = "n_available_df",
                                     N_Comparable_Loci = "n_comparable_loci")
-
-  # Use `summary_df` as the final variable name for the main summary
-  summary_df <- dplyr::left_join(probabilities_df, 
-                                 locus_summary_df, 
-                                 by = c("Sample.ID", "Site"))
+  
+  summary_df <- dplyr::left_join(probabilities_df, locus_summary_df, by = c("Sample.ID", "Site"))
   
   if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
   csv_path <- file.path(output_folder, "probability_of_recrudescence_summary.csv")
   utils::write.csv(summary_df, csv_path, row.names = FALSE)
-  message("Summary table saved to: ", csv_path)
-
-  # --- MARKER DETAILS DATAFRAME CREATION ---
+  if (verbose) message("Summary table saved to: ", csv_path)
+  
   marker_details_list <- list()
   for (site_name in names(results$ids)) {
-    if (is.null(results$locus_lrs[[site_name]])) next 
+    if (is.null(results$locus_lrs[[site_name]])) next
     
     site_ids <- results$ids[[site_name]]
     site_lrs <- results$locus_lrs[[site_name]]
     site_dists <- results$locus_dists[[site_name]]
+    marker_names <- results$locinames[[site_name]] %||% dimnames(site_lrs)[[2]] %||% paste0("Locus_", seq_len(dim(site_lrs)[2]))
     
-    if (!is.null(results$locinames) && !is.null(results$locinames[[site_name]])) {
-      marker_names <- results$locinames[[site_name]]
-    } else {
-      marker_names <- dimnames(site_lrs)[[2]]
-      if (is.null(marker_names)) {
-        marker_names <- paste0("Locus_", 1:ncol(site_lrs))
-      }
-    }
-
     mean_lrs <- apply(site_lrs, c(1, 2), mean, na.rm = TRUE)
     mean_dists <- apply(site_dists, c(1, 2), mean, na.rm = TRUE)
-    rownames(mean_lrs) <- rownames(mean_dists) <- site_ids
-    colnames(mean_lrs) <- colnames(mean_dists) <- marker_names
+    
+    if (length(site_ids) == nrow(mean_lrs) && length(marker_names) == ncol(mean_lrs)) {
+      dimnames(mean_lrs) <- list(site_ids, marker_names)
+    }
+    if (length(site_ids) == nrow(mean_dists) && length(marker_names) == ncol(mean_dists)) {
+      dimnames(mean_dists) <- list(site_ids, marker_names)
+    }
+    
     lrs_df <- as.data.frame(as.table(mean_lrs), stringsAsFactors = FALSE)
     colnames(lrs_df) <- c("Sample.ID", "Marker", "Mean_Likelihood_Ratio")
+    
     dists_df <- as.data.frame(as.table(mean_dists), stringsAsFactors = FALSE)
     colnames(dists_df) <- c("Sample.ID", "Marker", "Mean_Distance")
+    
     site_marker_details <- dplyr::full_join(lrs_df, dists_df, by = c("Sample.ID", "Marker"))
     site_marker_details$Site <- site_name
     marker_details_list[[site_name]] <- site_marker_details
   }
-
+  
+  marker_details_df <- NULL
   if (length(marker_details_list) > 0) {
     marker_details_df <- dplyr::bind_rows(marker_details_list)
     marker_details_df$Interpretation <- ifelse(marker_details_df$Mean_Likelihood_Ratio > 1, "Supports Recrudescence", "Supports Reinfection/Error")
     marker_csv_path <- file.path(output_folder, "marker_level_summary.csv")
     utils::write.csv(marker_details_df, marker_csv_path, row.names = FALSE)
-    message("Detailed marker-level summary saved to: ", marker_csv_path)
+    if (verbose) message("Detailed marker-level summary saved to: ", marker_csv_path)
   }
   
-return(
+  return(
     list(
-        summary = summary_df,
-        marker_details = if (exists("marker_details_df")) marker_details_df else NULL
+      summary = summary_df,
+      marker_details = marker_details_df
     )
-)
+  )
+}
+
+# Helper function for NULL coalescing
+`%||%` <- function(a, b) {
+  if (!is.null(a)) a else b
 }

@@ -2,3 +2,13 @@ MalReBay
 future
 dplyr
 ggplot2
+copula
+PDQutils
+poisbinom
+VGAM
+PfRecur
+purrr
+tidyr
+here
+kableExtra
+cowplot

@@ -6,11 +6,12 @@
 \alias{MalReBay-package}
 \title{MalReBay: Bayesian classification for malaria recurrences}
 \description{
-Classification of malaria infection recurrence using Bayesian algorithm.
+Classification of malaria infection recurrence using a Bayesian algorithm.
 }
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://SwissTPH.github.io/MalReBay}
   \item \url{https://github.com/SwissTPH/MalReBay}
   \item Report bugs at \url{https://github.com/SwissTPH/MalReBay/issues}
 }
@@ -22,7 +23,7 @@ Useful links:
 Authors:
 \itemize{
   \item Mateusz Plucinski
-  \item Monica Golumbeanu
+  \item Monica Golumbeanu \email{monica.golumbeanu@swisstph.ch}
 }
 
 }
