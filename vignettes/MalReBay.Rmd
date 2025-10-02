@@ -25,15 +25,15 @@ knitr::opts_chunk$set(
 
 ## 1. Introduction
 
-To monitor the effectiveness of antimalarial drugs, the **World Health Organization (WHO)** recommends **Therapeutic Efficacy Studies (TES)**. These are observational studies in which patients with uncomplicated malaria are treated and followed for several weeks to check if the infection clears and remains suppressed. Because patients can become re-infected during this follow-up period, distinguishing whether a recurrence is due to **recrudescence** (the reappearance of parasites from the original infection after partial clearance) or a **reinfection** (a new infection from a separate mosquito bite) is essential. This distinction, known as molecular correction, is made by comparing parasite genotypes from the initial infection and any recurrence.
+To monitor the effectiveness of antimalarial drugs, the **World Health Organization (WHO)** recommends the use of **Therapeutic Efficacy Studies (TES)**. TES are observational studies in which patients with uncomplicated malaria are treated and followed for several weeks to check if the infection clears and remains suppressed. Because patients can become re-infected during this follow-up period, distinguishing whether a recurrence is due to **recrudescence** (the reappearance of parasites from the original infection after partial clearance) or a **reinfection** (a new infection from a separate mosquito bite) is essential. This process, known as **molecular correction**, relies on comparing parasite genotypes from the initial infection and any subsequent recurrence.
 
-`MalReBay` package is designed to determine whether a recurrent malaria infection is a **recrudescence** or a **reinfection**. It uses a Bayesian framework to analyze paired genotyping data from a patient's initial infection (Day 0) and their subsequent day of recurrence (Day X).
+`MalReBay` is an R package that implements a **Bayesian framework** for molecular correction in malaria therapeutic efficacy studies. Instead of making a direct deterministic call, it uses genotyping data from a patient’s initial infection (day 0) and their recurrent infection to estimate the probability that a **recurrence** is due to **recrudescence** versus **reinfection**. Unlike rule-based methods, it explicitly incorporates genotyping uncertainty, within-host diversity, and local allele frequency information, providing a principled and robust classification.
 
 This tutorial provides a step-by-step guide to the main analysis workflow, from loading your data to interpreting the final results. We will first review the conceptual framework of the package and then walk through a practical example, from loading data to interpreting the final results.
 
 
 ## 2. The MalReBay workflow
-The `MalReBay` workflow follows a Bayesian framework to classify malaria recurrences as either recrudescence or reinfection. Conceptually, the process begins with paired genotyping data, incorporates model parameters (such as genotyping error and within-host diversity), and uses a Markov chain Monte Carlo (MCMC) algorithm to estimate the posterior probability of recrudescence for each case.
+The workflow begins with paired genotyping data from `day 0` and `day of recurrence` infections. These data are combined with model parameters (e.g., genotyping error rates, within-host diversity, allele frequencies) and analyzed using a Markov chain **Monte Carlo (MCMC)** algorithm. The output is the posterior probability of recrudescence for each recurrence, which can then be summarized at both the patient and study level.
 
 ![MalReBay framework.](figure/Bayesian_Framework.png){width=600px}
 
@@ -148,7 +148,16 @@ if (!dir.exists(output_dir)) {
 
 #### Step 3: Descriptive statistics
 
-##### MOI 
+In this step, we generate summary statistics to explore the genetic characteristics of the data before running the Bayesian model. Two key measures are considered:
+
++ Multiplicity of Infection (MOI): estimates the number of distinct parasite clones per marker in each sample, providing insight into within-host diversity.
+
++ Marker diversity: visualizes the distribution of allele sizes for each marker, helping to assess the level of genetic variability in the study population.
+
+These descriptive outputs give context for interpreting molecular correction results and can highlight potential sources of genotyping uncertainty.
+
+##### Multiplicity of Infection (MOI) 
+
 ```{r MOI,fig.width=7, fig.height=5}
 genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 
@@ -193,11 +202,11 @@ The MCMC sampler has several parameters that control its runtime and convergence
 ```{r define-mcmc-config-length}
 
 quick_mcmc_config <- list(
-  n_chains = 2, 
-  chunk_size = 500, 
-  max_iterations = 1000,
+  n_chains = 4, 
+  chunk_size = 5000, 
+  max_iterations = 20000,
   rhat_threshold = 1.1,
-  ess_threshold = 100
+  ess_threshold = 400
 )
 ```
 
@@ -366,7 +375,16 @@ if (!dir.exists(output_dir)) {
 
 #### Step 3: Descriptive statistics
 
-##### MOI 
+In this step, we generate summary statistics to explore the genetic characteristics of the data before running the Bayesian model. Two key measures are considered:
+
++ Multiplicity of Infection (MOI): estimates the number of distinct parasite clones per marker in each sample, providing insight into within-host diversity.
+
++ Marker diversity: visualizes the distribution of allele sizes for each marker, helping to assess the level of genetic variability in the study population.
+
+These descriptive outputs give context for interpreting molecular correction results and can highlight potential sources of genotyping uncertainty.
+
+
+##### Multiplicity of Infection (MOI)  
 ```{r MOI ampseq,fig.width=7, fig.height=5}
 genotypedata_ampseq <- dplyr::bind_rows(imported_data_ampseq$late_failures, imported_data_ampseq$additional)
 
@@ -408,11 +426,11 @@ if (imported_data_ampseq$data_type == "ampseq" && nrow(genotypedata_ampseq) > 0)
 ```{r define-mcmc-config-amspeq}
 
 quick_mcmc_config <- list(
-  n_chains = 2,          # Run two parallel chains
-  chunk_size = 500,       # Check convergence every 1000 iterations
-  max_iterations = 1000,   # Stop after a maximum of 1000 total iterations
+  n_chains = 4,          # Run two parallel chains
+  chunk_size = 5000,       # Check convergence every 1000 iterations
+  max_iterations = 20000,   # Stop after a maximum of 1000 total iterations
   rhat_threshold = 1.1,  # A relaxed convergence threshold for the example
-  ess_threshold = 100     # A relaxed effective sample size for the example
+  ess_threshold = 1000     # A relaxed effective sample size for the example
 )
 ```
 
@@ -568,7 +586,7 @@ The final table contains the following columns:
 
 ## 7. Checking non-converged chains and improving convergence
 
-Convergence is a crucial step to ensure that the MCMC results are reliable. In `MalReBay`, convergence is monitored automatically during sampling using both the log-likelihood and standard diagnostics. By default, the algorithm will stop once the following criteria are met:
+Convergence is a crucial step to ensure that the MCMC results are reliable. In `MalReBay`, convergence is monitored automatically during sampling using both the log-likelihood and standard diagnostics. If convergence is not achieved, the posterior estimates may be unreliable, leading to misleading classification of recurrences. For this reason, this is section is explicit for non-convergence check, so that users can easily diagnose problematic chains and take corrective action (e.g., increasing iterations, adjusting priors, or running more chains).
 
 + R-hat (Gelman–Rubin diagnostic): All parameters must satisfy $\hat{R} < 1.1$.
 
@@ -586,11 +604,11 @@ nonconv_dir <- file.path(output_dir, "non_convergence_diagnosis")
 if (!dir.exists(nonconv_dir)) dir.create(nonconv_dir, recursive = TRUE)
 
 quick_mcmc_config <- list(
-  n_chains = 2, 
-  chunk_size = 500, 
-  max_iterations = 2000,
+  n_chains = 4, 
+  chunk_size = 1000, 
+  max_iterations = 5000,
   rhat_threshold = 1.1,
-  ess_threshold = 100
+  ess_threshold = 400
 )
 
 plan(multisession, workers = 2)
