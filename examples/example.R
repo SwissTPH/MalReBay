@@ -18,33 +18,37 @@ input_file_micr <- "~/GitRepos/MalReBay/inst/extdata/Angola_2021_TES_7NMS.xlsx"
 # Folder where all results will be saved
 output_dir_micr <- "~/Bayesian_tests/"
 
+# Number of chains and cores for running in parallel
+nb_cores <- 3
+nb_chains <- 3
 #------------------------------------------
 
-quick_mcmc_config = list(
-  n_chains = 2, 
+# Fast configuration for the MCMC, for testing
+quick_mcmc_config <- list(
+  n_chains = nb_chains, 
   chunk_size = 100, #5000
   max_iterations = 500, #20000
   rhat_threshold = 1.1,
   ess_threshold = 400
 )
 
-mcmc_config = list(
-  n_chains = 2, 
-  chunk_size = 5000,
-  max_iterations = 20000,
-  rhat_threshold = 1.1,
-  ess_threshold = 400
-)
+# To ensure convergence
+# mcmc_config <- list(
+#   n_chains = nb_chains, 
+#   chunk_size = 5000,
+#   max_iterations = 20000,
+#   rhat_threshold = 1.1,
+#   ess_threshold = 400
+# )
 
-plan(multisession, workers = 2)
-
-classification_summary = classify_infections(
+# Main command of the package, parallel computation of each chain
+plan(multisession, workers = nb_chains)
+classification_summary <- classify_infections(
   input_filepath = input_file_micr,
   mcmc_config = quick_mcmc_config,
   output_folder = output_dir_micr,
   verbose = FALSE
 )
-
 plan(sequential)
 
 # Plot the distribution of the probabilities of recrudescence
@@ -61,15 +65,38 @@ ggplot(classification_summary$summary, aes(x = Probability)) +
 # Example 2: amplicon sequencing data
 #############
 
-
 #----------USER FILE SYSTEM ------------------
+# Input data
 input_file_amp_seq <- "~/GitRepos/MalReBay/inst/extdata/Amplicon_Sequencing.xlsx"
 
-n_cores <- 2
+# Folder where all results will be saved
+output_dir_micr <- "~/Bayesian_tests/test_amp_seq/"
+
+# Number of chains and cores for running in parallel
+nb_cores <- 2
+nb_chains <- 2
 ---------------------------------------------
+  
+# Fast configuration for the MCMC, for testing
+quick_mcmc_config = list(
+  n_chains = 3, 
+  chunk_size = 100, #5000
+  max_iterations = 500, #20000
+  rhat_threshold = 1.1,
+  ess_threshold = 400
+)
+
+# To ensure convergence
+mcmc_config <- list(
+  n_chains = nb_chains, 
+  chunk_size = 5000,
+  max_iterations = 20000,
+  rhat_threshold = 1.1,
+  ess_threshold = 400
+)
 
 # Main command of the package, parallel computation of each chain
-plan(multisession, workers = n_cores)
+plan(multisession, workers = nb_cores)
 
 classification_summary_ampseq <- classify_infections(
   input_filepath = input_file_amp_seq,
@@ -79,3 +106,12 @@ classification_summary_ampseq <- classify_infections(
 )
 
 plan(sequential)
+
+ggplot(classification_summary_ampseq$summary, aes(x = Probability)) +
+  geom_histogram(binwidth = 0.05, fill = "steelblue", color = "white", boundary = 0) +
+  labs(
+    title = "Distribution of Posterior Probabilities of Recrudescence",
+    x = "Posterior Probability",
+    y = "Number of Patients"
+  ) +
+  theme_bw()
