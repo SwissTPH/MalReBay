@@ -166,7 +166,6 @@ run_one_chain_ampseq <- function(chain_id,
   }
   
   # Initialize parameters and classification
-  # qq <- mean(c(hidden0, hiddenf), na.rm = TRUE); if (is.na(qq)) 
   qq <- 0.05
   q_loss <- 0.1
   prob_recrud <- 0.5
@@ -238,9 +237,6 @@ run_one_chain_ampseq <- function(chain_id,
       recodedf <- temp_recodedf
     }
     
-    # q_posterior_alpha <- 1 + sum(c(hidden0, hiddenf) == 1, na.rm = TRUE)
-    # q_posterior_beta  <- 1 + sum(c(hidden0, hiddenf) == 0, na.rm = TRUE)
-    # qq <- stats::rbeta(1, q_posterior_alpha, q_posterior_beta)
     
     n_lost <- 0
     n_retained <- 0

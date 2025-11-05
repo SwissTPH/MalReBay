@@ -36,6 +36,7 @@ run_all_sites <- function(
   local_sites_locus_lrs <- list()
   local_sites_locus_dists <- list()
   local_sites_locinames <- list()
+  local_sites_loglikelihood <- list()
   
   for (site in site_names) {
     jobname <- site
@@ -178,20 +179,7 @@ run_all_sites <- function(
       }
     }
     
-    if (length(full_loglik_history) > 0 && length(full_loglik_history[[1]]) > 0) {
-      if (verbose) cat(paste("\nGenerating convergence diagnostics for site:", site, "\n"))
-      
-      # PASS verbose FLAG DOWN
-      generate_likelihood_diagnostics(
-        all_chains_loglikelihood = full_loglik_history,
-        site_name = site,
-        output_folder = output_folder,
-        verbose = verbose # <-- PASS IT HERE
-      )
-    } else {
-      # Use `warning` for this case, but still make it conditional
-      if (verbose) warning(paste0("No MCMC output was generated for site '", site, "'. Skipping diagnostics."), call. = FALSE)
-    }
+    
     
     site_char <- as.character(site)
     if (length(full_chain_results) > 0) {
@@ -203,6 +191,7 @@ run_all_sites <- function(
         final_lrs <- do.call(abind::abind, list(lapply(full_chain_results, function(x) x$locus_lrs[,, keep_indices, drop = FALSE]), along = 3))
         final_dists <- do.call(abind::abind, list(lapply(full_chain_results, function(x) x$locus_dists[,, keep_indices, drop = FALSE]), along = 3))
         
+        local_sites_loglikelihood[[site]] <- full_loglik_history
         local_sites_locus_lrs[[site]] <- final_lrs
         local_sites_locus_dists[[site]] <- final_dists
         local_sites_classification[[site]] <- final_classification
@@ -218,6 +207,7 @@ run_all_sites <- function(
   return(
     list(
       classifications = local_sites_classification,
+      all_chains_loglikelihood = local_sites_loglikelihood,
       ids = local_sites_ids,
       locus_summary = local_sites_locus_summary,
       locus_lrs = local_sites_locus_lrs,

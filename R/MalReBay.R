@@ -1,11 +1,11 @@
 #' Classify Infections Using a Bayesian MCMC Framework
 #'
 #' @description
-#' This is the main user-facing function of the `MalReBay` package. It runs the
+#' This is the main function of the `MalReBay` package. It runs the
 #' complete Bayesian analysis workflow to classify parasite infections as either
-#' recrudescence or reinfection based on genotyping data. The function handles
-#' data import, MCMC simulation with automatic convergence checking, and the
-#' summarization and saving of final results.
+#' recrudescence or reinfection based on genotyping data. The function takes a processed data 
+#' object from `import_data()`, runs MCMC simulation with automatic convergence 
+#' checking, and summarizes the final results.
 #'
 #' @details
 #' The function operates by first importing and validating the data from the
@@ -35,82 +35,96 @@
 #' }
 #' Any parameters not specified in the list will use the default values.
 #'
-#' @param input_filepath A character string. The full path to the input Excel file
-#'   containing the cleaned genotyping data.
+#' @param imported_data A list object returned by the `import_data()`
+#'   function. This list must contain `$late_failures` (data.frame),
+#'   `$additional` (data.frame), `$marker_info` (data.frame), and
+#'   `$data_type` (character string).
 #' @param mcmc_config A list of MCMC configuration parameters. See Details for
 #'   a full list of options and their defaults.
 #' @param output_folder A character string specifying the path to the folder where
 #'   all results (summary CSVs, diagnostic plots) will be saved. The folder
 #'   will be created if it does not exist.
+#' @param n_workers An integer specifying the number of parallel cores to use.
+#'   Defaults to 1 (sequential). If `n_workers > 1`, the analysis will be
+#'   parallelized by site using the 'future' package.
 #' @param verbose A logical. If `TRUE` (the default), the function will print
 #'   progress messages, warnings about missing markers, and other information
 #'   to the console. If `FALSE`, it will run silently, only showing critical
 #'   errors.
-#'
+#' @param output_folder A character string specifying the path to the folder where
+#'   all results (summary CSVs, diagnostic plots) will be saved. The folder
+#'   will be created if it does not exist. **Note:** If a `convergence_diagnosis`
+#'   sub-folder exists from a previous run, it will be automatically removed to
+#'   ensure that all diagnostic plots are from the current analysis.
+#'   
+#'   
 #' @return
-#' A list containing two data frames:
-#' \item{summary}{A data frame summarizing the main results for each patient,
-#'   including the posterior probability of recrudescence and a summary of the
-#'   genetic data available for comparison.}
-#' \item{marker_details}{A detailed data frame providing the mean likelihood ratio
-#'   and mean allele distance for each genetic marker for each patient, offering
-#'   locus-specific insights into the classification.}
-#' Two CSV files corresponding to these data frames are also saved to the
-#' `output_folder`.
+#' A list containing three elements:
+#' \item{summary}{A data frame summarizing the main results for each patient...}
+#' \item{marker_details}{A detailed data frame providing the mean likelihood ratio...}
+#' \item{mcmc_loglikelihoods}{A list containing the raw MCMC log-likelihood chains 
+#'   for each site, which can be passed to `generate_likelihood_diagnostics()`.}
+#' CSV files and diagnostic plots are also saved to the `output_folder`.
 #'
 #' @importFrom utils modifyList write.csv
 #' @importFrom dplyr bind_rows rename left_join full_join
+#' @importFrom future plan multisession sequential availableCores
 #'
 #' @export
-#'
+#' 
 #' @examples
-#' # Get the path to the example data file included with the package
+#' # 1. Get the path to the example data file
 #' example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
 #'                             package = "MalReBay")
 #'
-#' # Create a temporary directory to save the results for this example
-#' temp_output_dir <- file.path(tempdir(), "MalReBay_example_silent")
-#' dir.create(temp_output_dir)
+#' # 2. Create a temporary directory for the results
+#' temp_output_dir <- file.path(tempdir(), "MalReBay_example")
+#' dir.create(temp_output_dir, showWarnings = FALSE)
 #'
-#' # Define a minimal MCMC configuration for a quick and illustrative run
-#' # NOTE: These settings are for demonstration only and are not sufficient
-#' # for a real analysis.
+#' # 3. Define a minimal MCMC configuration for a quick run
+#' # NOTE: For a real analysis, use more iterations.
 #' quick_mcmc_config <- list(
 #'   n_chains = 2,
-#'   chunk_size = 500,
-#'   max_iterations = 500, # Set max_iterations equal to chunk_size for one run
-#'   rhat_threshold = 1.1, # Relaxed for the example
-#'   ess_threshold = 50   # Relaxed for the example
+#'   max_iterations = 500,
+#'   chunk_size = 500
 #' )
 #'
 #' \dontrun{
-#' # Run the analysis silently
+#' # 4. Import and process the data first
+#' processed_data <- import_data(filepath = example_file)
+#'
+#' # 5. Run the analysis using the processed data object and 2 cores
 #' results_list <- classify_infections(
-#'   input_filepath = example_file,
+#'   imported_data = processed_data,
 #'   mcmc_config = quick_mcmc_config,
 #'   output_folder = temp_output_dir,
-#'   verbose = FALSE # Set to FALSE to suppress messages
+#'   n_workers = 2,
+#'   verbose = TRUE
 #' )
 #'
-#' # Run the analysis with full messages (the default behavior)
-#' # results_list_verbose <- classify_infections(
-#' #   input_filepath = example_file,
-#' #   mcmc_config = quick_mcmc_config,
-#' #   output_folder = temp_output_dir,
-#' #   verbose = TRUE
-#' # )
-#'
-#' # View the top rows of the main summary table
+#' # 6. View the top rows of the main summary table
 #' print(head(results_list$summary))
 #' }
-#'
-classify_infections <- function(input_filepath,
+classify_infections <- function(imported_data,
                                 mcmc_config,
                                 output_folder,
+                                n_workers = 1,
                                 verbose = TRUE) {
   
-  # Data Import and Validation ---
-  imported_data <- import_data(filepath = input_filepath)
+  required_elements <- c("late_failures", "additional", "marker_info", "data_type")
+  if (!is.list(imported_data) || !all(required_elements %in% names(imported_data))) {
+    stop(
+      "'imported_data' must be a valid list object returned by the import_data() function.",
+      call. = FALSE
+    )
+  }
+  
+  convergence_dir <- file.path(output_folder, "convergence_diagnosis")
+  if (dir.exists(convergence_dir)) {
+    if (verbose) message("INFO: Removing existing convergence diagnosis folder to ensure fresh results.")
+    unlink(convergence_dir, recursive = TRUE)
+  }
+ 
   genotypedata_latefailures <- imported_data$late_failures
   additional_genotypedata <- imported_data$additional
   marker_information <- imported_data$marker_info
@@ -189,6 +203,26 @@ classify_infections <- function(input_filepath,
   }
   
   if (verbose) message("The model is running MCMC analysis...")
+  
+  old_plan <- future::plan()
+  on.exit(future::plan(old_plan), add = TRUE)
+  
+  
+  if (n_workers == 1) {
+    if (verbose) message("INFO: Running analysis sequentially (n_workers = 1).")
+    future::plan(future::sequential)
+  } else {
+    available_cores <- future::availableCores()
+    if (n_workers > available_cores) {
+      if (verbose) {
+        message("INFO: 'n_workers' (", n_workers, ") exceeds available cores (", available_cores, "). Using ", available_cores, " cores.")
+      }
+      n_workers <- available_cores
+    }
+    if (verbose) message("INFO: Running analysis in parallel on ", n_workers, " cores.")
+    future::plan(future::multisession, workers = n_workers)
+  }
+  
   results <- run_all_sites(
     genotypedata_latefailures = latefailures_subset,
     additional_genotypedata = additional_subset,
@@ -294,7 +328,8 @@ classify_infections <- function(input_filepath,
   return(
     list(
       summary = summary_df,
-      marker_details = marker_details_df
+      marker_details = marker_details_df,
+      mcmc_loglikelihoods = results$all_chains_loglikelihood
     )
   )
 }

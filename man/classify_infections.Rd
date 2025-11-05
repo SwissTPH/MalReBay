@@ -4,18 +4,32 @@
 \alias{classify_infections}
 \title{Classify Infections Using a Bayesian MCMC Framework}
 \usage{
-classify_infections(input_filepath, mcmc_config, output_folder, verbose = TRUE)
+classify_infections(
+  imported_data,
+  mcmc_config,
+  output_folder,
+  n_workers = 1,
+  verbose = TRUE
+)
 }
 \arguments{
-\item{input_filepath}{A character string. The full path to the input Excel file
-containing the cleaned genotyping data.}
+\item{imported_data}{A list object returned by the \code{import_data()}
+function. This list must contain \verb{$late_failures} (data.frame),
+\verb{$additional} (data.frame), \verb{$marker_info} (data.frame), and
+\verb{$data_type} (character string).}
 
 \item{mcmc_config}{A list of MCMC configuration parameters. See Details for
 a full list of options and their defaults.}
 
 \item{output_folder}{A character string specifying the path to the folder where
 all results (summary CSVs, diagnostic plots) will be saved. The folder
-will be created if it does not exist.}
+will be created if it does not exist. \strong{Note:} If a \code{convergence_diagnosis}
+sub-folder exists from a previous run, it will be automatically removed to
+ensure that all diagnostic plots are from the current analysis.}
+
+\item{n_workers}{An integer specifying the number of parallel cores to use.
+Defaults to 1 (sequential). If \code{n_workers > 1}, the analysis will be
+parallelized by site using the 'future' package.}
 
 \item{verbose}{A logical. If \code{TRUE} (the default), the function will print
 progress messages, warnings about missing markers, and other information
@@ -23,22 +37,19 @@ to the console. If \code{FALSE}, it will run silently, only showing critical
 errors.}
 }
 \value{
-A list containing two data frames:
-\item{summary}{A data frame summarizing the main results for each patient,
-including the posterior probability of recrudescence and a summary of the
-genetic data available for comparison.}
-\item{marker_details}{A detailed data frame providing the mean likelihood ratio
-and mean allele distance for each genetic marker for each patient, offering
-locus-specific insights into the classification.}
-Two CSV files corresponding to these data frames are also saved to the
-\code{output_folder}.
+A list containing three elements:
+\item{summary}{A data frame summarizing the main results for each patient...}
+\item{marker_details}{A detailed data frame providing the mean likelihood ratio...}
+\item{mcmc_loglikelihoods}{A list containing the raw MCMC log-likelihood chains
+for each site, which can be passed to \code{generate_likelihood_diagnostics()}.}
+CSV files and diagnostic plots are also saved to the \code{output_folder}.
 }
 \description{
-This is the main user-facing function of the \code{MalReBay} package. It runs the
+This is the main function of the \code{MalReBay} package. It runs the
 complete Bayesian analysis workflow to classify parasite infections as either
-recrudescence or reinfection based on genotyping data. The function handles
-data import, MCMC simulation with automatic convergence checking, and the
-summarization and saving of final results.
+recrudescence or reinfection based on genotyping data. The function takes a processed data
+object from \code{import_data()}, runs MCMC simulation with automatic convergence
+checking, and summarizes the final results.
 }
 \details{
 The function operates by first importing and validating the data from the
@@ -69,44 +80,36 @@ output files and is mainly for debugging. (Default: FALSE).
 Any parameters not specified in the list will use the default values.
 }
 \examples{
-# Get the path to the example data file included with the package
+# 1. Get the path to the example data file
 example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
                             package = "MalReBay")
 
-# Create a temporary directory to save the results for this example
-temp_output_dir <- file.path(tempdir(), "MalReBay_example_silent")
-dir.create(temp_output_dir)
+# 2. Create a temporary directory for the results
+temp_output_dir <- file.path(tempdir(), "MalReBay_example")
+dir.create(temp_output_dir, showWarnings = FALSE)
 
-# Define a minimal MCMC configuration for a quick and illustrative run
-# NOTE: These settings are for demonstration only and are not sufficient
-# for a real analysis.
+# 3. Define a minimal MCMC configuration for a quick run
+# NOTE: For a real analysis, use more iterations.
 quick_mcmc_config <- list(
   n_chains = 2,
-  chunk_size = 500,
-  max_iterations = 500, # Set max_iterations equal to chunk_size for one run
-  rhat_threshold = 1.1, # Relaxed for the example
-  ess_threshold = 50   # Relaxed for the example
+  max_iterations = 500,
+  chunk_size = 500
 )
 
 \dontrun{
-# Run the analysis silently
+# 4. Import and process the data first
+processed_data <- import_data(filepath = example_file)
+
+# 5. Run the analysis using the processed data object and 2 cores
 results_list <- classify_infections(
-  input_filepath = example_file,
+  imported_data = processed_data,
   mcmc_config = quick_mcmc_config,
   output_folder = temp_output_dir,
-  verbose = FALSE # Set to FALSE to suppress messages
+  n_workers = 2,
+  verbose = TRUE
 )
 
-# Run the analysis with full messages (the default behavior)
-# results_list_verbose <- classify_infections(
-#   input_filepath = example_file,
-#   mcmc_config = quick_mcmc_config,
-#   output_folder = temp_output_dir,
-#   verbose = TRUE
-# )
-
-# View the top rows of the main summary table
+# 6. View the top rows of the main summary table
 print(head(results_list$summary))
 }
-
 }
