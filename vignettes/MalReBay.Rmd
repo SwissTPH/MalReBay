@@ -35,7 +35,7 @@ This tutorial provides a step-by-step guide to the main analysis workflow, from 
 ## 2. The MalReBay workflow
 The workflow begins with paired genotyping data from `day 0` and `day of recurrence` infections. These data are combined with model parameters (e.g., genotyping error rates, within-host diversity, allele frequencies) and analyzed using a Markov chain **Monte Carlo (MCMC)** algorithm. The output is the posterior probability of recrudescence for each recurrence, which can then be summarized at both the patient and study level.
 
-![MalReBay framework.](figure/Bayesian_Framework.png){width=600px}
+![MalReBay framework.](figure/Bayesian_Framework2.png){width=600px}
 
 
 Here we will have the conceptual steps that `MalReBay` takes to get from your raw data to the final classification. The main `classify_infections()` function automates this entire pipeline for you.
