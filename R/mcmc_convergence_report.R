@@ -72,6 +72,12 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood,
   site_dir <- NULL
   if (save_plot) {
     site_dir <- file.path(output_folder, "convergence_diagnosis", site_name)
+    
+    if (dir.exists(site_dir)) {
+      if (verbose) message("INFO: Removing existing convergence diagnosis folder for site: ", site_name)
+      unlink(site_dir, recursive = TRUE, force = TRUE)
+    }
+    
     dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   }
   
@@ -169,14 +175,22 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood,
     })
     
   } else {
-    old_par <- graphics::par(no.readonly = TRUE)
-    on.exit(graphics::par(old_par))
-    graphics::par(mfrow = c(2, 2), ask = interactive())
+    # old_par <- graphics::par(no.readonly = TRUE)
+    # on.exit(graphics::par(old_par))
+    # graphics::par(mfrow = c(2, 2), ask = interactive())
+    
+    temp_file <- tempfile(fileext = ".png")
+    grDevices::png(filename = temp_file, width = 900, height = 700, res = 120)
+    
+    graphics::par(mfrow = c(2, 2), mar = c(3, 3, 2, 1))
     
     plot_trace()
     plot_gelman()
     plot_hist()
-    stats::acf(clean_chains[[1]], main = "ACF - Chain 1", lag.max = 50) 
+    stats::acf(clean_chains[[1]], main = "ACF - Chain 1", lag.max = 50)
+    
+    grDevices::dev.off()
+    knitr::include_graphics(temp_file)
   }
   
   invisible(list(

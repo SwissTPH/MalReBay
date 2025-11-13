@@ -44,7 +44,7 @@ detect_data_type <- function(input_df) {
 #'   the data type and separating sheets into a structured list.
 #'
 #' @param filepath The full path to the input Excel file.
-#' @param verbose A logical value indicating whether to print progress messages.
+#' @param verbose Logical. If TRUE, prints progress and data-cleaning messages.
 #' @return A list containing the imported data.
 #' @export
 import_data <- function(filepath, verbose = TRUE) {

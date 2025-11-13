@@ -32,16 +32,35 @@ To monitor the effectiveness of antimalarial drugs, the **World Health Organizat
 This tutorial provides a step-by-step guide to the main analysis workflow, from loading your data to interpreting the final results. We will first review the conceptual framework of the package and then walk through a practical example, from loading data to interpreting the final results.
 
 
-## 2. The MalReBay workflow
+## 2. Bayesian framework for molecular correction
+
+`MalReBay` applies a Bayesian model to classify each malaria recurrence as a **recrudescence** or a **reinfection**. For each patient $i$, a binary variable $R_i$ indicates the recurrence cause:
+$R_i = 1$ for recrudescence and $R_i = 0$ for reinfection.
+
+Bayesian inference updates prior beliefs about $R_i$ using the observed genotyping data $D_i$, producing the posterior probability $P(R_i=1|D_i,\theta)$. 
+
+The figure below illustrates this process, in which prior probabilities and data likelihoods are combined through Bayes’ rule to obtain the posterior probabilities that drive recurrence classification.
+
+![Overview of the Bayesian inference framework implemented in MalReBay.](figure/Bayesian_Framework2.png){width=600px}
+
++ Prior $P(R_i)$ is the baseline belief about recrudescence before seeing the data.
+
++ Likelihood $P(D_i|R_i)$ is the probability of the observed allele patterns given each hypothesis, accounting for allele frequencies, within-host diversity, and genotyping errors.
+
++ Posterior $P(R_i|D_i)$ is the updated probability that a recurrence is a recrudescence after combining priors and data.
+
++ Recurrences events are classified as recrudescence when $P(R_i|D_i)$ exceeds a threshold (e.g., 0.5).
+
+In practice, these probabilities cannot be solved analytically because the posterior distribution has no closed form; therefore, MalReBay uses Markov chain Monte Carlo (MCMC) sampling to approximate them.
+
+## 3. The MalReBay workflow
 The workflow begins with paired genotyping data from `day 0` and `day of recurrence` infections. These data are combined with model parameters (e.g., genotyping error rates, within-host diversity, allele frequencies) and analyzed using a Markov chain **Monte Carlo (MCMC)** algorithm. The output is the posterior probability of recrudescence for each recurrence, which can then be summarized at both the patient and study level.
 
-![MalReBay framework.](figure/Bayesian_Framework2.png){width=600px}
+
+The main `classify_infections()` function automates this process—from loading the genotyping data and parameter settings to generating posterior estimates and final recurrence classifications. The following sections describe each input type and how to prepare your data for analysis.
 
 
-Here we will have the conceptual steps that `MalReBay` takes to get from your raw data to the final classification. The main `classify_infections()` function automates this entire pipeline for you.
-
-
-## 3. Input Data
+## 4. Input Data
 
 `MalReBay` can analyze two main types of genotyping data:
 
@@ -55,7 +74,7 @@ The input format differs slightly depending on which data type you are working w
 
 
 
-### 3.1 Length-polymorphic markers
+### 4.1 Length-polymorphic markers
 
 For length-polymorphic markers, the input Excel file should have the following structure:
 + A `Sample.ID` column that uniquely identifies each sample and includes "Day 0" or "Day of recurrence".
@@ -69,7 +88,7 @@ For length-polymorphic markers, the input Excel file should have the following s
 Here is an example of the expected input format for length-polymorphic data:
 ![Length polymorphic](figure/angola_1.png){width=700px}
 
-### 3.2 Amplicon sequencing data
+### 4.2 Amplicon sequencing data
 
 For amplicon sequencing,but the marker columns store haplotype labels instead of allele lengths. The input Excel file have similar structure as length-polymorphic data:
 
@@ -77,30 +96,34 @@ Here is an example of the expected input format for amplicon sequencing data:
 ![Amplicon sequencingt](figure/ampseq_1.png){width=700px}
 
 
-## 4. Descritptive analysis
+## 5. Descritptive analysis
 
-Before running the main classification analysis, it is often helpful to explore your genotyping data. `MalReBay` provides specialized functions to visualize allele and haplotype diversity, depending on the type of data you are analyzing.
-
-### 4.1 Length-polymorphic markers
-
-For datasets with length-polymorphic markers, we use the `generate_allele_frequency_plot()` function, which generates:
-
-+ Visualizes the frequency of each allele (defined by its length in base pairs) for each marker.
-
-+ Produces faceted bar plots that directly compare Day 0 (baseline) and Day of recurrence samples.
-
-+ Helps to visually identify changes in the parasite population over time.
-
-### 4.2 Amplicon sequencing data
-
-For amplicon sequencing datasets, we use the `generate_haplotype_diversity_plots()` function which generates:
-
-+ Genetic Diversity: A bar chart comparing three standard diversity indices (Richness, Shannon, and Simpson) across the markers.
+Before running the main classification analysis, it is often helpful to explore your genotyping data. `MalReBay` provides specialized functions to visualize **allele and haplotype diversity**, tailored to the type of data you are analyzing. These exploratory analyses can reveal which markers are **most informative or frequent in the population**, assess the **quality and completeness of the genotyping data**, and evaluate the **overall polymorphism and richness of the markers**, all of which are important for robust downstream analyses.
 
 
+### 5.1 Length-polymorphic markers
+
+For datasets with length-polymorphic markers, we now focus on **MOI (Multiplicity of Infection) and allele diversity visualizations**:
+
++ **MOI Violin Plots:** Show the distribution of the number of distinct parasite clones per infection, providing insight into infection complexity across samples.  
+
++ **Allele Diversity Pie Charts:** Display the relative frequencies of different alleles within each marker, highlighting dominant alleles and overall marker polymorphism.
+
++ These plots facilitate comparison of parasite population structure between baseline and recurrence samples.
+
+### 5.2 Amplicon sequencing data
+
+For amplicon sequencing datasets, we present similar visualizations:
+
++ **MOI Violin Plots:** Illustrate the number of distinct haplotypes per infection. 
+
++ **Haplotype Diversity Pie Charts:** Summarize the relative abundance of haplotypes for each marker.  
++ These plots help identify dominant haplotypes, assess genetic diversity, and detect shifts in the parasite population over time.
 
 
-## 5. Example of classification: length-polymorphic markers
+
+
+## 6. Example of classification: length-polymorphic markers
 
 In this section, we provide a step-by-step example of using the `MalReBay` package to classify recurrent malaria infections with length-polymorphic genotyping data.
 
@@ -122,9 +145,11 @@ library(kableExtra)
 
 #### Step 1: Load data
 
+We import the example dataset using `MalReBay:::import_data()`. The dataset includes both late failure samples and any additional samples. We then process the sample IDs to extract the patient identifier and day of sampling (baseline or day of recurrence).
+
 ```{r get-data-path-length}
 input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-imported_data <- MalReBay:::import_data(filepath = input_file)
+imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
 full_data <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 full_data <- full_data %>%
   dplyr::mutate(
@@ -137,6 +162,7 @@ full_data <- full_data %>%
 
 #### Step 2: Define an Output Folder
 
+An output folder is defined to store results generated by the analysis. If the folder does not already exist, it will be created automatically.
 
 ```{r define-output-dir-length}
 output_dir_lp <- here::here("vignettes", "malrebay_vignette_outputs", "length_polymorphic_results")
@@ -158,7 +184,7 @@ These descriptive outputs give context for interpreting molecular correction res
 
 ##### Multiplicity of Infection (MOI) 
 
-```{r MOI,fig.width=7, fig.height=5}
+```{r MOI,fig.width=7, fig.height=5, message=FALSE}
 genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 
 if (nrow(genotypedata_lp) > 0) {
@@ -180,7 +206,7 @@ if (nrow(genotypedata_lp) > 0) {
 
 
 ##### Marker diversity
-```{r marker-diversity-length-descriptive,fig.width=7, fig.height=5}
+```{r marker-diversity-length-descriptive,fig.width=7, fig.height=5, message=FALSE}
 if (imported_data$data_type == "length_polymorphic" && nrow(genotypedata_lp) > 0) {
   diversity_plot <- MalReBay:::generate_diversity_plots(
     genotypedata    = genotypedata_lp,
@@ -239,9 +265,11 @@ classification_summary <- classify_infections(
 
 
 
-The `classify_infections()` function returns a list containing two key data frames: `summary` and `marker_details`. 
+The `classify_infections()` function returns a list containing two key data frames:
 
-The `$summary` data frame provides the main result for each patient. Let's look at the first few rows.
++ `summary`: Main results for each patient, including the posterior probability of recrudescence and the number of comparable loci.
+
++ `marker_details`: Detailed information on each marker for each patient.
 
 ```{r view-summary-length}
 summary_df <- classification_summary$summary
@@ -249,7 +277,7 @@ summary_df <- classification_summary$summary
 knitr::kable(head(summary_df), caption = "Classification summary.")
 ```
 
-The columns are:
+Key columns in the summary include:
 
 + **Site**: The geographical site of the sample.
 
@@ -265,7 +293,9 @@ The columns are:
 
 #### Step 6: Visualizing the Results
 
-A histogram of the posterior probabilities is an excellent way to visualize the overall results. A clear separation into two groups (one near 0 and one near 1) indicates high confidence in the classifications.
+A histogram of the posterior probabilities provides a clear overview of the classification results. If the histogram shows a clear separation into two groups (one near 0 and one near 1), this indicates high confidence in distinguishing recrudescence from reinfection.
+
+The histogram allows you to visually assess the certainty of the classifications and to identify any ambiguous cases for further investigation.
 
 ```{r plot-histogram-length, fig.width=6, fig.height=4, out.width='100%'}
 ggplot(summary_df, aes(x = Probability)) +
@@ -313,39 +343,60 @@ The key plots for diagnostics are:
 
 Below is an example using the site `Benguela`, demonstrating how to generate and visualize the convergence diagnostics:
 
-```{r convergence-diagnostics, echo=FALSE, fig.align='center'}
+```{r convergence-diagnostics-LP}
 site_name <- "Benguela"
 LP_loglik_data <- classification_summary$mcmc_loglikelihoods[[site_name]]
 
 if (!is.null(LP_loglik_data)) {
-  generate_likelihood_diagnostics(
+    generate_likelihood_diagnostics(
     all_chains_loglikelihood = LP_loglik_data,
     site_name = site_name,
     save_plot = TRUE,
-    output_folder = output_dir_lp,
+    output_folder = "vignettes/malrebay_vignette_outputs/length_polymorphic_results",
     verbose = FALSE
   )
-
-  image_paths_LP <- file.path(output_dir_lp, "convergence_diagnosis", site_name,
-    c("gelman_loglikelihood.png", "loglikelihood_traceplot.png",
-      "loglikelihood_histogram.png", "loglikelihood_acf.png")
+image_paths_lp <- file.path(
+    "vignettes/malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis",
+    site_name,
+    c("gelman_loglikelihood.png",
+      "loglikelihood_traceplot.png",
+      "loglikelihood_histogram.png",
+      "loglikelihood_acf.png")
   )
 
-  if (all(file.exists(image_paths_LP))) {
+  if (all(file.exists(image_paths_lp))) {
     knitr::kable(
-      matrix(paste0("![](", image_paths_LP, "){width=100%}"), ncol = 2, byrow = TRUE),
+      matrix(paste0("![](", image_paths_lp, "){width=100%}"), ncol = 2, byrow = TRUE),
       escape = FALSE
     )
   } else {
-    knitr::kable("One or more diagnostic plots could not be found.")
+    knitr::kable("Convergence diagnostic plots could not be found. Please check the file paths.")
   }
 } else {
- knitr::kable(paste("Log-likelihood data for site '", site_name, "' not available.", sep = ""))
+  knitr::kable(paste("Log-likelihood data for site '", site_name, "' not available.", sep = ""))
 }
 ```
+
+
 These trace, Gelman–Rubin, histogram, and ACF plots collectively provide visual assurance that the MCMC chains have mixed well and stabilized.
 
 #### Step 8: Comparison with other methods
+
+To evaluate the performance of the Bayesian classification in MalReBay, we compare its results against two alternative approaches:
+
++ **PfRecur**: A previously published algorithm for classifying recurrent malaria infections.
+
++ **Match-counting algorithm**: A simpler approach that counts allele matches between Day 0 and recurrence samples.
+
+For length-polymorphic markers, we combine the outputs of `MalReBay`, `PfRecur`, and the `match-counting` algorithm into a single table. This allows us to examine, for each patient:
+
++ The number of loci compared and the number of matches between samples.
+
++ The per-locus results from match-counting (`R` for match, `NI` for non-match, `IND` for indeterminate).
+
++ The posterior probability of recrudescence from `MalReBay` (MalReBay_Probability).
+
++ The `PfRecur` probability for the same samples (PfRecur_Probability).
 
 ```{r comparison-methods, cache=TRUE, message=FALSE, warning=FALSE}
 pfrecur_raw_data <- readxl::read_excel(input_file)
@@ -394,21 +445,25 @@ knitr::kable(
 ```
 
 
-## 6. Example of classification: amplicon sequencing data
+## 7. Example of classification: amplicon sequencing data
 
 We will use an example dataset included with the package, containing data from a Therapeutic Efficacy Study (TES). The dataset includes 3 sequencing markers; `cpmp`, `cpp`, `amaD3`, genotyped from 20 patients.
 
 #### Step 1: Load data
 
+We import the example AmpSeq dataset using `MalReBay:::import_data()`. The dataset includes both late failure and additional samples.
+
 ```{r get-data-path ampseq, ver}
 input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx",
                                  package = "MalReBay")
 
-imported_data_ampseq <- MalReBay:::import_data(filepath = input_file_ampseq)
+imported_data_ampseq <- MalReBay:::import_data(filepath = input_file_ampseq, verbose = FALSE)
 ```
 
 
 #### Step 2: Define an Output Folder
+
+We define an output folder to store the results. If the folder does not exist, it is created automatically.
 
 ```{r define-output-dir-ampseq}
 output_dir_ampseq <- here::here("vignettes", "malrebay_vignette_outputs", "ampseq_results")
@@ -420,17 +475,15 @@ if (!dir.exists(output_dir_ampseq)) {
 
 #### Step 3: Descriptive statistics
 
-In this step, we generate summary statistics to explore the genetic characteristics of the data before running the Bayesian model. Two key measures are considered:
+We explore the genetic characteristics of the data:
 
-+ Multiplicity of Infection (MOI): estimates the number of distinct parasite clones per marker in each sample, providing insight into within-host diversity.
++ Multiplicity of Infection estimates the number of distinct haplotypes per marker in each sample, reflecting within-host diversity.
 
-+ Marker diversity: visualizes the distribution of allele sizes for each marker, helping to assess the level of genetic variability in the study population.
-
-These descriptive outputs give context for interpreting molecular correction results and can highlight potential sources of genotyping uncertainty.
++ Haplotype diversity plots summarize the relative frequencies of haplotypes for each marker, highlighting dominant haplotypes and overall genetic variability.
 
 
 ##### Multiplicity of Infection (MOI)  
-```{r MOI ampseq,fig.width=7, fig.height=5}
+```{r MOI_ampseq,fig.width=7, fig.height=5, message=FALSE}
 genotypedata_ampseq <- dplyr::bind_rows(imported_data_ampseq$late_failures, imported_data_ampseq$additional)
 
 if (nrow(genotypedata_ampseq) > 0) {
@@ -452,13 +505,13 @@ if (nrow(genotypedata_ampseq) > 0) {
 ```
 
 ##### Marker diversity
-```{r marker-diversity-ampseq,fig.width=7, fig.height=5}
+```{r marker-diversity-ampseq,fig.width=7, fig.height=5, message=FALSE}
 if (imported_data_ampseq$data_type == "ampseq" && nrow(genotypedata_ampseq) > 0) {
   diversity_plot_ampseq <- MalReBay:::generate_diversity_plots(
     genotypedata    = genotypedata_ampseq,
-      data_type       = "ampseq",
-      output_folder   = output_dir_ampseq,
-      filename_prefix = "haplotype_diversity"
+    data_type       = "ampseq",
+    output_folder   = output_dir_ampseq,
+    filename_prefix = "haplotype_diversity"
   )
   if (!is.null(diversity_plot_ampseq)) print(diversity_plot_ampseq)
 } else {
@@ -468,14 +521,26 @@ if (imported_data_ampseq$data_type == "ampseq" && nrow(genotypedata_ampseq) > 0)
 
 #### Step 4: MCMC Configuration
 
+We define the MCMC sampler parameters for this tutorial run:
+
++ **n_chains** Number of parallel chains.
+
++ **chunk_size** Number of iterations between convergence checks.
+
++ **max_iterations** Maximum total iterations.
+
++ **rhat_threshold** Gelman–Rubin statistic threshold for convergence.
+
++ **ess_threshold** Effective Sample Size threshold.
+
 ```{r define-mcmc-config-amspeq}
 
 quick_mcmc_config <- list(
-  n_chains = 4,          # Run two parallel chains
-  chunk_size = 1000,       # Check convergence every 1000 iterations
-  max_iterations = 1000,   # Stop after a maximum of 1000 total iterations
-  rhat_threshold = 1.1,  # A relaxed convergence threshold for the example
-  ess_threshold = 400     # A relaxed effective sample size for the example
+  n_chains = 4,
+  chunk_size = 1000,
+  max_iterations = 1000,
+  rhat_threshold = 1.1,
+  ess_threshold = 400     
 )
 ```
 
@@ -483,7 +548,7 @@ quick_mcmc_config <- list(
 
 #### Step 5: Execute the Main Function
 
-Now we can run the analysis. `classify_infections()` will print progress messages to the console, informing you about the data type it detected, the sites it is analyzing, and the status of the MCMC convergence.  The 'future' package is used in the background for parallel processing, so you can expect the analysis to run faster on multi-core machines.
+Now we can run the analysis by calling the `classify_infections()`.
 
 ```{r run-analysis-ampseq, cache=TRUE}
 classification_summary_ampseq <- classify_infections(
@@ -507,14 +572,15 @@ summary_df <- classification_summary_ampseq$summary
 knitr::kable(head(summary_df), caption = "Classification summary.")
 ```
 
-The columns are:
+Key columns in the summary include:
+
 + **Site**: The geographical site of the sample.
 
 + **Sample.ID**: The unique patient identifier.
 
 + **Probability**: The posterior probability that the infection is a **recrudescence**. A value near 1.0 suggests recrudescence, while a value near 0.0 suggests reinfection.
 
-+ **N_Available_D0 / N_Available_DF**: The number of loci with genetic data at Day 0 and Day of Failure, respectively.
++ **N_Available_D0 / N_Available_DF**: The number of loci with genetic data at Day 0 and Day of recurrence, respectively.
 
 + **N_Comparable_Loci**: The number of loci with data at *both* time points, which is the amount of data used for the classification.
 
@@ -522,7 +588,7 @@ The columns are:
 
 #### Step 6: Visualizing the Results
 
-A histogram of the posterior probabilities is an excellent way to visualize the overall results. A clear separation into two groups (one near 0 and one near 1) indicates high confidence in the classifications.
+A histogram of the posterior probabilities is an excellent way to visualize the overall results.
 
 ```{r plot-histogram-ampseq, fig.width=6, fig.height=4, out.width='100%'}
 ggplot(summary_df, aes(x = Probability)) +
@@ -540,58 +606,37 @@ ggplot(summary_df, aes(x = Probability)) +
 
 #### Step 7: Convergence diagnosis
 
-Convergence is monitored automatically during sampling using both the log-likelihood and standard diagnostics. By default, the algorithm will stop once the following criteria are met:
+We can generate convergence diagnostics for the Amplicon Sequencing analysis using the MCMC log-likelihood data. The figure below shows trace, Gelman–Rubin, histogram, and autocorrelation plots for a single site.
 
-+ **R-hat (Gelman–Rubin diagnostic):** All monitored parameters must have $\hat{R} < 1.1$ and the Gelman–Rubin plot should stabilize near 1.0 and remain below the 1.1 threshold.
-
-+ **Effective Sample Size (ESS):** The number of effectively independent samples must exceed the user-defined threshold (the value defined in parameter `ess_threshold`)
-
-+ **Maximum iterations:** If convergence has not been reached, sampling stops once the iteration cap (the value defined in parameter `max_iterations`).
-
-##### How to Generate Plots Interactively
-
-The `classify_infections` function saves the MCMC log-likelihood data for each site within its results object. You can use the exported `generate_likelihood_diagnostics` function to view the plots for any site interactively in your R session.
-
-The key plots for diagnostics are:
-
-+ **Trace plot:** Chains should look like "fuzzy caterpillars" with no trends.
-
-+ **Gelman-Rubin plot:** The shrink factor should approach 1.
-
-+ **Histogram:** Shows the posterior distribution of the log-likelihood.
-
-+ **Autocorrelation (ACF) plot:** Correlation should drop to zero quickly.
-
-
-The figures below illustrate the convergence diagnostics, including the Gelman–Rubin statistic, log-likelihood trace, histogram, and autocorrelation plot. Together, these provide a visual check that the chains have mixed well and stabilized.
-
-```{r convergence-diagnostics-ampseq, echo=FALSE, fig.align='center'}
+```{r convergence-diagnostics-ampseq}
 site_name <- "1"
 ampseq_loglik_data <- classification_summary_ampseq$mcmc_loglikelihoods[[site_name]]
 
 if (!is.null(ampseq_loglik_data)) {
-  generate_likelihood_diagnostics(
+    generate_likelihood_diagnostics(
     all_chains_loglikelihood = ampseq_loglik_data,
     site_name = site_name,
-    save_plot = TRUE,      
-    output_folder = output_dir_ampseq,
-    verbose = FALSE        
+    save_plot = TRUE,
+    output_folder = "vignettes/malrebay_vignette_outputs/ampseq_results",
+    verbose = FALSE
   )
-  
-  image_paths_ampseq <- file.path(output_dir_ampseq, "convergence_diagnosis", site_name,
-    c("gelman_loglikelihood.png", "loglikelihood_traceplot.png",
-      "loglikelihood_histogram.png", "loglikelihood_acf.png")
+image_paths_amp <- file.path(
+    "vignettes/malrebay_vignette_outputs/ampseq_results/convergence_diagnosis",
+    site_name,
+    c("gelman_loglikelihood.png",
+      "loglikelihood_traceplot.png",
+      "loglikelihood_histogram.png",
+      "loglikelihood_acf.png")
   )
-  
-  if (all(file.exists(image_paths_ampseq))) {
+
+  if (all(file.exists(image_paths_amp))) {
     knitr::kable(
-      matrix(paste0("![](", image_paths_ampseq, "){width=100%}"), ncol = 2, byrow = TRUE),
+      matrix(paste0("![](", image_paths_amp, "){width=100%}"), ncol = 2, byrow = TRUE),
       escape = FALSE
     )
   } else {
-    knitr::kable("One or more diagnostic plots could not be found.")
+    knitr::kable("Convergence diagnostic plots could not be found. Please check the file paths.")
   }
-
 } else {
   knitr::kable(paste("Log-likelihood data for site '", site_name, "' not available.", sep = ""))
 }
@@ -599,10 +644,20 @@ if (!is.null(ampseq_loglik_data)) {
 
 
 
-#### Step 9: Comparison with match-counting algorithm
 
+#### Step 8: Comparison with match-counting algorithm
 
-```{r match-counting}
+For amplicon sequencing data, we perform a similar comparison, but only between `MalReBay` and the `match-counting` algorithm. The resulting table includes:
+
++ Raw allele calls for each marker.
+
++ Match-counting summaries (`Number_Matches` and `Number_Loci_Compared`).
+
++ Per-locus results (`R`, `NI`, `IND`).
+
++ The posterior probability of recrudescence from `MalReBay.
+
+```{r MalReBay-match-counting}
 input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx",
                                  package = "MalReBay")
 imported_data_ampseq <- MalReBay::import_data(filepath = input_file_ampseq, verbose = FALSE)
@@ -654,7 +709,7 @@ The final table contains the following columns:
 + The final posterior probability of recrudescence from the Bayesian MCMC analysis (`Prob_Recrud_MalReBay`)
 
 
-## 7. Checking non-converged chains and improving convergence
+## 9. Checking non-converged chains and improving convergence
 
 Convergence is a crucial step to ensure that the MCMC results are reliable. In `MalReBay`, convergence is monitored automatically during sampling using both the log-likelihood and standard diagnostics. If convergence is not achieved, the posterior estimates may be unreliable, leading to misleading classification of recurrences. For this reason, this is section is explicit for non-convergence check, so that users can easily diagnose problematic chains and take corrective action (e.g., increasing iterations, adjusting priors, or running more chains).
 
@@ -666,16 +721,9 @@ Convergence is a crucial step to ensure that the MCMC results are reliable. In `
 
 
 #### output non-convergence
-```{r output-non-convergence, echo=FALSE}
+```{r output-non-convergence}
 input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-imported_data <- MalReBay:::import_data(filepath = input_file)
-
-main_output_dir <- here::here("vignettes", "malrebay_vignette_outputs")
-
-nonconverge_subdir <- file.path(main_output_dir, "non_convergence_test")
-if (!dir.exists(nonconverge_subdir)) {
-  dir.create(nonconverge_subdir, recursive = TRUE)
-}
+imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
 
 quick_mcmc_config <- list(
   n_chains = 4, 
@@ -688,25 +736,25 @@ quick_mcmc_config <- list(
 classification_summary_nonconverge <- classify_infections(
   imported_data = imported_data,
   mcmc_config = quick_mcmc_config,
-  output_folder = nonconverge_subdir,
+  output_folder = "vignettes/malrebay_vignette_outputs/non_convergence_test",
   n_workers = 2,
   verbose = FALSE
 )
 
-site_to_check <- "Benguela"
-loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_to_check]]
+site_name <- "Benguela"
+loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_name]]
 
 if (!is.null(loglik_data)) {
   generate_likelihood_diagnostics(
     all_chains_loglikelihood = loglik_data,
-    site_name = site_to_check,
+    site_name = site_name,
     save_plot = TRUE,
-    output_folder = nonconverge_subdir, 
+    output_folder = "vignettes/malrebay_vignette_outputs/non_convergence_test", 
     verbose = FALSE
   )
   
   image_paths <- file.path(
-    nonconverge_subdir, "convergence_diagnosis", site_to_check,
+    "vignettes/malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis", site_name,
     c("gelman_loglikelihood.png", "loglikelihood_traceplot.png", 
       "loglikelihood_histogram.png", "loglikelihood_acf.png")
   )
@@ -720,7 +768,7 @@ if (!is.null(loglik_data)) {
     knitr::kable("Non-convergence diagnostic plots could not be found. Please check the file paths.")
   }
 } else {
-  cat("No log-likelihood data found for site: ", site_to_check, "\n")
+  cat("No log-likelihood data found for site: ", site_name, "\n")
 }
 ```
 
@@ -733,6 +781,7 @@ When diagnosing MCMC output, the following visual patterns indicate that chains 
 + **Chain mixing:** In well-mixed traceplots, chains appear as overlapping “caterpillars” that fluctuate around a common mean. If the traces show different levels, do not overlap, or drift apart, it suggests poor mixing.
 
 + **Autocorrelation:** A good autocorrelation plot shows a rapid decline toward zero within a few lags. If autocorrelation remains high or decays slowly across iterations, it means the chains are exploring the parameter space inefficiently and convergence has not been reached.
+
 
 #### How to improve convergence.
 If chains fail to converge, several adjustments can help improve stability and mixing:
@@ -747,13 +796,13 @@ The package also includes an automatic convergence check: sampling will stop ear
 
 
 
-## 9. Package structure and specifications
+## 10. Package structure and specifications
 The `MalReBay` package is organized around three main stages: data preparation, Bayesian inference with MCMC, and summarization of results.
 
 ![MalReBay framework.](figure/MalReBay_Framework.png){width=600px}
 
 
-### 9.1 Data preparation
+### 10.1 Data preparation
 
 + `import_data()` function reads the input Excel file, automatically detects the data type (length-polymorphic vs. amplicon sequencing), and applies basic cleaning.
 
@@ -766,7 +815,7 @@ The `MalReBay` package is organized around three main stages: data preparation, 
 **Output**: A clean, structured dataset ready to be passed into the Bayesian engine.
 
 
-### 9.2 Bayesian inference with MCMC
+### 10.2 Bayesian inference with MCMC
 
 At the core of the package is a Gibbs sampling engine that explores the probability space and classifies recurrent infections as reinfections or recrudescences.
 
@@ -781,7 +830,7 @@ At the core of the package is a Gibbs sampling engine that explores the probabil
 + Multiple chains run in parallel, with automatic convergence checks based on R-hat and ESS.
 
 
-### 9.3 Summarization and output
+### 10.3 Summarization and output
 
 Once the MCMC converges, the package distills the results into clear, interpretable outputs.
 

@@ -9,7 +9,7 @@ import_data(filepath, verbose = TRUE)
 \arguments{
 \item{filepath}{The full path to the input Excel file.}
 
-\item{verbose}{A logical value indicating whether to print progress messages.}
+\item{verbose}{Logical. If TRUE, prints progress and data-cleaning messages.}
 }
 \value{
 A list containing the imported data.
