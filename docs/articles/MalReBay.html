@@ -46,7 +46,7 @@
 
 
 
-
+<script src="MalReBay_files/kePrint-0.0.1/kePrint.js"></script><link href="MalReBay_files/lightable-0.0.1/lightable.css" rel="stylesheet">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
@@ -70,23 +70,28 @@ color: grey
 <h2 id="introduction">1. Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
 <p>To monitor the effectiveness of antimalarial drugs, the <strong>World
-Health Organization (WHO)</strong> recommends <strong>Therapeutic
-Efficacy Studies (TES)</strong>. These are observational studies in
-which patients with uncomplicated malaria are treated and followed for
-several weeks to check if the infection clears and remains suppressed.
-Because patients can become re-infected during this follow-up period,
-distinguishing whether a recurrence is due to
+Health Organization (WHO)</strong> recommends the use of
+<strong>Therapeutic Efficacy Studies (TES)</strong>. TES are
+observational studies in which patients with uncomplicated malaria are
+treated and followed for several weeks to check if the infection clears
+and remains suppressed. Because patients can become re-infected during
+this follow-up period, distinguishing whether a recurrence is due to
 <strong>recrudescence</strong> (the reappearance of parasites from the
 original infection after partial clearance) or a
 <strong>reinfection</strong> (a new infection from a separate mosquito
-bite) is essential. This distinction, known as molecular correction, is
-made by comparing parasite genotypes from the initial infection and any
-recurrence.</p>
-<p><code>MalReBay</code> package is designed to determine whether a
-recurrent malaria infection is a <strong>recrudescence</strong> or a
-<strong>reinfection</strong>. It uses a Bayesian framework to analyze
-paired genotyping data from a patient’s initial infection (Day 0) and
-their subsequent day of recurrence (Day X).</p>
+bite) is essential. This process, known as <strong>molecular
+correction</strong>, relies on comparing parasite genotypes from the
+initial infection and any subsequent recurrence.</p>
+<p><code>MalReBay</code> is an R package that implements a
+<strong>Bayesian framework</strong> for molecular correction in malaria
+therapeutic efficacy studies. Instead of making a direct deterministic
+call, it uses genotyping data from a patient’s initial infection (day 0)
+and their recurrent infection to estimate the probability that a
+<strong>recurrence</strong> is due to <strong>recrudescence</strong>
+versus <strong>reinfection</strong>. Unlike rule-based methods, it
+explicitly incorporates genotyping uncertainty, within-host diversity,
+and local allele frequency information, providing a principled and
+robust classification.</p>
 <p>This tutorial provides a step-by-step guide to the main analysis
 workflow, from loading your data to interpreting the final results. We
 will first review the conceptual framework of the package and then walk
@@ -94,25 +99,74 @@ through a practical example, from loading data to interpreting the final
 results.</p>
 </div>
 <div class="section level2">
-<h2 id="the-malrebay-workflow">2. The MalReBay workflow<a class="anchor" aria-label="anchor" href="#the-malrebay-workflow"></a>
+<h2 id="bayesian-framework-for-molecular-correction">2. Bayesian framework for molecular correction<a class="anchor" aria-label="anchor" href="#bayesian-framework-for-molecular-correction"></a>
 </h2>
-<p>The <code>MalReBay</code> workflow follows a Bayesian framework to
-classify malaria recurrences as either recrudescence or reinfection.
-Conceptually, the process begins with paired genotyping data,
-incorporates model parameters (such as genotyping error and within-host
-diversity), and uses a Markov chain Monte Carlo (MCMC) algorithm to
-estimate the posterior probability of recrudescence for each case.</p>
+<p><code>MalReBay</code> applies a Bayesian model to classify each
+malaria recurrence as a <strong>recrudescence</strong> or a
+<strong>reinfection</strong>. For each patient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>,
+a binary variable
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>R</mi><mi>i</mi></msub><annotation encoding="application/x-tex">R_i</annotation></semantics></math>
+indicates the recurrence cause:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>R</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R_i = 1</annotation></semantics></math>
+for recrudescence and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>R</mi><mi>i</mi></msub><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">R_i = 0</annotation></semantics></math>
+for reinfection.</p>
+<p>Bayesian inference updates prior beliefs about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>R</mi><mi>i</mi></msub><annotation encoding="application/x-tex">R_i</annotation></semantics></math>
+using the observed genotyping data
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>D</mi><mi>i</mi></msub><annotation encoding="application/x-tex">D_i</annotation></semantics></math>,
+producing the posterior probability
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn><mo stretchy="false" form="prefix">|</mo><msub><mi>D</mi><mi>i</mi></msub><mo>,</mo><mi>θ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(R_i=1|D_i,\theta)</annotation></semantics></math>.</p>
+<p>The figure below illustrates this process, in which prior
+probabilities and data likelihoods are combined through Bayes’ rule to
+obtain the posterior probabilities that drive recurrence
+classification.</p>
 <div class="float">
-<img src="figure/Bayesian_Framework.png" width="0" alt="The Bayesian framework implemented in MalReBay."><div class="figcaption">The Bayesian framework implemented in
-MalReBay.</div>
+<img src="figure/Bayesian_Framework2.png" width="600" alt="Overview of the Bayesian inference framework implemented in MalReBay."><div class="figcaption">Overview of the Bayesian inference framework
+implemented in MalReBay.</div>
 </div>
-<p>Here we will have the conceptual steps that <code>MalReBay</code>
-takes to get from your raw data to the final classification. The main
-<code><a href="../reference/classify_infections.html">classify_infections()</a></code> function automates this entire
-pipeline for you.</p>
+<ul>
+<li><p>Prior
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(R_i)</annotation></semantics></math>
+is the baseline belief about recrudescence before seeing the
+data.</p></li>
+<li><p>Likelihood
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>D</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">|</mo><msub><mi>R</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(D_i|R_i)</annotation></semantics></math>
+is the probability of the observed allele patterns given each
+hypothesis, accounting for allele frequencies, within-host diversity,
+and genotyping errors.</p></li>
+<li><p>Posterior
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">|</mo><msub><mi>D</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(R_i|D_i)</annotation></semantics></math>
+is the updated probability that a recurrence is a recrudescence after
+combining priors and data.</p></li>
+<li><p>Recurrences events are classified as recrudescence when
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">|</mo><msub><mi>D</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(R_i|D_i)</annotation></semantics></math>
+exceeds a threshold (e.g., 0.5).</p></li>
+</ul>
+<p>In practice, these probabilities cannot be solved analytically
+because the posterior distribution has no closed form; therefore,
+MalReBay uses Markov chain Monte Carlo (MCMC) sampling to approximate
+them.</p>
 </div>
 <div class="section level2">
-<h2 id="input-data">3. Input Data<a class="anchor" aria-label="anchor" href="#input-data"></a>
+<h2 id="the-malrebay-workflow">3. The MalReBay workflow<a class="anchor" aria-label="anchor" href="#the-malrebay-workflow"></a>
+</h2>
+<p>The workflow begins with paired genotyping data from
+<code>day 0</code> and <code>day of recurrence</code> infections. These
+data are combined with model parameters (e.g., genotyping error rates,
+within-host diversity, allele frequencies) and analyzed using a Markov
+chain <strong>Monte Carlo (MCMC)</strong> algorithm. The output is the
+posterior probability of recrudescence for each recurrence, which can
+then be summarized at both the patient and study level.</p>
+<p>The main <code><a href="../reference/classify_infections.html">classify_infections()</a></code> function automates this
+process—from loading the genotyping data and parameter settings to
+generating posterior estimates and final recurrence classifications. The
+following sections describe each input type and how to prepare your data
+for analysis.</p>
+</div>
+<div class="section level2">
+<h2 id="input-data">4. Input Data<a class="anchor" aria-label="anchor" href="#input-data"></a>
 </h2>
 <p><code>MalReBay</code> can analyze two main types of genotyping
 data:</p>
@@ -127,68 +181,83 @@ TES.</p>
 are working with. Below we describe each format and provide
 examples.</p>
 <div class="section level3">
-<h3 id="length-polymorphic-markers">3.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers"></a>
+<h3 id="length-polymorphic-markers">4.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers"></a>
 </h3>
 <p>For length-polymorphic markers, the input Excel file should have the
-following structure: * A <code>Sample.ID</code> column that uniquely
-identifies each sample and includes “Day 0” or “Day of recurrence”. *
-The day of sampling (0 for baseline, X for recurrence). Note sometimes
-this is included in the Sample.ID column (e.g., <code>BD21-002D0</code>
-and <code>BD21-002D42</code>). * A <code>Site</code> column indicating
-the geographical origin of the sample. * Marker columns named like
-<code>LocusName_AlleleNumber</code> (e.g., <code>313_1</code>,
-<code>313_2</code>, <code>313_3</code>, etc.), where each cell
-represents the parasite clones fragment length observed in base
-pairs.</p>
+following structure: + A <code>Sample.ID</code> column that uniquely
+identifies each sample and includes “Day 0” or “Day of recurrence”.</p>
+<ul>
+<li><p>The day of sampling (0 for baseline, X for recurrence). Note
+sometimes this is included in the Sample.ID column (e.g.,
+<code>BD21-002D0</code> and <code>BD21-002D42</code>).</p></li>
+<li><p>A <code>Site</code> column indicating the geographical origin of
+the sample.</p></li>
+<li><p>Marker columns named like <code>LocusName_AlleleNumber</code>
+(e.g., <code>313_1</code>, <code>313_2</code>, <code>313_3</code>,
+etc.), where each cell represents the parasite clones fragment length
+observed in base pairs.</p></li>
+</ul>
 <p>Here is an example of the expected input format for
-length-polymorphic data: <img src="figure/angola_1.png" width="900" alt="Example input format"></p>
+length-polymorphic data: <img src="figure/angola_1.png" width="700" alt="Length polymorphic"></p>
 </div>
 <div class="section level3">
-<h3 id="amplicon-sequencing-data">3.2 Amplicon sequencing data<a class="anchor" aria-label="anchor" href="#amplicon-sequencing-data"></a>
+<h3 id="amplicon-sequencing-data">4.2 Amplicon sequencing data<a class="anchor" aria-label="anchor" href="#amplicon-sequencing-data"></a>
 </h3>
 <p>For amplicon sequencing,but the marker columns store haplotype labels
 instead of allele lengths. The input Excel file have similar structure
 as length-polymorphic data:</p>
 <p>Here is an example of the expected input format for amplicon
-sequencing data: <img src="figure/ampseq_1.png" width="900" alt="Example input format"></p>
+sequencing data: <img src="figure/ampseq_1.png" width="700" alt="Amplicon sequencingt"></p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="descritptive-analysis">4. Descritptive analysis<a class="anchor" aria-label="anchor" href="#descritptive-analysis"></a>
+<h2 id="descritptive-analysis">5. Descritptive analysis<a class="anchor" aria-label="anchor" href="#descritptive-analysis"></a>
 </h2>
 <p>Before running the main classification analysis, it is often helpful
 to explore your genotyping data. <code>MalReBay</code> provides
-specialized functions to visualize allele and haplotype diversity,
-depending on the type of data you are analyzing.</p>
+specialized functions to visualize <strong>allele and haplotype
+diversity</strong>, tailored to the type of data you are analyzing.
+These exploratory analyses can reveal which markers are <strong>most
+informative or frequent in the population</strong>, assess the
+<strong>quality and completeness of the genotyping data</strong>, and
+evaluate the <strong>overall polymorphism and richness of the
+markers</strong>, all of which are important for robust downstream
+analyses.</p>
 <div class="section level3">
-<h3 id="length-polymorphic-markers-1">4.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers-1"></a>
+<h3 id="length-polymorphic-markers-1">5.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers-1"></a>
 </h3>
-<p>For datasets with length-polymorphic markers, we use the
-<code><a href="../reference/generate_allele_frequency_plot.html">generate_allele_frequency_plot()</a></code> function, which
-generates:</p>
+<p>For datasets with length-polymorphic markers, we now focus on
+<strong>MOI (Multiplicity of Infection) and allele diversity
+visualizations</strong>:</p>
 <ul>
-<li>Visualizes the frequency of each allele (defined by its length in
-base pairs) for each marker.</li>
-<li>Produces faceted bar plots that directly compare Day 0 (baseline)
-and Day of recurrence samples.</li>
-<li>Helps to visually identify changes in the parasite population over
-time.</li>
+<li><p><strong>MOI Violin Plots:</strong> Show the distribution of the
+number of distinct parasite clones per infection, providing insight into
+infection complexity across samples.</p></li>
+<li><p><strong>Allele Diversity Pie Charts:</strong> Display the
+relative frequencies of different alleles within each marker,
+highlighting dominant alleles and overall marker polymorphism.</p></li>
+<li><p>These plots facilitate comparison of parasite population
+structure between baseline and recurrence samples.</p></li>
 </ul>
 </div>
 <div class="section level3">
-<h3 id="amplicon-sequencing-data-1">4.2 Amplicon sequencing data<a class="anchor" aria-label="anchor" href="#amplicon-sequencing-data-1"></a>
+<h3 id="amplicon-sequencing-data-1">5.2 Amplicon sequencing data<a class="anchor" aria-label="anchor" href="#amplicon-sequencing-data-1"></a>
 </h3>
-<p>For amplicon sequencing datasets, we use the
-<code>generate_haplotype_diversity_plots()</code> function which
-generates:</p>
+<p>For amplicon sequencing datasets, we present similar
+visualizations:</p>
 <ul>
-<li>Genetic Diversity: A bar chart comparing three standard diversity
-indices (Richness, Shannon, and Simpson) across the markers.</li>
+<li><p><strong>MOI Violin Plots:</strong> Illustrate the number of
+distinct haplotypes per infection.</p></li>
+<li><p><strong>Haplotype Diversity Pie Charts:</strong> Summarize the
+relative abundance of haplotypes for each marker.<br></p></li>
+<li><p>These plots help identify dominant haplotypes, assess genetic
+diversity, and detect shifts in the parasite population over
+time.</p></li>
 </ul>
 </div>
 </div>
 <div class="section level2">
-<h2 id="example-of-classification-length-polymorphic-markers">5. Example of classification: length-polymorphic markers<a class="anchor" aria-label="anchor" href="#example-of-classification-length-polymorphic-markers"></a>
+<h2 id="example-of-classification-length-polymorphic-markers">6. Example of classification: length-polymorphic markers<a class="anchor" aria-label="anchor" href="#example-of-classification-length-polymorphic-markers"></a>
 </h2>
 <p>In this section, we provide a step-by-step example of using the
 <code>MalReBay</code> package to classify recurrent malaria infections
@@ -203,61 +272,153 @@ Zaire.</p>
 <p>First, we need to load the <code>MalReBay</code> package, along with
 a couple of other useful packages for data handling and plotting.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/SwissTPH/MalReBay" class="external-link">MalReBay</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://SwissTPH.github.io/MalReBay" class="external-link">MalReBay</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://future.futureverse.org" class="external-link">future</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Attaching package: 'dplyr'</span></span>
-<span><span class="co">#&gt; The following objects are masked from 'package:stats':</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;     filter, lag</span></span>
-<span><span class="co">#&gt; The following objects are masked from 'package:base':</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;     intersect, setdiff, setequal, union</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">PfRecur</span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://purrr.tidyverse.org/" class="external-link">purrr</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyr.tidyverse.org" class="external-link">tidyr</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://here.r-lib.org/" class="external-link">here</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://haozhu233.github.io/kableExtra/" class="external-link">kableExtra</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level4">
 <h4 id="step-1-load-data">Step 1: Load data<a class="anchor" aria-label="anchor" href="#step-1-load-data"></a>
 </h4>
+<p>We import the example dataset using
+<code>MalReBay:::import_data()</code>. The dataset includes both late
+failure samples and any additional samples. We then process the sample
+IDs to extract the patient identifier and day of sampling (baseline or
+day of recurrence).</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># This command finds the example file within the installed MalReBay package</span></span>
-<span><span class="va">input_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Angola_2021_TES_7NMS.xlsx"</span>,</span>
-<span>                          package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">input_file</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "C:/Users/veron/AppData/Local/R/win-library/4.5/MalReBay/extdata/Angola_2021_TES_7NMS.xlsx"</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">input_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Angola_2021_TES_7NMS.xlsx"</span>, package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
+<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, <span class="va">imported_data</span><span class="op">$</span><span class="va">additional</span><span class="op">)</span></span>
+<span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="va">full_data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    Patient.ID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"D[0-9]+$"</span>, <span class="st">""</span>, <span class="va">Sample.ID</span><span class="op">)</span>,</span>
+<span>    DayNumber <span class="op">=</span> <span class="fu">readr</span><span class="fu">::</span><span class="fu"><a href="https://readr.tidyverse.org/reference/parse_number.html" class="external-link">parse_number</a></span><span class="op">(</span><span class="fu">stringr</span><span class="fu">::</span><span class="fu"><a href="https://stringr.tidyverse.org/reference/str_extract.html" class="external-link">str_extract</a></span><span class="op">(</span><span class="va">Sample.ID</span>, <span class="st">"D[0-9]+$"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    Day <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">DayNumber</span> <span class="op">==</span> <span class="fl">0</span>, <span class="st">"Day 0"</span>, <span class="st">"Day X"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level4">
-<h4 id="step-2-mcmc-configuration">Step 2: MCMC Configuration<a class="anchor" aria-label="anchor" href="#step-2-mcmc-configuration"></a>
+<h4 id="step-2-define-an-output-folder">Step 2: Define an Output Folder<a class="anchor" aria-label="anchor" href="#step-2-define-an-output-folder"></a>
+</h4>
+<p>An output folder is defined to store results generated by the
+analysis. If the folder does not already exist, it will be created
+automatically.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">output_dir_lp</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span>, <span class="st">"length_polymorphic_results"</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">output_dir_lp</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir_lp</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+</div>
+<div class="section level4">
+<h4 id="step-3-descriptive-statistics">Step 3: Descriptive statistics<a class="anchor" aria-label="anchor" href="#step-3-descriptive-statistics"></a>
+</h4>
+<p>In this step, we generate summary statistics to explore the genetic
+characteristics of the data before running the Bayesian model. Two key
+measures are considered:</p>
+<ul>
+<li><p>Multiplicity of Infection (MOI): estimates the number of distinct
+parasite clones per marker in each sample, providing insight into
+within-host diversity.</p></li>
+<li><p>Marker diversity: visualizes the distribution of allele sizes for
+each marker, helping to assess the level of genetic variability in the
+study population.</p></li>
+</ul>
+<p>These descriptive outputs give context for interpreting molecular
+correction results and can highlight potential sources of genotyping
+uncertainty.</p>
+<div class="section level5">
+<h5 id="multiplicity-of-infection-moi">Multiplicity of Infection (MOI)<a class="anchor" aria-label="anchor" href="#multiplicity-of-infection-moi"></a>
+</h5>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">genotypedata_lp</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, <span class="va">imported_data</span><span class="op">$</span><span class="va">additional</span><span class="op">)</span></span>
+<span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">genotypedata_lp</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">moi_per_marker_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">::</span><span class="fu"><a href="../reference/calculate_marker_moi.html">calculate_marker_moi</a></span><span class="op">(</span></span>
+<span>    genotypedata <span class="op">=</span> <span class="va">genotypedata_lp</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">moi_per_marker_data</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">moi_per_marker_data</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu">MalReBay</span><span class="fu">::</span><span class="fu"><a href="../reference/generate_marker_moi_plot.html">generate_marker_moi_plot</a></span><span class="op">(</span></span>
+<span>      moi_data <span class="op">=</span> <span class="va">moi_per_marker_data</span>,</span>
+<span>      output_folder <span class="op">=</span> <span class="va">output_dir_lp</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI plot: MOI data could not be calculated."</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI analysis: No genotype data available."</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/MOI-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset." width="672"></p>
+</div>
+<div class="section level5">
+<h5 id="marker-diversity">Marker diversity<a class="anchor" aria-label="anchor" href="#marker-diversity"></a>
+</h5>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">data_type</span> <span class="op">==</span> <span class="st">"length_polymorphic"</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">genotypedata_lp</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">diversity_plot</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/generate_diversity_plots.html">generate_diversity_plots</a></span><span class="op">(</span></span>
+<span>    genotypedata    <span class="op">=</span> <span class="va">genotypedata_lp</span>,</span>
+<span>    data_type       <span class="op">=</span> <span class="st">"length_polymorphic"</span>,</span>
+<span>    marker_info     <span class="op">=</span> <span class="va">imported_data</span><span class="op">$</span><span class="va">marker_info</span>,</span>
+<span>    output_folder   <span class="op">=</span> <span class="va">output_dir_lp</span>,</span>
+<span>    filename_prefix <span class="op">=</span> <span class="st">"length_polymorphic_diversity"</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">diversity_plot</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">diversity_plot</span><span class="op">)</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping Length Polymorphic diversity plots: No data found."</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/marker-diversity-length-descriptive-1.png" class="r-plt" alt="A set of pie charts showing the allele diversity for each microsatellite marker." width="672"></p>
+</div>
+</div>
+<div class="section level4">
+<h4 id="step-4-mcmc-configuration">Step 4: MCMC Configuration<a class="anchor" aria-label="anchor" href="#step-4-mcmc-configuration"></a>
 </h4>
 <p>The MCMC sampler has several parameters that control its runtime and
 convergence criteria. For this quick tutorial, we will use a relaxed
 configuration. For a real analysis, you should use more iterations
 (e.g., <code>max_iterations</code> should be 10000 or more) and stricter
 thresholds to ensure robust convergence.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="section level5">
+<h5 id="parameter-definitions">Parameter Definitions<a class="anchor" aria-label="anchor" href="#parameter-definitions"></a>
+</h5>
+<ul>
+<li><p><strong>max_iterations</strong> is the maximum total number of
+MCMC iterations and serves as an upper limit to ensure the model stops
+even if convergence hasn’t been reached earlier. The appropriate number
+of iterations varies with data quality and marker type. In this example
+we are using the Microsatellite markers and for the dataset we will use
+20,000 runs.</p></li>
+<li><p><strong>ess_threshold</strong> is the Effective Sample Size
+(ESS), a standard MCMC diagnostic that measures how many independent
+samples the chain effectively represents after accounting for
+autocorrelation. A higher ESS indicates better mixing and more reliable
+estimates. Common thresholds range from 200 to 1,000+, depending on
+precision needs. In our setup, 400 provides a balance between
+computational cost and reliability.</p></li>
+<li><p><strong>rhat_threshold</strong> is the Gelman–Rubin statistic,
+corresponding to the potential scale reduction factor (R̂ or R-hat). It
+compares within- and between-chain variance, with values close to 1.0
+indicating convergence (typically acceptable if R̂ &lt; 1.1).</p></li>
+<li><p><strong>chunk_size</strong> – The number of iterations run before
+intermediate convergence checks are performed. This parameter controls
+the automatic stopping mechanism by dividing the total iterations into
+smaller chunks (e.g., four). Smaller chunk_size values allow for more
+frequent convergence checks but increase computational time.</p></li>
+</ul>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  n_chains <span class="op">=</span> <span class="fl">2</span>,          <span class="co"># Run two parallel chains</span></span>
-<span>  chunk_size <span class="op">=</span> <span class="fl">5000</span>,       <span class="co"># Check convergence every 1000 iterations</span></span>
-<span>  max_iterations <span class="op">=</span> <span class="fl">20000</span>,   <span class="co"># Stop after a maximum of 1000 total iterations</span></span>
-<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,  <span class="co"># A relaxed convergence threshold for the example</span></span>
-<span>  ess_threshold <span class="op">=</span> <span class="fl">100</span>     <span class="co"># A relaxed effective sample size for the example</span></span>
+<span>  n_chains <span class="op">=</span> <span class="fl">4</span>, </span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
+<span>  ess_threshold <span class="op">=</span> <span class="fl">400</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
-<div class="section level4">
-<h4 id="step-3-define-an-output-folder">Step 3 Define an Output Folder<a class="anchor" aria-label="anchor" href="#step-3-define-an-output-folder"></a>
-</h4>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">output_dir</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">output_dir</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">output_dir</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs"</span></span></code></pre></div>
 </div>
 <div class="section level4">
-<h4 id="step-4-execute-the-main-function">Step 4 Execute the Main Function<a class="anchor" aria-label="anchor" href="#step-4-execute-the-main-function"></a>
+<h4 id="step-5-execute-the-main-function">Step 5: Execute the Main Function<a class="anchor" aria-label="anchor" href="#step-5-execute-the-main-function"></a>
 </h4>
 <p>Now we can run the analysis. <code><a href="../reference/classify_infections.html">classify_infections()</a></code> will
 print progress messages to the console, informing you about the data
@@ -265,215 +426,24 @@ type it detected, the sites it is analyzing, and the status of the MCMC
 convergence. The ‘future’ package is used in the background for parallel
 processing, so you can expect the analysis to run faster on multi-core
 machines.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="va">multisession</span>, workers <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">classification_summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
-<span>  input_filepath <span class="op">=</span> <span class="va">input_file</span>,</span>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">classification_summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
+<span>  imported_data <span class="op">=</span> <span class="va">imported_data</span>,</span>
 <span>  mcmc_config <span class="op">=</span> <span class="va">quick_mcmc_config</span>,</span>
-<span>  output_folder <span class="op">=</span> <span class="va">output_dir</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt; INFO: Detected 'length_polymorphic' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following length-polymorphic data processing pipeline.</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in classify_infections(input_filepath = input_file, mcmc_config =</span></span>
-<span><span class="co">#&gt; quick_mcmc_config, : The following requested markers were NOT found and will be</span></span>
-<span><span class="co">#&gt; ignored: PolyA, TA42, TA81, TA87, TA40, ARAII, PFG377, TA60, K1, MAD20, RO33,</span></span>
-<span><span class="co">#&gt; R033, FC27, IC, 3D7, glurp</span></span>
-<span><span class="co">#&gt; Proceeding with analysis for these markers: 313, 383, TA1, POLYA, PFPK2, 2490, TA109</span></span>
-<span><span class="co">#&gt; The model is running MCMC analysis...</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 19</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Benguela</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Benguela </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood          1       1.01</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      700.7297</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 13</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Lunda Sul</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Lunda Sul </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood       1.01       1.02</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;       506.223</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 38</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Zaire</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Zaire </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood          1       1.01</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      695.5842</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Structure of MCMC results ---</span></span>
-<span><span class="co">#&gt; List of 6</span></span>
-<span><span class="co">#&gt;  $ classifications:List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:3000] 0 0 1 0 0 0 0 0 0 0 ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:3000] 0 0 0 0 0 1 0 0 0 0 ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:3000] 1 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span><span class="co">#&gt;  $ ids            :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : chr [1:19] "BD21-002" "BD21-040" "BD21-041" "BD21-053" ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: chr [1:13] "LL21-008" "LL21-010" "LL21-027" "LL21-037" ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : chr [1:38] "ZL21-203" "ZL21-204" "ZL21-209" "ZL21-218" ...</span></span>
-<span><span class="co">#&gt;  $ locus_summary  :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela :'data.frame':    19 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:19] "BD21-002" "BD21-040" "BD21-041" "BD21-053" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:19] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul:'data.frame':    13 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:13] "LL21-008" "LL21-010" "LL21-027" "LL21-037" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:13] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    :'data.frame':    38 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:38] "ZL21-203" "ZL21-204" "ZL21-209" "ZL21-218" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:38] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;  $ locus_lrs      :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:3000] 1.79e-01 1.58e-09 2.29 1.34e-02 2.43e-19 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:3000] 0.007245 0.000625 1 1.525768 0.13728 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:3000] 2.56 4.08e-09 8.49e-01 1.00 1.92e-03 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locus_dists    :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:3000] 2 8 0 2 16 6 0 8 10 16 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:3000] 4 8 2 0 2 0 0 0 2 2 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:3000] 0 10 0 8 4 2 8 0 10 2 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locinames      :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt; NULL</span></span>
-<span><span class="co">#&gt; ----------------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$ids ---</span></span>
-<span><span class="co">#&gt; [1] "Benguela"  "Lunda Sul" "Zaire"    </span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$classifications ---</span></span>
-<span><span class="co">#&gt; [1] "Benguela"  "Lunda Sul" "Zaire"    </span></span>
-<span><span class="co">#&gt; ----------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Benguela' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  19 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  19x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Lunda Sul' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  13 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  13x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Zaire' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  38 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  38x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; Summary table saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/probability_of_recrudescence_summary.csv</span></span>
-<span><span class="co">#&gt; Detailed marker-level summary saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/marker_level_summary.csv</span></span>
-<span></span>
-<span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="va">sequential</span><span class="op">)</span></span></code></pre></div>
+<span>  output_folder <span class="op">=</span> <span class="va">output_dir_lp</span>,</span>
+<span>  n_workers <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The <code><a href="../reference/classify_infections.html">classify_infections()</a></code> function returns a list
-containing two key data frames: <code>summary</code> and
-<code>marker_details</code>.</p>
-<p>The <code>$summary</code> data frame provides the main result for
-each patient. Let’s look at the first few rows.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+containing two key data frames:</p>
+<ul>
+<li><p><code>summary</code>: Main results for each patient, including
+the posterior probability of recrudescence and the number of comparable
+loci.</p></li>
+<li><p><code>marker_details</code>: Detailed information on each marker
+for each patient.</p></li>
+</ul>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">summary_df</span> <span class="op">&lt;-</span> <span class="va">classification_summary</span><span class="op">$</span><span class="va">summary</span></span>
 <span></span>
 <span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">summary_df</span><span class="op">)</span>, caption <span class="op">=</span> <span class="st">"Classification summary."</span><span class="op">)</span></span></code></pre></div>
@@ -515,7 +485,7 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="odd">
 <td align="left">Benguela</td>
 <td align="left">BD21-041</td>
-<td align="right">0.9940000</td>
+<td align="right">0.9933333</td>
 <td align="right">7</td>
 <td align="right">7</td>
 <td align="right">7</td>
@@ -523,7 +493,7 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="even">
 <td align="left">Benguela</td>
 <td align="left">BD21-053</td>
-<td align="right">0.5953333</td>
+<td align="right">0.6266667</td>
 <td align="right">7</td>
 <td align="right">5</td>
 <td align="right">5</td>
@@ -546,25 +516,34 @@ each patient. Let’s look at the first few rows.</p>
 </tr>
 </tbody>
 </table>
-<p>The columns are: * <strong>Site</strong>: The geographical site of
-the sample. * <strong>Sample.ID</strong>: The unique patient identifier.
-* <strong>Probability</strong>: The posterior probability that the
+<p>Key columns in the summary include:</p>
+<ul>
+<li><p><strong>Site</strong>: The geographical site of the
+sample.</p></li>
+<li><p><strong>Sample.ID</strong>: The unique patient
+identifier.</p></li>
+<li><p><strong>Probability</strong>: The posterior probability that the
 infection is a <strong>recrudescence</strong>. A value near 1.0 suggests
-recrudescence, while a value near 0.0 suggests reinfection. *
-<strong>N_Available_D0 / N_Available_DF</strong>: The number of loci
-with genetic data at Day 0 and Day of Failure, respectively. *
-<strong>N_Comparable_Loci</strong>: The number of loci with data at
-<em>both</em> time points, which is the amount of data used for the
-classification.</p>
+recrudescence, while a value near 0.0 suggests reinfection.</p></li>
+<li><p><strong>N_Available_D0 / N_Available_DF</strong>: The number of
+loci with genetic data at Day 0 and Day of Failure,
+respectively.</p></li>
+<li><p><strong>N_Comparable_Loci</strong>: The number of loci with data
+at <em>both</em> time points, which is the amount of data used for the
+classification.</p></li>
+</ul>
 </div>
 <div class="section level4">
-<h4 id="step-5--visualizing-the-results">Step 5. Visualizing the Results<a class="anchor" aria-label="anchor" href="#step-5--visualizing-the-results"></a>
+<h4 id="step-6-visualizing-the-results">Step 6: Visualizing the Results<a class="anchor" aria-label="anchor" href="#step-6-visualizing-the-results"></a>
 </h4>
-<p>A histogram of the posterior probabilities is an excellent way to
-visualize the overall results. A clear separation into two groups (one
-near 0 and one near 1) indicates high confidence in the
-classifications.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p>A histogram of the posterior probabilities provides a clear overview
+of the classification results. If the histogram shows a clear separation
+into two groups (one near 0 and one near 1), this indicates high
+confidence in distinguishing recrudescence from reinfection.</p>
+<p>The histogram allows you to visually assess the certainty of the
+classifications and to identify any ambiguous cases for further
+investigation.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">summary_df</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">Probability</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>binwidth <span class="op">=</span> <span class="fl">0.05</span>, fill <span class="op">=</span> <span class="st">"steelblue"</span>, color <span class="op">=</span> <span class="st">"white"</span>, boundary <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
@@ -573,62 +552,489 @@ classifications.</p>
 <span>    y <span class="op">=</span> <span class="st">"Number of Patients"</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_bw</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/plot-histogram-length-1.png" width="700"></p>
+<p><img src="MalReBay_files/figure-html/plot-histogram-length-1.png" class="r-plt" alt="Histogram showing the distribution of posterior probabilities of recrudescence." width="100%"></p>
 <p class="caption">
-This histogram shows the distribution of posterior probabilities. In
-this example run, we see a clear group of patients with low probability
-(likely reinfections) and another group with high probability (likely
-recrudescences).
+In this example run, we see a clear group of patients with low
+probability (likely reinfections) and another group with high
+probability (likely recrudescences).
 </p>
 </div>
 <div class="section level4">
-<h4 id="step-6--convergence-diagnosis">Step 6. Convergence diagnosis<a class="anchor" aria-label="anchor" href="#step-6--convergence-diagnosis"></a>
+<h4 id="step-7-convergence-diagnosis">Step 7: Convergence diagnosis<a class="anchor" aria-label="anchor" href="#step-7-convergence-diagnosis"></a>
 </h4>
-<p><img src="malrebay_vignette_outputs/convergence_diagnosis/Benguela/loglikelihood_traceplot.png" width="400"><img src="malrebay_vignette_outputs/convergence_diagnosis/Benguela/gelman_loglikelihood.png" width="400"></p>
+<p>Convergence is monitored automatically during sampling using both the
+log-likelihood and standard diagnostics. By default, the algorithm will
+stop once the following criteria are met:</p>
+<ul>
+<li><p><strong>R-hat (Gelman–Rubin diagnostic):</strong> All monitored
+parameters must have
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover><mi>R</mi><mo accent="true">̂</mo></mover><mo>&lt;</mo><mn>1.1</mn></mrow><annotation encoding="application/x-tex">\hat{R} &lt; 1.1</annotation></semantics></math>
+and the Gelman–Rubin plot should stabilize near 1.0 and remain below the
+1.1 threshold.</p></li>
+<li><p><strong>Effective Sample Size (ESS):</strong> The number of
+effectively independent samples must exceed the user-defined threshold
+(the value defined in parameter <code>ess_threshold</code>)</p></li>
+<li><p><strong>Maximum iterations:</strong> If convergence has not been
+reached, sampling stops once the iteration cap (the value defined in
+parameter <code>max_iterations</code>).</p></li>
+</ul>
+<div class="section level5">
+<h5 id="how-to-generate-plots-interactively">How to Generate Plots Interactively<a class="anchor" aria-label="anchor" href="#how-to-generate-plots-interactively"></a>
+</h5>
+<p>The <code>classify_infections</code> function saves the MCMC
+log-likelihood data for each site within its results object. You can use
+the exported <code>generate_likelihood_diagnostics</code> function to
+view the plots for any site interactively in your R session.</p>
+<p>The key plots for diagnostics are:</p>
+<ul>
+<li><p><strong>Trace plot:</strong> Chains should look like “fuzzy
+caterpillars” with no trends.</p></li>
+<li><p><strong>Gelman-Rubin plot:</strong> The shrink factor should
+approach 1.</p></li>
+<li><p><strong>Histogram:</strong> Shows the posterior distribution of
+the log-likelihood.</p></li>
+<li><p><strong>Autocorrelation (ACF) plot:</strong> Correlation should
+drop to zero quickly.</p></li>
+</ul>
+</div>
+<div class="section level5">
+<h5 id="example-diagnostics-for-a-single-site">Example: Diagnostics for a Single Site<a class="anchor" aria-label="anchor" href="#example-diagnostics-for-a-single-site"></a>
+</h5>
+<p>Below is an example using the site <code>Benguela</code>,
+demonstrating how to generate and visualize the convergence
+diagnostics:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">site_name</span> <span class="op">&lt;-</span> <span class="st">"Benguela"</span></span>
+<span><span class="va">LP_loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="va">plot_output_folder_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir_lp</span>, <span class="st">"convergence_diagnosis"</span>, <span class="va">site_name</span><span class="op">)</span></span>
+<span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">LP_loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">LP_loglik_data</span>,</span>
+<span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
+<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="va">output_dir_lp</span>, </span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span>  <span class="va">image_paths_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
+<span>    <span class="st">"malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis"</span>,</span>
+<span>    <span class="va">site_name</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"gelman_loglikelihood.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_traceplot.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_histogram.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_acf.png"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="va">check_paths_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="va">image_paths_lp</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">check_paths_lp</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">alt_texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plot for"</span>, <span class="va">site_name</span>, <span class="st">":"</span>, </span>
+<span>                       <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Gelman-Rubin plot"</span>, <span class="st">"Trace plot"</span>, <span class="st">"Histogram"</span>, <span class="st">"Autocorrelation plot"</span><span class="op">)</span><span class="op">)</span></span>
+<span>    </span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"!["</span>, <span class="va">alt_texts</span>, <span class="st">"]("</span>, <span class="va">image_paths_lp</span>, <span class="st">"){width=100%}"</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>      escape <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plots could not be found. Please check the file paths."</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available."</span>, sep <span class="op">=</span> <span class="st">""</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="49%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr class="odd">
+<td align="left"><img src="malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis/Benguela/gelman_loglikelihood.png" style="width:100.0%" alt="Convergence diagnostic plot for Benguela : Gelman-Rubin plot"></td>
+<td align="left"><img src="malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis/Benguela/loglikelihood_traceplot.png" style="width:100.0%" alt="Convergence diagnostic plot for Benguela : Trace plot"></td>
+</tr>
+<tr class="even">
+<td align="left"><img src="malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis/Benguela/loglikelihood_histogram.png" style="width:100.0%" alt="Convergence diagnostic plot for Benguela : Histogram"></td>
+<td align="left"><img src="malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis/Benguela/loglikelihood_acf.png" style="width:100.0%" alt="Convergence diagnostic plot for Benguela : Autocorrelation plot"></td>
+</tr>
+</tbody>
+</table>
+<p>These trace, Gelman–Rubin, histogram, and ACF plots collectively
+provide visual assurance that the MCMC chains have mixed well and
+stabilized.</p>
+</div>
 </div>
 <div class="section level4">
-<h4 id="step-7--marker-descriptive-analysis">Step 7. Marker descriptive analysis<a class="anchor" aria-label="anchor" href="#step-7--marker-descriptive-analysis"></a>
+<h4 id="step-8-comparison-with-other-methods">Step 8: Comparison with other methods<a class="anchor" aria-label="anchor" href="#step-8-comparison-with-other-methods"></a>
 </h4>
-<p>The visualizing the allele frequency distributions helps us
-understand the genetic diversity of the markers and can reveal potential
-issues or interesting patterns in the data. The following code chunk
-will only run if the detected data type is
-<code>length_polymorphic</code>, as these frequency plots are most
-informative for numeric allele lengths. It uses the internal helper
-function <code>generate_allele_frequency_plot</code> to create two sets
-of plots, Site-Specific Plots and Overall Plot.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># We use the package's internal import function to get the raw data</span></span>
-<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">import_data</span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file</span><span class="op">)</span></span>
-<span><span class="co">#&gt; INFO: Detected 'length_polymorphic' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following length-polymorphic data processing pipeline.</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, <span class="va">imported_data</span><span class="op">$</span><span class="va">additional</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Generate an overview plot for all sites combined</span></span>
-<span><span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/generate_allele_frequency_plot.html">generate_allele_frequency_plot</a></span><span class="op">(</span></span>
-<span>  raw_data_df <span class="op">=</span> <span class="va">full_data</span>,</span>
-<span>  output_folder <span class="op">=</span> <span class="va">output_dir</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The plots help answer the following questions about data quality and
-genetic diversity:</p>
+<p>To evaluate the performance of the Bayesian classification in
+MalReBay, we compare its results against two alternative approaches:</p>
 <ul>
-<li>“Is marker X highly diverse (many bars) or mostly monomorphic (one
-or two bars)?”</li>
-<li>“Are there differences in allele distributions between Day 0 and Day
-of Failure?”</li>
-<li>“Does the genetic diversity in Site A differ significantly from Site
-B?”</li>
+<li><p><strong>PfRecur</strong>: A previously published algorithm for
+classifying recurrent malaria infections.</p></li>
+<li><p><strong>Match-counting algorithm</strong>: A simpler approach
+that counts allele matches between Day 0 and recurrence
+samples.</p></li>
 </ul>
+<p>For length-polymorphic markers, we combine the outputs of
+<code>MalReBay</code>, <code>PfRecur</code>, and the
+<code>match-counting</code> algorithm into a single table. This allows
+us to examine, for each patient:</p>
+<ul>
+<li><p>The number of loci compared and the number of matches between
+samples.</p></li>
+<li><p>The per-locus results from match-counting (<code>R</code> for
+match, <code>NI</code> for non-match, <code>IND</code> for
+indeterminate).</p></li>
+<li><p>The posterior probability of recrudescence from
+<code>MalReBay</code> (MalReBay_Probability).</p></li>
+<li><p>The <code>PfRecur</code> probability for the same samples
+(PfRecur_Probability).</p></li>
+</ul>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pfrecur_raw_data</span> <span class="op">&lt;-</span> <span class="fu">readxl</span><span class="fu">::</span><span class="fu"><a href="https://readxl.tidyverse.org/reference/read_excel.html" class="external-link">read_excel</a></span><span class="op">(</span><span class="va">input_file</span><span class="op">)</span></span>
+<span><span class="va">pfrecur_results</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/run_pfrecur_analysis_original_prep.html">run_pfrecur_analysis_original_prep</a></span><span class="op">(</span></span>
+<span>  raw_data_df <span class="op">=</span> <span class="va">pfrecur_raw_data</span>,</span>
+<span>  output_csv_path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".csv"</span><span class="op">)</span> </span>
+<span><span class="op">)</span></span>
+<span><span class="va">pfrecur_clean</span> <span class="op">&lt;-</span> <span class="va">pfrecur_results</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>Sample.ID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">sub</a></span><span class="op">(</span><span class="st">"^(.*)D[0-9]+$"</span>, <span class="st">"\\1"</span>, <span class="va">recurrence</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>PfRecur_Probability <span class="op">=</span> <span class="va">M1</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Sample.ID</span>, <span class="va">PfRecur_Probability</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">match_results_lp</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">perform_match_counting</span><span class="op">(</span></span>
+<span>  genotypedata_latefailures <span class="op">=</span> <span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, </span>
+<span>  marker_info <span class="op">=</span> <span class="va">imported_data</span><span class="op">$</span><span class="va">marker_info</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">match_summary_clean</span> <span class="op">&lt;-</span> <span class="va">match_results_lp</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>Patient.ID <span class="op">=</span> <span class="va">Sample.ID</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">malrebay_clean</span> <span class="op">&lt;-</span> <span class="va">summary_df</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Site</span>, <span class="va">Sample.ID</span>, MalReBay_Probability <span class="op">=</span> <span class="va">Probability</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>Sample.ID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">Sample.ID</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">combined_comparison</span> <span class="op">&lt;-</span> <span class="va">malrebay_clean</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">pfrecur_clean</span>, by <span class="op">=</span> <span class="st">"Sample.ID"</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">match_summary_clean</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span> <span class="op">=</span> <span class="st">"Patient.ID"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">marker_column_names</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">match_summary_clean</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Patient.ID"</span>, <span class="st">"Number_Matches"</span>, <span class="st">"Number_Loci_Compared"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">final_table</span> <span class="op">&lt;-</span> <span class="va">combined_comparison</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span></span>
+<span>    <span class="va">Sample.ID</span>,</span>
+<span>    <span class="va">Site</span>,</span>
+<span>    <span class="va">Number_Matches</span>,</span>
+<span>    Loci_Compared <span class="op">=</span> <span class="va">Number_Loci_Compared</span>,</span>
+<span>    <span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of</a></span><span class="op">(</span><span class="va">marker_column_names</span><span class="op">)</span>,</span>
+<span>    MalReBay <span class="op">=</span> <span class="va">MalReBay_Probability</span>,</span>
+<span>    PfRecur <span class="op">=</span> <span class="va">PfRecur_Probability</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">final_table</span><span class="op">)</span>, </span>
+<span>  caption <span class="op">=</span> <span class="st">"Comparison of MalReBay, PfRecur, and match-counting results for length-polymorphic data."</span>,</span>
+<span>  digits <span class="op">=</span> <span class="fl">3</span></span>
+<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/kableExtra/man/scroll_box.html" class="external-link">scroll_box</a></span><span class="op">(</span>width <span class="op">=</span> <span class="st">"100%"</span><span class="op">)</span> </span></code></pre></div>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:100%; ">
+<table class="table">
+<caption>
+Comparison of MalReBay, PfRecur, and match-counting results for
+length-polymorphic data.
+</caption>
+<thead><tr>
+<th style="text-align:left;">
+Sample.ID
+</th>
+<th style="text-align:left;">
+Site
+</th>
+<th style="text-align:right;">
+Number_Matches
+</th>
+<th style="text-align:right;">
+Loci_Compared
+</th>
+<th style="text-align:left;">
+313
+</th>
+<th style="text-align:left;">
+383
+</th>
+<th style="text-align:left;">
+TA1
+</th>
+<th style="text-align:left;">
+POLYA
+</th>
+<th style="text-align:left;">
+PFPK2
+</th>
+<th style="text-align:left;">
+2490
+</th>
+<th style="text-align:left;">
+TA109
+</th>
+<th style="text-align:right;">
+MalReBay
+</th>
+<th style="text-align:right;">
+PfRecur
+</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+BD21-002
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+BD21-040
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+BD21-041
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+0.993
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+BD21-053
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+IND
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+IND
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+0.627
+</td>
+<td style="text-align:right;">
+0.312
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+BD21-075
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+BD21-099
+</td>
+<td style="text-align:left;">
+Benguela
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 </div>
 <div class="section level2">
-<h2 id="example-of-classification-amplicon-sequencing-data">6. Example of classification: amplicon sequencing data<a class="anchor" aria-label="anchor" href="#example-of-classification-amplicon-sequencing-data"></a>
+<h2 id="example-of-classification-amplicon-sequencing-data">7. Example of classification: amplicon sequencing data<a class="anchor" aria-label="anchor" href="#example-of-classification-amplicon-sequencing-data"></a>
 </h2>
 <p>We will use an example dataset included with the package, containing
 data from a Therapeutic Efficacy Study (TES). The dataset includes 3
@@ -637,128 +1043,125 @@ sequencing markers; <code>cpmp</code>, <code>cpp</code>,
 <div class="section level4">
 <h4 id="step-1-load-data-1">Step 1: Load data<a class="anchor" aria-label="anchor" href="#step-1-load-data-1"></a>
 </h4>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># This command finds the example file within the installed MalReBay package</span></span>
-<span><span class="va">input_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Amplicon_Sequencing.xlsx"</span>,</span>
-<span>                          package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
+<p>We import the example AmpSeq dataset using
+<code>MalReBay:::import_data()</code>. The dataset includes both late
+failure and additional samples.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">input_file_ampseq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Amplicon_Sequencing.xlsx"</span>,</span>
+<span>                                 package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">input_file</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "C:/Users/veron/AppData/Local/R/win-library/4.5/MalReBay/extdata/Amplicon_Sequencing.xlsx"</span></span></code></pre></div>
+<span><span class="va">imported_data_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file_ampseq</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level4">
-<h4 id="step-2-mcmc-configuration-1">Step 2: MCMC Configuration<a class="anchor" aria-label="anchor" href="#step-2-mcmc-configuration-1"></a>
+<h4 id="step-2-define-an-output-folder-1">Step 2: Define an Output Folder<a class="anchor" aria-label="anchor" href="#step-2-define-an-output-folder-1"></a>
 </h4>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<p>We define an output folder to store the results. If the folder does
+not exist, it is created automatically.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">output_dir_ampseq</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span>, <span class="st">"ampseq_results"</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">output_dir_ampseq</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir_ampseq</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+</div>
+<div class="section level4">
+<h4 id="step-3-descriptive-statistics-1">Step 3: Descriptive statistics<a class="anchor" aria-label="anchor" href="#step-3-descriptive-statistics-1"></a>
+</h4>
+<p>We explore the genetic characteristics of the data:</p>
+<ul>
+<li><p>Multiplicity of Infection estimates the number of distinct
+haplotypes per marker in each sample, reflecting within-host
+diversity.</p></li>
+<li><p>Haplotype diversity plots summarize the relative frequencies of
+haplotypes for each marker, highlighting dominant haplotypes and overall
+genetic variability.</p></li>
+</ul>
+<div class="section level5">
+<h5 id="multiplicity-of-infection-moi-1">Multiplicity of Infection (MOI)<a class="anchor" aria-label="anchor" href="#multiplicity-of-infection-moi-1"></a>
+</h5>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">genotypedata_ampseq</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">late_failures</span>, <span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">additional</span><span class="op">)</span></span>
+<span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">genotypedata_ampseq</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">moi_per_marker_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/calculate_marker_moi.html">calculate_marker_moi</a></span><span class="op">(</span></span>
+<span>    genotypedata <span class="op">=</span> <span class="va">genotypedata_ampseq</span></span>
+<span>  <span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">moi_per_marker_data</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">moi_per_marker_data</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu">MalReBay</span><span class="fu">::</span><span class="fu"><a href="../reference/generate_marker_moi_plot.html">generate_marker_moi_plot</a></span><span class="op">(</span></span>
+<span>      moi_data <span class="op">=</span> <span class="va">moi_per_marker_data</span>,</span>
+<span>      output_folder <span class="op">=</span> <span class="va">output_dir_ampseq</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI plot: MOI data could not be calculated."</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI analysis: No genotype data available."</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/MOI_ampseq-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the amplicon sequencing dataset." width="672"></p>
+</div>
+<div class="section level5">
+<h5 id="marker-diversity-1">Marker diversity<a class="anchor" aria-label="anchor" href="#marker-diversity-1"></a>
+</h5>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">data_type</span> <span class="op">==</span> <span class="st">"ampseq"</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">genotypedata_ampseq</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">diversity_plot_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/generate_diversity_plots.html">generate_diversity_plots</a></span><span class="op">(</span></span>
+<span>    genotypedata    <span class="op">=</span> <span class="va">genotypedata_ampseq</span>,</span>
+<span>    data_type       <span class="op">=</span> <span class="st">"ampseq"</span>,</span>
+<span>    output_folder   <span class="op">=</span> <span class="va">output_dir_ampseq</span>,</span>
+<span>    filename_prefix <span class="op">=</span> <span class="st">"haplotype_diversity"</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">diversity_plot_ampseq</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">diversity_plot_ampseq</span><span class="op">)</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping AmpSeq diversity plots: No data found."</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/marker-diversity-ampseq-1.png" class="r-plt" alt="A set of pie charts showing the haplotype diversity for each amplicon sequencing marker." width="672"></p>
+</div>
+</div>
+<div class="section level4">
+<h4 id="step-4-mcmc-configuration-1">Step 4: MCMC Configuration<a class="anchor" aria-label="anchor" href="#step-4-mcmc-configuration-1"></a>
+</h4>
+<p>We define the MCMC sampler parameters for this tutorial run:</p>
+<ul>
+<li><p><strong>n_chains</strong> Number of parallel chains.</p></li>
+<li><p><strong>chunk_size</strong> Number of iterations between
+convergence checks.</p></li>
+<li><p><strong>max_iterations</strong> Maximum total
+iterations.</p></li>
+<li><p><strong>rhat_threshold</strong> Gelman–Rubin statistic threshold
+for convergence.</p></li>
+<li><p><strong>ess_threshold</strong> Effective Sample Size
+threshold.</p></li>
+</ul>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  n_chains <span class="op">=</span> <span class="fl">2</span>,          <span class="co"># Run two parallel chains</span></span>
-<span>  chunk_size <span class="op">=</span> <span class="fl">5000</span>,       <span class="co"># Check convergence every 1000 iterations</span></span>
-<span>  max_iterations <span class="op">=</span> <span class="fl">20000</span>,   <span class="co"># Stop after a maximum of 1000 total iterations</span></span>
-<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,  <span class="co"># A relaxed convergence threshold for the example</span></span>
-<span>  ess_threshold <span class="op">=</span> <span class="fl">100</span>     <span class="co"># A relaxed effective sample size for the example</span></span>
+<span>  n_chains <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
+<span>  ess_threshold <span class="op">=</span> <span class="fl">400</span>     </span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level4">
-<h4 id="step-3-define-an-output-folder-1">Step 3 Define an Output Folder<a class="anchor" aria-label="anchor" href="#step-3-define-an-output-folder-1"></a>
+<h4 id="step-5-execute-the-main-function-1">Step 5: Execute the Main Function<a class="anchor" aria-label="anchor" href="#step-5-execute-the-main-function-1"></a>
 </h4>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">output_dir</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">output_dir</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">output_dir</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs"</span></span></code></pre></div>
-</div>
-<div class="section level4">
-<h4 id="step-4-execute-the-main-function-1">Step 4 Execute the Main Function<a class="anchor" aria-label="anchor" href="#step-4-execute-the-main-function-1"></a>
-</h4>
-<p>Now we can run the analysis. <code><a href="../reference/classify_infections.html">classify_infections()</a></code> will
-print progress messages to the console, informing you about the data
-type it detected, the sites it is analyzing, and the status of the MCMC
-convergence. The ‘future’ package is used in the background for parallel
-processing, so you can expect the analysis to run faster on multi-core
-machines.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="va">multisession</span>, workers <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">classification_summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
-<span>  input_filepath <span class="op">=</span> <span class="va">input_file</span>,</span>
+<p>Now we can run the analysis by calling the
+<code><a href="../reference/classify_infections.html">classify_infections()</a></code>.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">classification_summary_ampseq</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
+<span>  imported_data <span class="op">=</span> <span class="va">imported_data_ampseq</span>,</span>
 <span>  mcmc_config <span class="op">=</span> <span class="va">quick_mcmc_config</span>,</span>
-<span>  output_folder <span class="op">=</span> <span class="va">output_dir</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt; INFO: Detected 'ampseq' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following amplicon sequencing data processing pipeline.</span></span>
-<span><span class="co">#&gt; Amplicon sequencing data detected. The following haplotype markers will be used for analysis: cpmp, cpp, amaD3</span></span>
-<span><span class="co">#&gt; The model is running MCMC analysis...</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 20</span></span>
-<span><span class="co">#&gt; INFO: Preparing AMPSEQ MCMC engine for site: 1</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: 1 </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood       1.35       2.09</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      2089.676</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Structure of MCMC results ---</span></span>
-<span><span class="co">#&gt; List of 6</span></span>
-<span><span class="co">#&gt;  $ classifications:List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1: num [1:20, 1:3000] 1 1 1 1 1 1 1 1 1 0 ...</span></span>
-<span><span class="co">#&gt;  $ ids            :List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1: chr [1:20] "1" "10" "11" "12" ...</span></span>
-<span><span class="co">#&gt;  $ locus_summary  :List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1:'data.frame':    20 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:20] "1" "10" "11" "12" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:20] 3 3 3 3 3 3 3 3 3 3 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:20] 3 3 3 3 3 3 3 3 3 3 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:20] 3 3 3 3 3 3 3 3 3 3 ...</span></span>
-<span><span class="co">#&gt;  $ locus_lrs      :List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1: num [1:20, 1:3, 1:3000] 87 18.9 27.5 71.6 1060.7 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locus_dists    :List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1: num [1:20, 1:3, 1:3000] 0 0 0 0 0 0 1 0 0 1 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locinames      :List of 1</span></span>
-<span><span class="co">#&gt;   ..$ 1: chr [1:3] "cpmp" "cpp" "amaD3"</span></span>
-<span><span class="co">#&gt; NULL</span></span>
-<span><span class="co">#&gt; ----------------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$ids ---</span></span>
-<span><span class="co">#&gt; [1] "1"</span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$classifications ---</span></span>
-<span><span class="co">#&gt; [1] "1"</span></span>
-<span><span class="co">#&gt; ----------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: '1' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  20 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  20x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; Summary table saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/probability_of_recrudescence_summary.csv</span></span>
-<span><span class="co">#&gt; Detailed marker-level summary saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/marker_level_summary.csv</span></span>
-<span></span>
-<span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html" class="external-link">plan</a></span><span class="op">(</span><span class="va">sequential</span><span class="op">)</span></span></code></pre></div>
+<span>  output_folder <span class="op">=</span> <span class="va">output_dir_ampseq</span>,</span>
+<span>  n_workers <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The <code><a href="../reference/classify_infections.html">classify_infections()</a></code> function returns a list
 containing two key data frames: <code>summary</code> and
 <code>marker_details</code>.</p>
 <p>The <code>$summary</code> data frame provides the main result for
 each patient. Let’s look at the first few rows.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">summary_df</span> <span class="op">&lt;-</span> <span class="va">classification_summary</span><span class="op">$</span><span class="va">summary</span></span>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">summary_df</span> <span class="op">&lt;-</span> <span class="va">classification_summary_ampseq</span><span class="op">$</span><span class="va">summary</span></span>
 <span></span>
 <span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">summary_df</span><span class="op">)</span>, caption <span class="op">=</span> <span class="st">"Classification summary."</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
@@ -783,7 +1186,7 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="odd">
 <td align="left">1</td>
 <td align="left">1</td>
-<td align="right">0.9996667</td>
+<td align="right">1.0000000</td>
 <td align="right">3</td>
 <td align="right">3</td>
 <td align="right">3</td>
@@ -823,32 +1226,36 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="even">
 <td align="left">1</td>
 <td align="left">14</td>
-<td align="right">0.9916667</td>
+<td align="right">0.9933333</td>
 <td align="right">3</td>
 <td align="right">3</td>
 <td align="right">3</td>
 </tr>
 </tbody>
 </table>
-<p>The columns are: * <strong>Site</strong>: The geographical site of
-the sample. * <strong>Sample.ID</strong>: The unique patient identifier.
-* <strong>Probability</strong>: The posterior probability that the
+<p>Key columns in the summary include:</p>
+<ul>
+<li><p><strong>Site</strong>: The geographical site of the
+sample.</p></li>
+<li><p><strong>Sample.ID</strong>: The unique patient
+identifier.</p></li>
+<li><p><strong>Probability</strong>: The posterior probability that the
 infection is a <strong>recrudescence</strong>. A value near 1.0 suggests
-recrudescence, while a value near 0.0 suggests reinfection. *
-<strong>N_Available_D0 / N_Available_DF</strong>: The number of loci
-with genetic data at Day 0 and Day of Failure, respectively. *
-<strong>N_Comparable_Loci</strong>: The number of loci with data at
-<em>both</em> time points, which is the amount of data used for the
-classification.</p>
+recrudescence, while a value near 0.0 suggests reinfection.</p></li>
+<li><p><strong>N_Available_D0 / N_Available_DF</strong>: The number of
+loci with genetic data at Day 0 and Day of recurrence,
+respectively.</p></li>
+<li><p><strong>N_Comparable_Loci</strong>: The number of loci with data
+at <em>both</em> time points, which is the amount of data used for the
+classification.</p></li>
+</ul>
 </div>
 <div class="section level4">
-<h4 id="step-5--visualizing-the-results-1">Step 5. Visualizing the Results<a class="anchor" aria-label="anchor" href="#step-5--visualizing-the-results-1"></a>
+<h4 id="step-6-visualizing-the-results-1">Step 6: Visualizing the Results<a class="anchor" aria-label="anchor" href="#step-6-visualizing-the-results-1"></a>
 </h4>
 <p>A histogram of the posterior probabilities is an excellent way to
-visualize the overall results. A clear separation into two groups (one
-near 0 and one near 1) indicates high confidence in the
-classifications.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+visualize the overall results.</p>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">summary_df</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">Probability</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>binwidth <span class="op">=</span> <span class="fl">0.05</span>, fill <span class="op">=</span> <span class="st">"steelblue"</span>, color <span class="op">=</span> <span class="st">"white"</span>, boundary <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
@@ -857,447 +1264,479 @@ classifications.</p>
 <span>    y <span class="op">=</span> <span class="st">"Number of Patients"</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_bw</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/plot-histogram-ampseq-1.png" width="700"></p>
+<p><img src="MalReBay_files/figure-html/plot-histogram-ampseq-1.png" class="r-plt" alt="Histogram showing the distribution of posterior probabilities of recrudescence." width="100%"></p>
 <p class="caption">
-This histogram shows the distribution of posterior probabilities. In
-this example run, we see a clear group of patients with low probability
-(likely reinfections) and another group with high probability (likely
-recrudescences).
+In this example run, we see a clear group of patients with low
+probability (likely reinfections) and another group with high
+probability (likely recrudescences).
 </p>
 </div>
 <div class="section level4">
-<h4 id="step-6--convergence-diagnosis-1">Step 6. Convergence diagnosis<a class="anchor" aria-label="anchor" href="#step-6--convergence-diagnosis-1"></a>
+<h4 id="step-7-convergence-diagnosis-1">Step 7: Convergence diagnosis<a class="anchor" aria-label="anchor" href="#step-7-convergence-diagnosis-1"></a>
 </h4>
-<p><img src="malrebay_vignette_outputs/convergence_diagnosis/1/loglikelihood_traceplot.png" width="400"><img src="malrebay_vignette_outputs/convergence_diagnosis/1/gelman_loglikelihood.png" width="400"></p>
+<p>We can generate convergence diagnostics for the Amplicon Sequencing
+analysis using the MCMC log-likelihood data. The figure below shows
+trace, Gelman–Rubin, histogram, and autocorrelation plots for a single
+site.</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">site_name</span> <span class="op">&lt;-</span> <span class="st">"1"</span></span>
+<span><span class="va">ampseq_loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary_ampseq</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
+<span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">ampseq_loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">ampseq_loglik_data</span>,</span>
+<span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
+<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="va">output_dir_ampseq</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span>  <span class="va">image_paths_amp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
+<span>    <span class="st">"malrebay_vignette_outputs/ampseq_results/convergence_diagnosis"</span>,</span>
+<span>    <span class="va">site_name</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"gelman_loglikelihood.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_traceplot.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_histogram.png"</span>,</span>
+<span>      <span class="st">"loglikelihood_acf.png"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="va">check_paths_amp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
+<span>    <span class="st">"vignettes"</span>,</span>
+<span>    <span class="va">image_paths_amp</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">check_paths_amp</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">alt_texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plot for"</span>, <span class="va">site_name</span>, <span class="st">":"</span>, </span>
+<span>                       <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Gelman-Rubin plot"</span>, <span class="st">"Trace plot"</span>, <span class="st">"Histogram"</span>, <span class="st">"Autocorrelation plot"</span><span class="op">)</span><span class="op">)</span></span>
+<span>    </span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"!["</span>, <span class="va">alt_texts</span>, <span class="st">"]("</span>, <span class="va">image_paths_amp</span>, <span class="st">"){width=100%}"</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>      escape <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plots could not be found. Please check the file paths."</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available."</span>, sep <span class="op">=</span> <span class="st">""</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="48%">
+<col width="51%">
+</colgroup>
+<tbody>
+<tr class="odd">
+<td align="left"><img src="malrebay_vignette_outputs/ampseq_results/convergence_diagnosis/1/gelman_loglikelihood.png" style="width:100.0%" alt="Convergence diagnostic plot for 1 : Gelman-Rubin plot"></td>
+<td align="left"><img src="malrebay_vignette_outputs/ampseq_results/convergence_diagnosis/1/loglikelihood_traceplot.png" style="width:100.0%" alt="Convergence diagnostic plot for 1 : Trace plot"></td>
+</tr>
+<tr class="even">
+<td align="left"><img src="malrebay_vignette_outputs/ampseq_results/convergence_diagnosis/1/loglikelihood_histogram.png" style="width:100.0%" alt="Convergence diagnostic plot for 1 : Histogram"></td>
+<td align="left"><img src="malrebay_vignette_outputs/ampseq_results/convergence_diagnosis/1/loglikelihood_acf.png" style="width:100.0%" alt="Convergence diagnostic plot for 1 : Autocorrelation plot"></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level4">
-<h4 id="step-7--marker-descriptive-analysis-1">Step 7. Marker descriptive analysis<a class="anchor" aria-label="anchor" href="#step-7--marker-descriptive-analysis-1"></a>
+<h4 id="step-8-comparison-with-match-counting-algorithm">Step 8: Comparison with match-counting algorithm<a class="anchor" aria-label="anchor" href="#step-8-comparison-with-match-counting-algorithm"></a>
 </h4>
-<p>The visualizing the allele frequency distributions helps us
-understand the genetic diversity of the markers and can reveal potential
-issues or interesting patterns in the data. The following code chunk
-will only run if the detected data type is
-<code>length_polymorphic</code>, as these frequency plots are most
-informative for numeric allele lengths. It uses the internal helper
-function <code>generate_allele_frequency_plot</code> to create two sets
-of plots, Site-Specific Plots and Overall Plot.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># We use the package's internal import function to get the raw data</span></span>
-<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">import_data</span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file</span><span class="op">)</span></span>
-<span><span class="co">#&gt; INFO: Detected 'ampseq' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following amplicon sequencing data processing pipeline.</span></span>
-<span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, <span class="va">imported_data</span><span class="op">$</span><span class="va">additional</span><span class="op">)</span></span>
+<p>For amplicon sequencing data, we perform a similar comparison, but
+only between <code>MalReBay</code> and the <code>match-counting</code>
+algorithm. The resulting table includes:</p>
+<ul>
+<li><p>Raw allele calls for each marker.</p></li>
+<li><p>Match-counting summaries (<code>Number_Matches</code> and
+<code>Number_Loci_Compared</code>).</p></li>
+<li><p>Per-locus results (<code>R</code>, <code>NI</code>,
+<code>IND</code>).</p></li>
+<li><p>The posterior probability of recrudescence from
+`MalReBay.</p></li>
+</ul>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">input_file_ampseq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Amplicon_Sequencing.xlsx"</span>,</span>
+<span>                                 package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
+<span><span class="va">imported_data_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file_ampseq</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Generate an overview plot for all sites combined</span></span>
-<span><span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">generate_haplotype_diversity_plots</span><span class="op">(</span></span>
-<span>  raw_data_df <span class="op">=</span> <span class="va">full_data</span>,</span>
-<span>  output_folder <span class="op">=</span> <span class="va">output_dir</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">mcmc_summary_ampseq</span> <span class="op">&lt;-</span> <span class="va">classification_summary_ampseq</span><span class="op">$</span><span class="va">summary</span></span>
+<span></span>
+<span><span class="va">match_results_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">perform_match_counting</span><span class="op">(</span></span>
+<span>  genotypedata_latefailures <span class="op">=</span> <span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">late_failures</span>, </span>
+<span>  marker_info <span class="op">=</span> <span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">marker_info</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">mcmc_summary_clean</span> <span class="op">&lt;-</span> <span class="va">mcmc_summary_ampseq</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>Patient.ID <span class="op">=</span> <span class="va">Sample.ID</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Patient.ID</span>, <span class="va">Site</span>, Prob_Recrud_MalReBay <span class="op">=</span> <span class="va">Probability</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">match_summary_clean</span> <span class="op">&lt;-</span> <span class="va">match_results_ampseq</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>Patient.ID <span class="op">=</span> <span class="va">Sample.ID</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">final_table</span> <span class="op">&lt;-</span> <span class="va">mcmc_summary_clean</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">match_summary_clean</span>, by <span class="op">=</span> <span class="st">"Patient.ID"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">marker_column_names</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">match_summary_clean</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Patient.ID"</span>, <span class="st">"Number_Matches"</span>, <span class="st">"Number_Loci_Compared"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">final_comparison_table_ampseq</span> <span class="op">&lt;-</span> <span class="va">final_table</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span></span>
+<span>    Sample.ID <span class="op">=</span> <span class="va">Patient.ID</span>,</span>
+<span>    <span class="va">Site</span>,</span>
+<span>    <span class="va">Number_Matches</span>,</span>
+<span>    <span class="va">Number_Loci_Compared</span>,</span>
+<span>    <span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of</a></span><span class="op">(</span><span class="va">marker_column_names</span><span class="op">)</span>, </span>
+<span>    MalReBay <span class="op">=</span> <span class="va">Prob_Recrud_MalReBay</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">final_comparison_table_ampseq</span><span class="op">)</span>, </span>
+<span>  caption <span class="op">=</span> <span class="st">"Comparison of match-counting results and MalReBay probability for amplicon data."</span>,</span>
+<span>  digits <span class="op">=</span> <span class="fl">3</span></span>
+<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/kableExtra/man/scroll_box.html" class="external-link">scroll_box</a></span><span class="op">(</span>width <span class="op">=</span> <span class="st">"100%"</span><span class="op">)</span></span></code></pre></div>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:100%; ">
+<table class="table">
+<caption>
+Comparison of match-counting results and MalReBay probability for
+amplicon data.
+</caption>
+<thead><tr>
+<th style="text-align:left;">
+Sample.ID
+</th>
+<th style="text-align:left;">
+Site
+</th>
+<th style="text-align:right;">
+Number_Matches
+</th>
+<th style="text-align:right;">
+Number_Loci_Compared
+</th>
+<th style="text-align:left;">
+cpmp
+</th>
+<th style="text-align:left;">
+cpp
+</th>
+<th style="text-align:left;">
+amaD3
+</th>
+<th style="text-align:right;">
+MalReBay
+</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+10
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+11
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+12
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+NI
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+13
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+1.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+14
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:left;">
+R
+</td>
+<td style="text-align:right;">
+0.993
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The final table contains the following columns:</p>
+<ul>
+<li><p>The raw allele data for each marker.</p></li>
+<li><p>The summary of the match-counting algorithm
+(<code>Number_Matches</code>,
+<code>Number_Loci_Compared</code>).</p></li>
+<li><p>The detailed per-locus result of the match-counting
+(<code>R</code> for match, <code>NI</code> for non-match,
+<code>IND</code> for indeterminate).</p></li>
+<li><p>The final posterior probability of recrudescence from the
+Bayesian MCMC analysis (<code>Prob_Recrud_MalReBay</code>)</p></li>
+</ul>
 </div>
 </div>
 <div class="section level2">
-<h2 id="checking-for-convergence">7. Checking for convergence<a class="anchor" aria-label="anchor" href="#checking-for-convergence"></a>
+<h2 id="checking-non-converged-chains-and-improving-convergence">9. Checking non-converged chains and improving convergence<a class="anchor" aria-label="anchor" href="#checking-non-converged-chains-and-improving-convergence"></a>
 </h2>
 <p>Convergence is a crucial step to ensure that the MCMC results are
 reliable. In <code>MalReBay</code>, convergence is monitored
 automatically during sampling using both the log-likelihood and standard
-diagnostics. By default, the algorithm will stop once the following
-criteria are met:</p>
+diagnostics. If convergence is not achieved, the posterior estimates may
+be unreliable, leading to misleading classification of recurrences. For
+this reason, this is section is explicit for non-convergence check, so
+that users can easily diagnose problematic chains and take corrective
+action (e.g., increasing iterations, adjusting priors, or running more
+chains).</p>
 <ul>
-<li>R-hat (Gelman–Rubin diagnostic) &lt; 1.1</li>
-<li>Effective Sample Size (ESS) &gt; 100 ()</li>
-<li>Or when the maximum iteration limit is reached.</li>
+<li><p>R-hat (Gelman–Rubin diagnostic): All parameters must satisfy
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover><mi>R</mi><mo accent="true">̂</mo></mover><mo>&lt;</mo><mn>1.1</mn></mrow><annotation encoding="application/x-tex">\hat{R} &lt; 1.1</annotation></semantics></math>.</p></li>
+<li><p>Effective Sample Size (ESS): The ESS must exceed the user-defined
+threshold (<code>ess_threshold</code>).</p></li>
+<li><p>Maximum iterations: If convergence has not been achieved,
+sampling stops once the upper limit (<code>max_iterations</code>) is
+reached.</p></li>
 </ul>
-<p>Checking if the algorithm has not converge.</p>
+<div class="section level4">
+<h4 id="output-non-convergence">output non-convergence<a class="anchor" aria-label="anchor" href="#output-non-convergence"></a>
+</h4>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">input_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Angola_2021_TES_7NMS.xlsx"</span>, package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
+<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  n_chains <span class="op">=</span> <span class="fl">4</span>, </span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
+<span>  ess_threshold <span class="op">=</span> <span class="fl">100</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">output_dir_nonconverge</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span>, <span class="st">"non_convergence_test"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">classification_summary_nonconverge</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
+<span>  imported_data <span class="op">=</span> <span class="va">imported_data</span>,</span>
+<span>  mcmc_config <span class="op">=</span> <span class="va">quick_mcmc_config</span>,</span>
+<span>  output_folder <span class="op">=</span> <span class="va">output_dir_nonconverge</span>,</span>
+<span>  n_workers <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">site_name</span> <span class="op">&lt;-</span> <span class="st">"Benguela"</span></span>
+<span><span class="va">loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary_nonconverge</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
+<span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">loglik_data</span>,</span>
+<span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
+<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="va">output_dir_nonconverge</span>, </span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span>  <span class="va">image_paths</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
+<span>    <span class="st">"malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis"</span>, <span class="va">site_name</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"gelman_loglikelihood.png"</span>, <span class="st">"loglikelihood_traceplot.png"</span>, </span>
+<span>      <span class="st">"loglikelihood_histogram.png"</span>, <span class="st">"loglikelihood_acf.png"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="va">check_paths</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="va">image_paths</span><span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">check_paths</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">alt_texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Non-convergence diagnostic plot for"</span>, <span class="va">site_name</span>, <span class="st">":"</span>, </span>
+<span>                       <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Gelman-Rubin plot"</span>, <span class="st">"Trace plot"</span>, <span class="st">"Histogram"</span>, <span class="st">"Autocorrelation plot"</span><span class="op">)</span><span class="op">)</span></span>
+<span>    </span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"!["</span>, <span class="va">alt_texts</span>, <span class="st">"]("</span>, <span class="va">image_paths</span>, <span class="st">"){width=100%}"</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>      escape <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="st">"Non-convergence diagnostic plots could not be found. Please check the file paths."</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"No log-likelihood data found for site: "</span>, <span class="va">site_name</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="49%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr class="odd">
+<td align="left"><img src="malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis/Benguela/gelman_loglikelihood.png" style="width:100.0%" alt="Non-convergence diagnostic plot for Benguela : Gelman-Rubin plot"></td>
+<td align="left"><img src="malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis/Benguela/loglikelihood_traceplot.png" style="width:100.0%" alt="Non-convergence diagnostic plot for Benguela : Trace plot"></td>
+</tr>
+<tr class="even">
+<td align="left"><img src="malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis/Benguela/loglikelihood_histogram.png" style="width:100.0%" alt="Non-convergence diagnostic plot for Benguela : Histogram"></td>
+<td align="left"><img src="malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis/Benguela/loglikelihood_acf.png" style="width:100.0%" alt="Non-convergence diagnostic plot for Benguela : Autocorrelation plot"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level4">
+<h4 id="identifying-lack-of-convergence">Identifying lack of convergence<a class="anchor" aria-label="anchor" href="#identifying-lack-of-convergence"></a>
+</h4>
+<p>When diagnosing MCMC output, the following visual patterns indicate
+that chains may not have converged:</p>
 <ul>
-<li>R-hat values: If the Gelman–Rubin statistic does not stabilize close
-to 1.0 and remains above 1.1, this suggests poor convergence.</li>
-<li>Chain mixing: If the MCMC chains have noticeably different means or
-if the “caterpillar” plots of the chains do not overlap, this indicates
-poor mixing.</li>
-<li>Autocorrelation: Ideally, autocorrelation in the samples should drop
-quickly toward zero. High and persistent autocorrelation suggests that
-the chains are exploring the parameter space inefficiently.</li>
+<li><p><strong><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>R</mi><mo accent="true">̂</mo></mover><annotation encoding="application/x-tex">\hat{R}</annotation></semantics></math>
+values:</strong> In the Gelman–Rubin plot, values should stabilize close
+to 1.0. If the curve stays well above 1.1 or drifts without settling, it
+signals non-convergence.</p></li>
+<li><p><strong>Chain mixing:</strong> In well-mixed traceplots, chains
+appear as overlapping “caterpillars” that fluctuate around a common
+mean. If the traces show different levels, do not overlap, or drift
+apart, it suggests poor mixing.</p></li>
+<li><p><strong>Autocorrelation:</strong> A good autocorrelation plot
+shows a rapid decline toward zero within a few lags. If autocorrelation
+remains high or decays slowly across iterations, it means the chains are
+exploring the parameter space inefficiently and convergence has not been
+reached.</p></li>
 </ul>
-<p>How to improve convergence.</p>
+</div>
+<div class="section level4">
+<h4 id="how-to-improve-convergence-">How to improve convergence.<a class="anchor" aria-label="anchor" href="#how-to-improve-convergence-"></a>
+</h4>
+<p>If chains fail to converge, several adjustments can help improve
+stability and mixing:</p>
 <ul>
-<li>Increase the number of iterations.</li>
-<li>Run more chains in parallel.</li>
-<li>Adjust the chunk size or thinning interval.</li>
+<li><p>Increase the number of iterations: Allow more sampling time so
+chains have a better chance to explore the parameter space
+thoroughly.</p></li>
+<li><p>Run additional chains in parallel: More chains improve the
+chances of detecting convergence and can reveal mixing issues more
+clearly.</p></li>
+<li><p>Adjust the chunk size or apply thinning: Modifying these settings
+can reduce autocorrelation and improve the efficiency of the
+samples.</p></li>
 </ul>
 <p>The package also includes an automatic convergence check: sampling
 will stop early once the criteria above are satisfied, so in many cases
 you will not need to tune these settings manually.</p>
 </div>
-<div class="section level2">
-<h2 id="comparison-with-match-counting-algorithm">8. Comparison with match-counting algorithm<a class="anchor" aria-label="anchor" href="#comparison-with-match-counting-algorithm"></a>
-</h2>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">input_file_length</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Angola_2021_TES_7NMS.xlsx"</span>,</span>
-<span>                                 package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">import_data</span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file_length</span><span class="op">)</span></span>
-<span><span class="co">#&gt; INFO: Detected 'length_polymorphic' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following length-polymorphic data processing pipeline.</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span></span>
-<span><span class="va">match_results_df</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">perform_match_counting</span><span class="op">(</span></span>
-<span>  genotypedata_latefailures <span class="op">=</span> <span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, </span>
-<span>  marker_info <span class="op">=</span> <span class="va">imported_data</span><span class="op">$</span><span class="va">marker_info</span><span class="op">)</span></span>
-<span>  </span>
-<span><span class="va">mcmc_summary_for_comparison</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
-<span>  input_filepath <span class="op">=</span> <span class="va">input_file_length</span>,</span>
-<span>  mcmc_config <span class="op">=</span> <span class="va">quick_mcmc_config</span>,</span>
-<span>  output_folder <span class="op">=</span> <span class="va">output_dir</span></span>
-<span><span class="op">)</span><span class="op">$</span><span class="va">summary</span></span>
-<span><span class="co">#&gt; INFO: Detected 'length_polymorphic' data format.</span></span>
-<span><span class="co">#&gt; INFO: Following length-polymorphic data processing pipeline.</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in FUN(X[[i]], ...): NAs introduced by coercion</span></span>
-<span><span class="co">#&gt; Warning in classify_infections(input_filepath = input_file_length, mcmc_config</span></span>
-<span><span class="co">#&gt; = quick_mcmc_config, : The following requested markers were NOT found and will</span></span>
-<span><span class="co">#&gt; be ignored: PolyA, TA42, TA81, TA87, TA40, ARAII, PFG377, TA60, K1, MAD20,</span></span>
-<span><span class="co">#&gt; RO33, R033, FC27, IC, 3D7, glurp</span></span>
-<span><span class="co">#&gt; Proceeding with analysis for these markers: 313, 383, TA1, POLYA, PFPK2, 2490, TA109</span></span>
-<span><span class="co">#&gt; The model is running MCMC analysis...</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 19</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Benguela</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Benguela </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood          1          1</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      699.7713</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 13</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Lunda Sul</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Lunda Sul </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood       1.05       1.16</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      514.0891</span></span>
-<span><span class="co">#&gt; Number of patient pairs (nids) found: 38</span></span>
-<span><span class="co">#&gt; INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: Zaire</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 4 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 3 columns for this locus.</span></span>
-<span><span class="co">#&gt;     -&gt; Binning method is: microsatellite</span></span>
-<span><span class="co">#&gt;     -&gt; Found 5 columns for this locus.</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Generating convergence diagnostics for site: Zaire </span></span>
-<span><span class="co">#&gt; Gelman-Rubin R-hat for Log-Likelihood:</span></span>
-<span><span class="co">#&gt; Potential scale reduction factors:</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               Point est. Upper C.I.</span></span>
-<span><span class="co">#&gt; loglikelihood       1.01       1.07</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Effective Sample Size (ESS):</span></span>
-<span><span class="co">#&gt; loglikelihood </span></span>
-<span><span class="co">#&gt;      511.9711</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Structure of MCMC results ---</span></span>
-<span><span class="co">#&gt; List of 6</span></span>
-<span><span class="co">#&gt;  $ classifications:List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:3000] 0 0 1 0 0 0 0 0 0 0 ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:3000] 0 0 0 0 0 0 0 1 0 0 ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:3000] 1 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span><span class="co">#&gt;  $ ids            :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : chr [1:19] "BD21-002" "BD21-040" "BD21-041" "BD21-053" ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: chr [1:13] "LL21-008" "LL21-010" "LL21-027" "LL21-037" ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : chr [1:38] "ZL21-203" "ZL21-204" "ZL21-209" "ZL21-218" ...</span></span>
-<span><span class="co">#&gt;  $ locus_summary  :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela :'data.frame':    19 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:19] "BD21-002" "BD21-040" "BD21-041" "BD21-053" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:19] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:19] 7 7 7 5 7 7 7 7 5 7 ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul:'data.frame':    13 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:13] "LL21-008" "LL21-010" "LL21-027" "LL21-037" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:13] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:13] 7 7 2 7 4 6 7 6 5 4 ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    :'data.frame':    38 obs. of  4 variables:</span></span>
-<span><span class="co">#&gt;   .. ..$ patient_id       : chr [1:38] "ZL21-203" "ZL21-204" "ZL21-209" "ZL21-218" ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_d0   : num [1:38] 7 7 7 7 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_available_df   : num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;   .. ..$ n_comparable_loci: num [1:38] 7 7 7 4 7 7 7 7 7 7 ...</span></span>
-<span><span class="co">#&gt;  $ locus_lrs      :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:3000] 4.21e-01 5.33e-08 4.84 8.91e-03 2.87e-16 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:3000] 2.38e-03 3.04e-07 1.00 4.47e-05 2.05e-03 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:3000] 2.41 2.36e-10 2.97e-02 1.00 6.27e-04 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locus_dists    :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : num [1:19, 1:7, 1:3000] 2 8 0 2 16 10 0 8 12 12 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: num [1:13, 1:7, 1:3000] 4 10 0 6 4 0 0 0 8 2 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : num [1:38, 1:7, 1:3000] 0 10 2 2 4 2 10 2 10 2 ...</span></span>
-<span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 3</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;   .. .. ..$ : NULL</span></span>
-<span><span class="co">#&gt;  $ locinames      :List of 3</span></span>
-<span><span class="co">#&gt;   ..$ Benguela : chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt;   ..$ Lunda Sul: chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt;   ..$ Zaire    : chr [1:7] "313" "383" "TA1" "POLYA" ...</span></span>
-<span><span class="co">#&gt; NULL</span></span>
-<span><span class="co">#&gt; ----------------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$ids ---</span></span>
-<span><span class="co">#&gt; [1] "Benguela"  "Lunda Sul" "Zaire"    </span></span>
-<span><span class="co">#&gt; --- Debug: Names in results$classifications ---</span></span>
-<span><span class="co">#&gt; [1] "Benguela"  "Lunda Sul" "Zaire"    </span></span>
-<span><span class="co">#&gt; ----------------------------------</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Benguela' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  19 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  19x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Lunda Sul' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  13 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  13x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; --- Processing site: 'Zaire' ---</span></span>
-<span><span class="co">#&gt; Is site_ids NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Length of site_ids:  38 </span></span>
-<span><span class="co">#&gt; Is site_probs_matrix NULL?  FALSE </span></span>
-<span><span class="co">#&gt; Dimensions of site_probs_matrix:  38x3000 </span></span>
-<span><span class="co">#&gt; Check passed. Calculating probabilities...</span></span>
-<span><span class="co">#&gt; Summary table saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/probability_of_recrudescence_summary.csv</span></span>
-<span><span class="co">#&gt; Detailed marker-level summary saved to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/marker_level_summary.csv</span></span>
-<span></span>
-<span><span class="va">mcmc_summary_for_merge</span> <span class="op">&lt;-</span> <span class="va">mcmc_summary_for_comparison</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span>, <span class="st">"Probability"</span>, <span class="st">"N_Comparable_Loci"</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">mcmc_summary_for_merge</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span>, <span class="st">"Prob_Recrudescence"</span>, <span class="st">"N_Comparable_Loci_MCMC"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">alleles_with_patient_id</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="va">imported_data</span><span class="op">$</span><span class="va">late_failures</span>, </span>
-<span>                                         Patient.ID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">" (Day 0|Day Failure)$"</span>, <span class="st">""</span>, <span class="va">Sample.ID</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">final_table</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">alleles_with_patient_id</span>, <span class="va">match_results_df</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Patient.ID"</span> <span class="op">=</span> <span class="st">"Sample.ID"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">final_table</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">final_table</span>, <span class="va">mcmc_summary_for_merge</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span> <span class="op">=</span> <span class="st">"Sample.ID"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">final_table_sorted</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">final_table</span>, <span class="va">Patient.ID</span>, <span class="va">Sample.ID</span><span class="op">)</span></span>
-<span><span class="va">id_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span>, <span class="st">"Site"</span><span class="op">)</span></span>
-<span><span class="va">original_allele_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"(_allele_\\d+|_\\d+)$"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">final_table_sorted</span><span class="op">)</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">analysis_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Number_Matches"</span>, <span class="st">"Number_Loci_Compared"</span>, </span>
-<span>                   <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">match_results_df</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample.ID"</span>, <span class="st">"Number_Matches"</span>, <span class="st">"Number_Loci_Compared"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                   <span class="st">"Prob_Recrudescence"</span>, <span class="st">"N_Comparable_Loci_MCMC"</span><span class="op">)</span></span>
-<span><span class="va">final_cols_order</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">intersect</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">id_cols</span>, <span class="va">original_allele_cols</span>, <span class="va">analysis_cols</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">final_table_sorted</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">final_comparison_table</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">final_table_sorted</span>, <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of</a></span><span class="op">(</span><span class="va">final_cols_order</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">output_path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir</span>, <span class="st">"algorithm_classification_comparison_table.csv"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/write.table.html" class="external-link">write.csv</a></span><span class="op">(</span><span class="va">final_comparison_table</span>, <span class="va">output_path</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span>, na <span class="op">=</span> <span class="st">""</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">final_comparison_table</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">12</span><span class="op">]</span><span class="op">)</span>, </span>
-<span>  caption <span class="op">=</span> <span class="st">"First 12 columns of the final comparison table."</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<table style="width:100%;" class="table">
-<caption>First 12 columns of the final comparison table.</caption>
-<colgroup>
-<col width="23%">
-<col width="10%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-<col width="6%">
-</colgroup>
-<thead><tr class="header">
-<th align="left">Sample.ID</th>
-<th align="left">Site</th>
-<th align="right">313_1</th>
-<th align="right">313_2</th>
-<th align="right">313_3</th>
-<th align="right">383_1</th>
-<th align="right">383_2</th>
-<th align="right">383_3</th>
-<th align="right">TA1_1</th>
-<th align="right">TA1_2</th>
-<th align="right">TA1_3</th>
-<th align="right">TA1_4</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td align="left">BD21-002 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">248</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">133</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">174</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-002 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">246</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-<tr class="odd">
-<td align="left">BD21-040 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">230</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">137</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">162</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-040 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">222</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">171</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-<tr class="odd">
-<td align="left">BD21-041 Day 0</td>
-<td align="left">Benguela</td>
-<td align="right">238</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">139</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="left">BD21-041 Day Failure</td>
-<td align="left">Benguela</td>
-<td align="right">238</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">123</td>
-<td align="right">141</td>
-<td align="right">NA</td>
-<td align="right">177</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-<td align="right">NA</td>
-</tr>
-</tbody>
-</table>
-<p>The final table contains the following columns: * The raw allele data
-for each marker. * The summary of the match-counting algorithm
-(<code>Number_Matches</code>, <code>Number_Loci_Compared</code>). * The
-detailed per-locus result of the match-counting (<code>R</code> for
-match, <code>NI</code> for non-match, <code>IND</code> for
-indeterminate). * The final posterior probability of recrudescence from
-the Bayesian MCMC analysis (<code>Prob_Recrudescence</code>)</p>
 </div>
 <div class="section level2">
-<h2 id="package-structure-and-specifications">9. Package structure and specifications<a class="anchor" aria-label="anchor" href="#package-structure-and-specifications"></a>
+<h2 id="package-structure-and-specifications">10. Package structure and specifications<a class="anchor" aria-label="anchor" href="#package-structure-and-specifications"></a>
 </h2>
 <p>The <code>MalReBay</code> package is organized around three main
 stages: data preparation, Bayesian inference with MCMC, and
@@ -1306,48 +1745,65 @@ summarization of results.</p>
 <img src="figure/MalReBay_Framework.png" width="600" alt="MalReBay framework."><div class="figcaption">MalReBay framework.</div>
 </div>
 <div class="section level3">
-<h3 id="data-preparation">9.1 Data Preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
+<h3 id="data-preparation">10.1 Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
 </h3>
 <ul>
-<li>
-<code>import_data()</code> function reads the input Excel file,
+<li><p><code><a href="../reference/import_data.html">import_data()</a></code> function reads the input Excel file,
 automatically detects the data type (length-polymorphic vs. amplicon
-sequencing), and applies basic cleaning.</li>
-<li>For length-polymorphic markers, <code>define_alleles()</code> groups
-raw fragment lengths into discrete, well-defined allele bins.</li>
-<li>
-<code>calculate_frequencies()</code> function estimates the initial
-population-level frequency of each allele, which serves as the prior for
-the MCMC algorithm.</li>
-<li>
-<code>recode_alleles()</code> converts allele values into
-integer-based codes, ensuring consistency across sites and markers.</li>
+sequencing), and applies basic cleaning.</p></li>
+<li><p>For length-polymorphic markers, <code>define_alleles()</code>
+groups raw fragment lengths into discrete, well-defined allele
+bins.</p></li>
+<li><p><code>calculate_frequencies()</code> function estimates the
+initial population-level frequency of each allele, which serves as the
+prior for the MCMC algorithm.</p></li>
+<li><p><code>recode_alleles()</code> converts allele values into
+integer-based codes, ensuring consistency across sites and
+markers.</p></li>
 </ul>
 <p><strong>Output</strong>: A clean, structured dataset ready to be
 passed into the Bayesian engine.</p>
 </div>
 <div class="section level3">
-<h3 id="bayesian-inference-with-mcmc">9.2 Bayesian Inference with MCMC<a class="anchor" aria-label="anchor" href="#bayesian-inference-with-mcmc"></a>
+<h3 id="bayesian-inference-with-mcmc">10.2 Bayesian inference with MCMC<a class="anchor" aria-label="anchor" href="#bayesian-inference-with-mcmc"></a>
 </h3>
 <p>At the core of the package is a Gibbs sampling engine that explores
 the probability space and classifies recurrent infections as
 reinfections or recrudescences.</p>
 <ul>
-<li>
-<code>run_all_sites()</code> organizes the analysis across
+<li><p><code>run_all_sites()</code> organizes the analysis across
 geographical sites, calling the relevant MCMC functions
 (<code>run_one_chain()</code> or
-<code>run_one_chain_ampseq()</code>).</li>
-<li>During each iteration, the algorithm updates key parameters:
+<code>run_one_chain_ampseq()</code>).</p></li>
+<li>
+<p>During each iteration, the algorithm updates key parameters:</p>
 <ul>
-<li>Hidden alleles (<code>switch_hidden_length()</code> /
-<code>switch_hidden_ampseq()</code>).</li>
-<li>Population allele frequencies
-(<code>findposteriorfrequencies()</code>)</li>
+<li><p>Hidden alleles (<code>switch_hidden_length()</code> /
+<code>switch_hidden_ampseq()</code>).</p></li>
+<li><p>Population allele frequencies
+(<code>findposteriorfrequencies()</code>)</p></li>
 </ul>
 </li>
-<li>Multiple chains run in parallel, with automatic convergence checks
-based on R-hat and ESS.</li>
+<li><p>Multiple chains run in parallel, with automatic convergence
+checks based on R-hat and ESS.</p></li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="summarization-and-output">10.3 Summarization and output<a class="anchor" aria-label="anchor" href="#summarization-and-output"></a>
+</h3>
+<p>Once the MCMC converges, the package distills the results into clear,
+interpretable outputs.</p>
+<ul>
+<li><p>Posterior Probabilities: A summary table reporting, for each
+patient, the posterior probability of recrudescence.</p></li>
+<li><p>Diagnostic Reports: Functions such as
+<code><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics()</a></code> produce trace plots and
+Gelman–Rubin plots for convergence checks.</p></li>
+<li><p>Allele Frequency Plots:
+<code>generate_allele_frequency_plot()</code> visualizes allele
+distributions overall and by site.</p></li>
+<li><p>Marker-Level Analysis: Detailed tables show how individual
+genetic markers contribute to each classification</p></li>
 </ul>
 </div>
 </div>
@@ -1362,7 +1818,7 @@ based on R-hat and ESS.</li>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer>

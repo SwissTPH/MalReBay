@@ -184,7 +184,7 @@ These descriptive outputs give context for interpreting molecular correction res
 
 ##### Multiplicity of Infection (MOI) 
 
-```{r MOI,fig.width=7, fig.height=5, message=FALSE}
+```{r MOI,fig.width=7, fig.height=5, message=FALSE, fig.alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset."}
 genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 
 if (nrow(genotypedata_lp) > 0) {
@@ -206,7 +206,7 @@ if (nrow(genotypedata_lp) > 0) {
 
 
 ##### Marker diversity
-```{r marker-diversity-length-descriptive,fig.width=7, fig.height=5, message=FALSE}
+```{r marker-diversity-length-descriptive,fig.width=7, fig.height=5, message=FALSE, fig.alt="A set of pie charts showing the allele diversity for each microsatellite marker."}
 if (imported_data$data_type == "length_polymorphic" && nrow(genotypedata_lp) > 0) {
   diversity_plot <- MalReBay:::generate_diversity_plots(
     genotypedata    = genotypedata_lp,
@@ -297,7 +297,7 @@ A histogram of the posterior probabilities provides a clear overview of the clas
 
 The histogram allows you to visually assess the certainty of the classifications and to identify any ambiguous cases for further investigation.
 
-```{r plot-histogram-length, fig.width=6, fig.height=4, out.width='100%'}
+```{r plot-histogram-length, fig.width=6, fig.height=4, out.width='100%', fig.alt="Histogram showing the distribution of posterior probabilities of recrudescence."}
 ggplot(summary_df, aes(x = Probability)) +
   geom_histogram(binwidth = 0.05, fill = "steelblue", color = "white", boundary = 0) +
   labs(
@@ -308,7 +308,7 @@ ggplot(summary_df, aes(x = Probability)) +
   theme_bw()
 ```
 
-<p class="caption">This histogram shows the distribution of posterior probabilities. In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
+<p class="caption"> In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
 
 
 
@@ -346,27 +346,34 @@ Below is an example using the site `Benguela`, demonstrating how to generate and
 ```{r convergence-diagnostics-LP}
 site_name <- "Benguela"
 LP_loglik_data <- classification_summary$mcmc_loglikelihoods[[site_name]]
+plot_output_folder_lp <- file.path(output_dir_lp, "convergence_diagnosis", site_name)
 
 if (!is.null(LP_loglik_data)) {
     generate_likelihood_diagnostics(
     all_chains_loglikelihood = LP_loglik_data,
     site_name = site_name,
     save_plot = TRUE,
-    output_folder = "vignettes/malrebay_vignette_outputs/length_polymorphic_results",
+    output_folder = output_dir_lp, 
     verbose = FALSE
   )
-image_paths_lp <- file.path(
-    "vignettes/malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis",
+
+  image_paths_lp <- file.path(
+    "malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis",
     site_name,
     c("gelman_loglikelihood.png",
       "loglikelihood_traceplot.png",
       "loglikelihood_histogram.png",
       "loglikelihood_acf.png")
   )
+  
+  check_paths_lp <- file.path("vignettes", image_paths_lp)
 
-  if (all(file.exists(image_paths_lp))) {
+  if (all(file.exists(check_paths_lp))) {
+    alt_texts <- paste("Convergence diagnostic plot for", site_name, ":", 
+                       c("Gelman-Rubin plot", "Trace plot", "Histogram", "Autocorrelation plot"))
+    
     knitr::kable(
-      matrix(paste0("![](", image_paths_lp, "){width=100%}"), ncol = 2, byrow = TRUE),
+      matrix(paste0("![", alt_texts, "](", image_paths_lp, "){width=100%}"), ncol = 2, byrow = TRUE),
       escape = FALSE
     )
   } else {
@@ -483,7 +490,7 @@ We explore the genetic characteristics of the data:
 
 
 ##### Multiplicity of Infection (MOI)  
-```{r MOI_ampseq,fig.width=7, fig.height=5, message=FALSE}
+```{r MOI_ampseq,fig.width=7, fig.height=5, message=FALSE, fig.alt="Violin plot showing the multiplicity of infection per marker for the amplicon sequencing dataset."}
 genotypedata_ampseq <- dplyr::bind_rows(imported_data_ampseq$late_failures, imported_data_ampseq$additional)
 
 if (nrow(genotypedata_ampseq) > 0) {
@@ -505,7 +512,7 @@ if (nrow(genotypedata_ampseq) > 0) {
 ```
 
 ##### Marker diversity
-```{r marker-diversity-ampseq,fig.width=7, fig.height=5, message=FALSE}
+```{r marker-diversity-ampseq,fig.width=7, fig.height=5, message=FALSE, fig.alt="A set of pie charts showing the haplotype diversity for each amplicon sequencing marker."}
 if (imported_data_ampseq$data_type == "ampseq" && nrow(genotypedata_ampseq) > 0) {
   diversity_plot_ampseq <- MalReBay:::generate_diversity_plots(
     genotypedata    = genotypedata_ampseq,
@@ -590,7 +597,7 @@ Key columns in the summary include:
 
 A histogram of the posterior probabilities is an excellent way to visualize the overall results.
 
-```{r plot-histogram-ampseq, fig.width=6, fig.height=4, out.width='100%'}
+```{r plot-histogram-ampseq, fig.width=6, fig.height=4, out.width='100%', fig.alt="Histogram showing the distribution of posterior probabilities of recrudescence."}
 ggplot(summary_df, aes(x = Probability)) +
   geom_histogram(binwidth = 0.05, fill = "steelblue", color = "white", boundary = 0) +
   labs(
@@ -601,7 +608,7 @@ ggplot(summary_df, aes(x = Probability)) +
   theme_bw()
 ```
 
-<p class="caption">This histogram shows the distribution of posterior probabilities. In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
+<p class="caption">In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
 
 
 #### Step 7: Convergence diagnosis
@@ -617,21 +624,30 @@ if (!is.null(ampseq_loglik_data)) {
     all_chains_loglikelihood = ampseq_loglik_data,
     site_name = site_name,
     save_plot = TRUE,
-    output_folder = "vignettes/malrebay_vignette_outputs/ampseq_results",
+    output_folder = output_dir_ampseq,
     verbose = FALSE
   )
-image_paths_amp <- file.path(
-    "vignettes/malrebay_vignette_outputs/ampseq_results/convergence_diagnosis",
+
+  image_paths_amp <- file.path(
+    "malrebay_vignette_outputs/ampseq_results/convergence_diagnosis",
     site_name,
     c("gelman_loglikelihood.png",
       "loglikelihood_traceplot.png",
       "loglikelihood_histogram.png",
       "loglikelihood_acf.png")
   )
+  
+  check_paths_amp <- file.path(
+    "vignettes",
+    image_paths_amp
+  )
 
-  if (all(file.exists(image_paths_amp))) {
+  if (all(file.exists(check_paths_amp))) {
+    alt_texts <- paste("Convergence diagnostic plot for", site_name, ":", 
+                       c("Gelman-Rubin plot", "Trace plot", "Histogram", "Autocorrelation plot"))
+    
     knitr::kable(
-      matrix(paste0("![](", image_paths_amp, "){width=100%}"), ncol = 2, byrow = TRUE),
+      matrix(paste0("![", alt_texts, "](", image_paths_amp, "){width=100%}"), ncol = 2, byrow = TRUE),
       escape = FALSE
     )
   } else {
@@ -733,10 +749,12 @@ quick_mcmc_config <- list(
   ess_threshold = 100
 )
 
+output_dir_nonconverge <- here::here("vignettes", "malrebay_vignette_outputs", "non_convergence_test")
+
 classification_summary_nonconverge <- classify_infections(
   imported_data = imported_data,
   mcmc_config = quick_mcmc_config,
-  output_folder = "vignettes/malrebay_vignette_outputs/non_convergence_test",
+  output_folder = output_dir_nonconverge,
   n_workers = 2,
   verbose = FALSE
 )
@@ -749,19 +767,24 @@ if (!is.null(loglik_data)) {
     all_chains_loglikelihood = loglik_data,
     site_name = site_name,
     save_plot = TRUE,
-    output_folder = "vignettes/malrebay_vignette_outputs/non_convergence_test", 
+    output_folder = output_dir_nonconverge, 
     verbose = FALSE
   )
-  
+
   image_paths <- file.path(
-    "vignettes/malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis", site_name,
+    "malrebay_vignette_outputs/non_convergence_test/convergence_diagnosis", site_name,
     c("gelman_loglikelihood.png", "loglikelihood_traceplot.png", 
       "loglikelihood_histogram.png", "loglikelihood_acf.png")
   )
   
-  if (all(file.exists(image_paths))) {
+  check_paths <- file.path("vignettes", image_paths)
+  
+  if (all(file.exists(check_paths))) {
+    alt_texts <- paste("Non-convergence diagnostic plot for", site_name, ":", 
+                       c("Gelman-Rubin plot", "Trace plot", "Histogram", "Autocorrelation plot"))
+    
     knitr::kable(
-      matrix(paste0("![](", image_paths, "){width=100%}"), ncol = 2, byrow = TRUE),
+      matrix(paste0("![", alt_texts, "](", image_paths, "){width=100%}"), ncol = 2, byrow = TRUE),
       escape = FALSE
     )
   } else {
