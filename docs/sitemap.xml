@@ -8,10 +8,15 @@
 <url><loc>https://SwissTPH.github.io/MalReBay/index.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/LICENSE-text.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/LICENSE.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/calculate_marker_moi.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/reference/classify_infections.html</loc></url>
-<url><loc>https://SwissTPH.github.io/MalReBay/reference/generate_allele_frequency_plot.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/generate_diversity_plots.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/generate_likelihood_diagnostics.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/generate_marker_moi_plot.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/import_data.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/reference/index.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/reference/MalReBay-package.html</loc></url>
 <url><loc>https://SwissTPH.github.io/MalReBay/reference/pipe.html</loc></url>
+<url><loc>https://SwissTPH.github.io/MalReBay/reference/run_pfrecur_analysis_original_prep.html</loc></url>
 </urlset>
 
