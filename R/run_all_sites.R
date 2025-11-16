@@ -3,8 +3,13 @@
 #' @description
 #' (Documentation unchanged)
 #'
-#' @param ... [All previous parameters]
-#' @param verbose A logical. If `TRUE` (the default), prints progress messages
+#' @param genotypedata_latefailures Data frame of late treatment failure samples.
+#' @param additional_genotypedata Additional neutral marker data.
+#' @param marker_info_subset Marker definitions used for allele matching.
+#' @param mcmc_config List of MCMC configuration options.
+#' @param data_type Either "ampseq" or "length".
+#' @param output_folder Directory where results will be saved.
+#' @param verbose Logical; whether to print progress messages.
 #'   and diagnostics to the console.
 #'
 #' @keywords internal

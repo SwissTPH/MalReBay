@@ -11,9 +11,9 @@ Classification of malaria infection recurrence using a Bayesian algorithm.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://SwissTPH.github.io/MalReBay}
-  \item \url{https://github.com/SwissTPH/MalReBay}
-  \item Report bugs at \url{https://github.com/SwissTPH/MalReBay/issues}
+  \item \url{https://swisstph.github.io/MalReBay}
+  \item \url{https://github.com/swisstph/MalReBay}
+  \item Report bugs at \url{https://github.com/swisstph/MalReBay/issues}
 }
 
 }
