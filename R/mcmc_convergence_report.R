@@ -175,10 +175,10 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood,
     })
     
   } else {
-    old_par <- graphics::par(no.readonly = TRUE)   # save old par settings
-    on.exit(graphics::par(old_par), add = TRUE)   # restore old par on exit
+    old_par <- graphics::par(no.readonly = TRUE)  
+    on.exit(graphics::par(old_par), add = TRUE) 
     
-    graphics::par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))  # 2x2 grid with margins
+    graphics::par(mfrow = c(2, 2), mar = c(3, 3, 2, 1)) 
     
     colors <- grDevices::rainbow(length(loglikelihood_mcmc))
     graphics::matplot(do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
