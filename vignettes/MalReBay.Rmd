@@ -141,6 +141,7 @@ library(purrr)
 library(tidyr)
 library(here)
 library(kableExtra)
+library(patchwork)
 ```
 
 #### Step 1: Load data
