@@ -599,52 +599,19 @@ diagnostics:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">site_name</span> <span class="op">&lt;-</span> <span class="st">"Benguela"</span></span>
 <span><span class="va">LP_loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="va">plot_output_folder_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir_lp</span>, <span class="st">"convergence_diagnosis"</span>, <span class="va">site_name</span><span class="op">)</span></span>
 <span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">LP_loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
 <span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">LP_loglik_data</span>,</span>
 <span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
-<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    output_folder <span class="op">=</span> <span class="va">output_dir_lp</span>, </span>
+<span>    save_plot <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
-<span></span>
-<span>  <span class="va">image_paths_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
-<span>    <span class="st">"malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis"</span>,</span>
-<span>    <span class="va">site_name</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"gelman_loglikelihood.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_traceplot.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_histogram.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_acf.png"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span>  </span>
-<span>  <span class="va">check_paths_lp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="va">image_paths_lp</span><span class="op">)</span></span>
-<span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">check_paths_lp</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">alt_texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plot for"</span>, <span class="va">site_name</span>, <span class="st">":"</span>, </span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Gelman-Rubin plot"</span>, <span class="st">"Trace plot"</span>, <span class="st">"Histogram"</span>, <span class="st">"Autocorrelation plot"</span><span class="op">)</span><span class="op">)</span></span>
-<span>    </span>
-<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
-<span>      <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"!["</span>, <span class="va">alt_texts</span>, <span class="st">"]("</span>, <span class="va">image_paths_lp</span>, <span class="st">"){width=100%}"</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>      escape <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>    <span class="op">)</span></span>
-<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plots could not be found. Please check the file paths."</span><span class="op">)</span></span>
-<span>  <span class="op">}</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available."</span>, sep <span class="op">=</span> <span class="st">""</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available.\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<table class="table">
-<colgroup><col width="100%"></colgroup>
-<thead><tr class="header">
-<th align="left">x</th>
-</tr></thead>
-<tbody><tr class="odd">
-<td align="left">Convergence diagnostic plots could not be found. Please
-check the file paths.</td>
-</tr></tbody>
-</table>
+<p><img src="MalReBay_files/figure-html/convergence-diagnostics-LP-1.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/convergence-diagnostics-LP-2.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/convergence-diagnostics-LP-3.png" class="r-plt" width="700"></p>
 <p>These trace, Gelman–Rubin, histogram, and ACF plots collectively
 provide visual assurance that the MCMC chains have mixed well and
 stabilized.</p>
@@ -1271,52 +1238,17 @@ site.</p>
 <span><span class="va">ampseq_loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary_ampseq</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
 <span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">ampseq_loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
 <span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">ampseq_loglik_data</span>,</span>
 <span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
-<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    output_folder <span class="op">=</span> <span class="va">output_dir_ampseq</span>,</span>
+<span>    save_plot <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
-<span></span>
-<span>  <span class="va">image_paths_amp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
-<span>    <span class="st">"malrebay_vignette_outputs/ampseq_results/convergence_diagnosis"</span>,</span>
-<span>    <span class="va">site_name</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"gelman_loglikelihood.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_traceplot.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_histogram.png"</span>,</span>
-<span>      <span class="st">"loglikelihood_acf.png"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span>  </span>
-<span>  <span class="va">check_paths_amp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span></span>
-<span>    <span class="st">"vignettes"</span>,</span>
-<span>    <span class="va">image_paths_amp</span></span>
-<span>  <span class="op">)</span></span>
-<span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">check_paths_amp</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">alt_texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plot for"</span>, <span class="va">site_name</span>, <span class="st">":"</span>, </span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Gelman-Rubin plot"</span>, <span class="st">"Trace plot"</span>, <span class="st">"Histogram"</span>, <span class="st">"Autocorrelation plot"</span><span class="op">)</span><span class="op">)</span></span>
-<span>    </span>
-<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
-<span>      <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"!["</span>, <span class="va">alt_texts</span>, <span class="st">"]("</span>, <span class="va">image_paths_amp</span>, <span class="st">"){width=100%}"</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>      escape <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>    <span class="op">)</span></span>
-<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>    <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="st">"Convergence diagnostic plots could not be found. Please check the file paths."</span><span class="op">)</span></span>
-<span>  <span class="op">}</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available."</span>, sep <span class="op">=</span> <span class="st">""</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Log-likelihood data for site '"</span>, <span class="va">site_name</span>, <span class="st">"' not available.\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<table class="table">
-<colgroup><col width="100%"></colgroup>
-<thead><tr class="header">
-<th align="left">x</th>
-</tr></thead>
-<tbody><tr class="odd">
-<td align="left">Convergence diagnostic plots could not be found. Please
-check the file paths.</td>
-</tr></tbody>
-</table>
+<p><img src="MalReBay_files/figure-html/convergence-diagnostics-ampseq-1.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/convergence-diagnostics-ampseq-2.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/convergence-diagnostics-ampseq-3.png" class="r-plt" width="700"></p>
 </div>
 <div class="section level4">
 <h4 id="step-8-comparison-with-match-counting-algorithm">Step 8: Comparison with match-counting algorithm<a class="anchor" aria-label="anchor" href="#step-8-comparison-with-match-counting-algorithm"></a>
@@ -1334,236 +1266,45 @@ algorithm. The resulting table includes:</p>
 `MalReBay.</p></li>
 </ul>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">input_file_ampseq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Amplicon_Sequencing.xlsx"</span>,</span>
-<span>                                 package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
-<span><span class="va">imported_data_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file_ampseq</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">input_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"Angola_2021_TES_7NMS.xlsx"</span>, package <span class="op">=</span> <span class="st">"MalReBay"</span><span class="op">)</span></span>
+<span><span class="va">imported_data</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu"><a href="../reference/import_data.html">import_data</a></span><span class="op">(</span>filepath <span class="op">=</span> <span class="va">input_file</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">mcmc_summary_ampseq</span> <span class="op">&lt;-</span> <span class="va">classification_summary_ampseq</span><span class="op">$</span><span class="va">summary</span></span>
+<span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  n_chains <span class="op">=</span> <span class="fl">4</span>, </span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
+<span>  ess_threshold <span class="op">=</span> <span class="fl">100</span></span>
+<span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">match_results_ampseq</span> <span class="op">&lt;-</span> <span class="fu">MalReBay</span><span class="fu">:::</span><span class="fu">perform_match_counting</span><span class="op">(</span></span>
-<span>  genotypedata_latefailures <span class="op">=</span> <span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">late_failures</span>, </span>
-<span>  marker_info <span class="op">=</span> <span class="va">imported_data_ampseq</span><span class="op">$</span><span class="va">marker_info</span><span class="op">)</span></span>
+<span><span class="va">output_dir_nonconverge</span> <span class="op">&lt;-</span> <span class="fu">here</span><span class="fu">::</span><span class="fu"><a href="https://here.r-lib.org/reference/here.html" class="external-link">here</a></span><span class="op">(</span><span class="st">"vignettes"</span>, <span class="st">"malrebay_vignette_outputs"</span>, <span class="st">"non_convergence_test"</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="va">output_dir_nonconverge</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir_nonconverge</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
 <span></span>
-<span><span class="va">mcmc_summary_clean</span> <span class="op">&lt;-</span> <span class="va">mcmc_summary_ampseq</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>Patient.ID <span class="op">=</span> <span class="va">Sample.ID</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Patient.ID</span>, <span class="va">Site</span>, Prob_Recrud_MalReBay <span class="op">=</span> <span class="va">Probability</span><span class="op">)</span></span>
+<span><span class="va">classification_summary_nonconverge</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/classify_infections.html">classify_infections</a></span><span class="op">(</span></span>
+<span>  imported_data <span class="op">=</span> <span class="va">imported_data</span>,</span>
+<span>  mcmc_config <span class="op">=</span> <span class="va">quick_mcmc_config</span>,</span>
+<span>  output_folder <span class="op">=</span> <span class="va">output_dir_nonconverge</span>,</span>
+<span>  n_workers <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">match_summary_clean</span> <span class="op">&lt;-</span> <span class="va">match_results_ampseq</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>Patient.ID <span class="op">=</span> <span class="va">Sample.ID</span><span class="op">)</span></span>
+<span><span class="va">site_name</span> <span class="op">&lt;-</span> <span class="st">"Benguela"</span></span>
+<span><span class="va">loglik_data</span> <span class="op">&lt;-</span> <span class="va">classification_summary_nonconverge</span><span class="op">$</span><span class="va">mcmc_loglikelihoods</span><span class="op">[[</span><span class="va">site_name</span><span class="op">]</span><span class="op">]</span></span>
 <span></span>
-<span><span class="va">final_table</span> <span class="op">&lt;-</span> <span class="va">mcmc_summary_clean</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">match_summary_clean</span>, by <span class="op">=</span> <span class="st">"Patient.ID"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">marker_column_names</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">match_summary_clean</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Patient.ID"</span>, <span class="st">"Number_Matches"</span>, <span class="st">"Number_Loci_Compared"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">final_comparison_table_ampseq</span> <span class="op">&lt;-</span> <span class="va">final_table</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span></span>
-<span>    Sample.ID <span class="op">=</span> <span class="va">Patient.ID</span>,</span>
-<span>    <span class="va">Site</span>,</span>
-<span>    <span class="va">Number_Matches</span>,</span>
-<span>    <span class="va">Number_Loci_Compared</span>,</span>
-<span>    <span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of</a></span><span class="op">(</span><span class="va">marker_column_names</span><span class="op">)</span>, </span>
-<span>    MalReBay <span class="op">=</span> <span class="va">Prob_Recrud_MalReBay</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">loglik_data</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
+<span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">loglik_data</span>,</span>
+<span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
+<span>    save_plot <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="va">output_dir_nonconverge</span>,</span>
+<span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
-<span></span>
-<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">final_comparison_table_ampseq</span><span class="op">)</span>, </span>
-<span>  caption <span class="op">=</span> <span class="st">"Comparison of match-counting results and MalReBay probability for amplicon data."</span>,</span>
-<span>  digits <span class="op">=</span> <span class="fl">3</span></span>
-<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/kableExtra/man/scroll_box.html" class="external-link">scroll_box</a></span><span class="op">(</span>width <span class="op">=</span> <span class="st">"100%"</span><span class="op">)</span></span></code></pre></div>
-<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:100%; ">
-<table class="table">
-<caption>
-Comparison of match-counting results and MalReBay probability for
-amplicon data.
-</caption>
-<thead><tr>
-<th style="text-align:left;">
-Sample.ID
-</th>
-<th style="text-align:left;">
-Site
-</th>
-<th style="text-align:right;">
-Number_Matches
-</th>
-<th style="text-align:right;">
-Number_Loci_Compared
-</th>
-<th style="text-align:left;">
-cpmp
-</th>
-<th style="text-align:left;">
-cpp
-</th>
-<th style="text-align:left;">
-amaD3
-</th>
-<th style="text-align:right;">
-MalReBay
-</th>
-</tr></thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:right;">
-1.000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-10
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:right;">
-1.000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-11
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:right;">
-1.000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-12
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-NI
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-NI
-</td>
-<td style="text-align:right;">
-1.000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-13
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:right;">
-1.000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-14
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:left;">
-R
-</td>
-<td style="text-align:right;">
-0.993
-</td>
-</tr>
-</tbody>
-</table>
-</div>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"No log-likelihood data found for site: "</span>, <span class="va">site_name</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/MalReBay-match-counting-1.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/MalReBay-match-counting-2.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/MalReBay-match-counting-3.png" class="r-plt" width="700"></p>
 <p>The final table contains the following columns:</p>
 <ul>
 <li><p>The raw allele data for each marker.</p></li>
@@ -1634,8 +1375,8 @@ reached.</p></li>
 <span>  <span class="fu"><a href="../reference/generate_likelihood_diagnostics.html">generate_likelihood_diagnostics</a></span><span class="op">(</span></span>
 <span>    all_chains_loglikelihood <span class="op">=</span> <span class="va">loglik_data</span>,</span>
 <span>    site_name <span class="op">=</span> <span class="va">site_name</span>,</span>
-<span>    save_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    output_folder <span class="op">=</span> <span class="va">output_dir_nonconverge</span>, </span>
+<span>    save_plot <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    output_folder <span class="op">=</span> <span class="cn">NULL</span>, </span>
 <span>    verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
@@ -1661,6 +1402,7 @@ reached.</p></li>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"No log-likelihood data found for site: "</span>, <span class="va">site_name</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
+<p><img src="MalReBay_files/figure-html/output-non-convergence-1.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/output-non-convergence-2.png" class="r-plt" width="700"><img src="MalReBay_files/figure-html/output-non-convergence-3.png" class="r-plt" width="700"></p>
 <table class="table">
 <colgroup><col width="100%"></colgroup>
 <thead><tr class="header">

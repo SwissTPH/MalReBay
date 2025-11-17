@@ -466,47 +466,21 @@ generate and visualize the convergence diagnostics:
 ``` r
 site_name <- "Benguela"
 LP_loglik_data <- classification_summary$mcmc_loglikelihoods[[site_name]]
-plot_output_folder_lp <- file.path(output_dir_lp, "convergence_diagnosis", site_name)
 
 if (!is.null(LP_loglik_data)) {
-    generate_likelihood_diagnostics(
+  generate_likelihood_diagnostics(
     all_chains_loglikelihood = LP_loglik_data,
     site_name = site_name,
-    save_plot = TRUE,
-    output_folder = output_dir_lp, 
+    save_plot = FALSE,
+    output_folder = NULL,
     verbose = FALSE
   )
-
-  image_paths_lp <- file.path(
-    "malrebay_vignette_outputs/length_polymorphic_results/convergence_diagnosis",
-    site_name,
-    c("gelman_loglikelihood.png",
-      "loglikelihood_traceplot.png",
-      "loglikelihood_histogram.png",
-      "loglikelihood_acf.png")
-  )
-  
-  check_paths_lp <- file.path("vignettes", image_paths_lp)
-
-  if (all(file.exists(check_paths_lp))) {
-    alt_texts <- paste("Convergence diagnostic plot for", site_name, ":", 
-                       c("Gelman-Rubin plot", "Trace plot", "Histogram", "Autocorrelation plot"))
-    
-    knitr::kable(
-      matrix(paste0("![", alt_texts, "](", image_paths_lp, "){width=100%}"), ncol = 2, byrow = TRUE),
-      escape = FALSE
-    )
-  } else {
-    knitr::kable("Convergence diagnostic plots could not be found. Please check the file paths.")
-  }
 } else {
-  knitr::kable(paste("Log-likelihood data for site '", site_name, "' not available.", sep = ""))
+  cat("Log-likelihood data for site '", site_name, "' not available.\n")
 }
 ```
 
-| x |
-|:---|
-| Convergence diagnostic plots could not be found. Please check the file paths. |
+![](MalReBay_files/figure-html/convergence-diagnostics-LP-1.png)![](MalReBay_files/figure-html/convergence-diagnostics-LP-2.png)![](MalReBay_files/figure-html/convergence-diagnostics-LP-3.png)
 
 These trace, Gelman–Rubin, histogram, and ACF plots collectively provide
 visual assurance that the MCMC chains have mixed well and stabilized.
@@ -799,47 +773,19 @@ site_name <- "1"
 ampseq_loglik_data <- classification_summary_ampseq$mcmc_loglikelihoods[[site_name]]
 
 if (!is.null(ampseq_loglik_data)) {
-    generate_likelihood_diagnostics(
+  generate_likelihood_diagnostics(
     all_chains_loglikelihood = ampseq_loglik_data,
     site_name = site_name,
-    save_plot = TRUE,
-    output_folder = output_dir_ampseq,
+    save_plot = FALSE,
+    output_folder = NULL,
     verbose = FALSE
   )
-
-  image_paths_amp <- file.path(
-    "malrebay_vignette_outputs/ampseq_results/convergence_diagnosis",
-    site_name,
-    c("gelman_loglikelihood.png",
-      "loglikelihood_traceplot.png",
-      "loglikelihood_histogram.png",
-      "loglikelihood_acf.png")
-  )
-  
-  check_paths_amp <- file.path(
-    "vignettes",
-    image_paths_amp
-  )
-
-  if (all(file.exists(check_paths_amp))) {
-    alt_texts <- paste("Convergence diagnostic plot for", site_name, ":", 
-                       c("Gelman-Rubin plot", "Trace plot", "Histogram", "Autocorrelation plot"))
-    
-    knitr::kable(
-      matrix(paste0("![", alt_texts, "](", image_paths_amp, "){width=100%}"), ncol = 2, byrow = TRUE),
-      escape = FALSE
-    )
-  } else {
-    knitr::kable("Convergence diagnostic plots could not be found. Please check the file paths.")
-  }
 } else {
-  knitr::kable(paste("Log-likelihood data for site '", site_name, "' not available.", sep = ""))
+  cat("Log-likelihood data for site '", site_name, "' not available.\n")
 }
 ```
 
-| x |
-|:---|
-| Convergence diagnostic plots could not be found. Please check the file paths. |
+![](MalReBay_files/figure-html/convergence-diagnostics-ampseq-1.png)![](MalReBay_files/figure-html/convergence-diagnostics-ampseq-2.png)![](MalReBay_files/figure-html/convergence-diagnostics-ampseq-3.png)
 
 #### Step 8: Comparison with match-counting algorithm
 
@@ -857,57 +803,47 @@ table includes:
 - The posterior probability of recrudescence from \`MalReBay.
 
 ``` r
-input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx",
-                                 package = "MalReBay")
-imported_data_ampseq <- MalReBay::import_data(filepath = input_file_ampseq, verbose = FALSE)
+input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
 
-mcmc_summary_ampseq <- classification_summary_ampseq$summary
+quick_mcmc_config <- list(
+  n_chains = 4, 
+  chunk_size = 1000, 
+  max_iterations = 1000, 
+  rhat_threshold = 1.1,
+  ess_threshold = 100
+)
 
-match_results_ampseq <- MalReBay:::perform_match_counting(
-  genotypedata_latefailures = imported_data_ampseq$late_failures, 
-  marker_info = imported_data_ampseq$marker_info)
+output_dir_nonconverge <- here::here("vignettes", "malrebay_vignette_outputs", "non_convergence_test")
+if (!dir.exists(output_dir_nonconverge)) {
+  dir.create(output_dir_nonconverge, recursive = TRUE)
+}
 
-mcmc_summary_clean <- mcmc_summary_ampseq %>%
-  dplyr::rename(Patient.ID = Sample.ID) %>%
-  dplyr::select(Patient.ID, Site, Prob_Recrud_MalReBay = Probability)
+classification_summary_nonconverge <- classify_infections(
+  imported_data = imported_data,
+  mcmc_config = quick_mcmc_config,
+  output_folder = output_dir_nonconverge,
+  n_workers = 2,
+  verbose = FALSE
+)
 
-match_summary_clean <- match_results_ampseq %>%
-  dplyr::rename(Patient.ID = Sample.ID)
+site_name <- "Benguela"
+loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_name]]
 
-final_table <- mcmc_summary_clean %>%
-  dplyr::left_join(match_summary_clean, by = "Patient.ID")
-
-marker_column_names <- setdiff(colnames(match_summary_clean), c("Patient.ID", "Number_Matches", "Number_Loci_Compared"))
-
-final_comparison_table_ampseq <- final_table %>%
-  dplyr::select(
-    Sample.ID = Patient.ID,
-    Site,
-    Number_Matches,
-    Number_Loci_Compared,
-    all_of(marker_column_names), 
-    MalReBay = Prob_Recrud_MalReBay
+if (!is.null(loglik_data)) {
+  generate_likelihood_diagnostics(
+    all_chains_loglikelihood = loglik_data,
+    site_name = site_name,
+    save_plot = FALSE,
+    output_folder = output_dir_nonconverge,
+    verbose = FALSE
   )
-
-knitr::kable(
-  head(final_comparison_table_ampseq), 
-  caption = "Comparison of match-counting results and MalReBay probability for amplicon data.",
-  digits = 3
-) %>%
-  scroll_box(width = "100%")
+} else {
+  cat("No log-likelihood data found for site: ", site_name, "\n")
+}
 ```
 
-| Sample.ID | Site | Number_Matches | Number_Loci_Compared | cpmp | cpp | amaD3 | MalReBay |
-|:----------|:-----|---------------:|---------------------:|:-----|:----|:------|---------:|
-| 1         | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 10        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 11        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 12        | 1    |              1 |                    3 | NI   | R   | NI    |    1.000 |
-| 13        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 14        | 1    |              3 |                    3 | R    | R   | R     |    0.993 |
-
-Comparison of match-counting results and MalReBay probability for
-amplicon data.
+![](MalReBay_files/figure-html/MalReBay-match-counting-1.png)![](MalReBay_files/figure-html/MalReBay-match-counting-2.png)![](MalReBay_files/figure-html/MalReBay-match-counting-3.png)
 
 The final table contains the following columns:
 
@@ -976,8 +912,8 @@ if (!is.null(loglik_data)) {
   generate_likelihood_diagnostics(
     all_chains_loglikelihood = loglik_data,
     site_name = site_name,
-    save_plot = TRUE,
-    output_folder = output_dir_nonconverge, 
+    save_plot = FALSE,
+    output_folder = NULL, 
     verbose = FALSE
   )
 
@@ -1004,6 +940,8 @@ if (!is.null(loglik_data)) {
   cat("No log-likelihood data found for site: ", site_name, "\n")
 }
 ```
+
+![](MalReBay_files/figure-html/output-non-convergence-1.png)![](MalReBay_files/figure-html/output-non-convergence-2.png)![](MalReBay_files/figure-html/output-non-convergence-3.png)
 
 | x |
 |:---|

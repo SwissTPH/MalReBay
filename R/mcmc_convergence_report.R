@@ -175,22 +175,26 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood,
     })
     
   } else {
-    # old_par <- graphics::par(no.readonly = TRUE)
-    # on.exit(graphics::par(old_par))
-    # graphics::par(mfrow = c(2, 2), ask = interactive())
+    old_par <- graphics::par(no.readonly = TRUE)   # save old par settings
+    on.exit(graphics::par(old_par), add = TRUE)   # restore old par on exit
     
-    temp_file <- tempfile(fileext = ".png")
-    grDevices::png(filename = temp_file, width = 900, height = 700, res = 120)
+    graphics::par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))  # 2x2 grid with margins
     
-    graphics::par(mfrow = c(2, 2), mar = c(3, 3, 2, 1))
+    colors <- grDevices::rainbow(length(loglikelihood_mcmc))
+    graphics::matplot(do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
+                      type = "l", lty = 1, col = colors,
+                      main = paste(site_name, "- Traceplot"),
+                      ylab = "Log-Likelihood", xlab = "Iterations")
+    graphics::legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)),
+                     col = colors, lty = 1, cex = 0.8, box.lty = 0)
     
-    plot_trace()
-    plot_gelman()
-    plot_hist()
-    stats::acf(clean_chains[[1]], main = "ACF - Chain 1", lag.max = 50)
+    coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE, ask = FALSE)
     
-    grDevices::dev.off()
-    knitr::include_graphics(temp_file)
+    graphics::hist(unlist(clean_chains), breaks = 40,
+                   main = paste(site_name, "- Histogram"),
+                   xlab = "Log-Likelihood", col = "steelblue", border = "white")
+    
+    stats::acf(clean_chains[[1]], main = paste(site_name, "- ACF (Chain 1)"), lag.max = 50)
   }
   
   invisible(list(
