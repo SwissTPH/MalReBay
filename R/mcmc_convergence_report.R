@@ -29,9 +29,9 @@
 #'   \item `n_valid`: The number of valid (finite) samples per chain.
 #' }
 #'
-#' @importFrom coda as.mcmc.list mcmc varnames gelman.diag effectiveSize gelman.plot
+#' @importFrom coda as.mcmc.list mcmc varnames gelman.diag effectiveSize
 #' @importFrom grDevices png dev.off rainbow n2mfrow
-#' @importFrom graphics matplot legend title hist par
+#' @importFrom graphics matplot legend title hist par text abline
 #' @importFrom stats acf var
 #'
 #' @export
@@ -175,26 +175,47 @@ generate_likelihood_diagnostics <- function(all_chains_loglikelihood,
     })
     
   } else {
-    old_par <- graphics::par(no.readonly = TRUE)  
-    on.exit(graphics::par(old_par), add = TRUE) 
+    old_par <- graphics::par(no.readonly = TRUE)
+    on.exit(graphics::par(old_par), add = TRUE)
     
-    graphics::par(mfrow = c(2, 2), mar = c(3, 3, 2, 1)) 
+    graphics::par(mfrow = c(2, 2), mar = c(4.1, 4.1, 2.1, 1.1), oma = c(0, 0, 2, 0))
     
+    # Plot 1: Traceplot
     colors <- grDevices::rainbow(length(loglikelihood_mcmc))
     graphics::matplot(do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
-                      type = "l", lty = 1, col = colors,
-                      main = paste(site_name, "- Traceplot"),
-                      ylab = "Log-Likelihood", xlab = "Iterations")
+                      type = "l", lty = 1, col = colors, main = "Traceplot",
+                      ylab = "Log-Likelihood", xlab = "Iteration",
+                      cex.main = 1, cex.lab = 0.9) # Control font sizes
     graphics::legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)),
-                     col = colors, lty = 1, cex = 0.8, box.lty = 0)
+                     col = colors, lty = 1, cex = 0.7, bty = "n") # Smaller legend, no box
     
-    coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE, ask = FALSE)
+    # Plot 2: Gelman-Rubin Plot
+    tryCatch({
+      gelman_data <- coda::gelman.diag(loglikelihood_mcmc, autoburnin = TRUE)
+      plot(gelman_data$shrink[, "median"], type = "l", col = "black",
+           ylim = range(gelman_data$shrink), main = "Gelman-Rubin (R-hat)",
+           xlab = "Iteration", ylab = "Shrink Factor",
+           cex.main = 1, cex.lab = 0.9) # Control font sizes
+      graphics::lines(gelman_data$shrink[, "97.5%"], lty = 2, col = "red")
+      graphics::abline(h = 1, col = "gray", lty = 3)
+      graphics::legend("topright", legend = c("Median", "97.5% CI"),
+                       col = c("black", "red"), lty = 1:2, cex = 0.7, bty = "n")
+    }, error = function(e) {
+      plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")
+      title(main = "Gelman-Rubin (R-hat)")
+      text(1, 1, "Could not generate plot.\n(Chains may be too short)", col = "red", cex = 0.9)
+    })
     
-    graphics::hist(unlist(clean_chains), breaks = 40,
-                   main = paste(site_name, "- Histogram"),
-                   xlab = "Log-Likelihood", col = "steelblue", border = "white")
+    # Plot 3: Histogram
+    graphics::hist(unlist(clean_chains), breaks = 40, main = "Posterior Histogram",
+                   xlab = "Log-Likelihood", col = "steelblue", border = "white",
+                   cex.main = 1, cex.lab = 0.9) # Control font sizes
     
-    stats::acf(clean_chains[[1]], main = paste(site_name, "- ACF (Chain 1)"), lag.max = 50)
+    # Plot 4: ACF Plot
+    stats::acf(clean_chains[[1]], main = "ACF (Chain 1)",
+               cex.main = 1, cex.lab = 0.9) # Control font sizes
+    
+    graphics::mtext(paste("Convergence Diagnostics for:", site_name), outer = TRUE, cex = 1.2)
   }
   
   invisible(list(
