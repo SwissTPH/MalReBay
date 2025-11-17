@@ -1,8 +1,7 @@
 #' Run the Full MCMC Analysis Pipeline Across All Sites
 #'
 #' @description
-#' (Documentation unchanged)
-#'
+#' manages MCMC runs
 #' @param genotypedata_latefailures Data frame of late treatment failure samples.
 #' @param additional_genotypedata Additional neutral marker data.
 #' @param marker_info_subset Marker definitions used for allele matching.
