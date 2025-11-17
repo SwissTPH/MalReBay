@@ -2,8 +2,3 @@ url: https://swisstph.github.io/MalReBay
 template:
   bootstrap: 5
 
-articles:
-- title: "Using MalReBay for Recurrence Classification"
-  contents:
-    - MalReBay
-

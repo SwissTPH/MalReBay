@@ -1,5 +1,5 @@
 # Articles
 
-### Using MalReBay for Recurrence Classification
+### All vignettes
 
 - [MalReBay](https://swisstph.github.io/MalReBay/articles/MalReBay.md):

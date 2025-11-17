@@ -477,16 +477,14 @@ if (!is.null(LP_loglik_data)) {
 } else {
   cat("Log-likelihood data for site '", site_name, "' not available.\n")
 }
-#> Warning in min(x): no non-missing arguments to min; returning Inf
-#> Warning in max(x): no non-missing arguments to max; returning -Inf
-#> Warning in min(x, na.rm = na.rm): no non-missing arguments to min; returning
-#> Inf
-#> Warning in max(x, na.rm = na.rm): no non-missing arguments to max; returning
-#> -Inf
 ```
 
 ![Convergence diagnostic plots for the Benguela
-site.](MalReBay_files/figure-html/convergence-diagnostics-LP-1.png)
+site.](MalReBay_files/figure-html/convergence-diagnostics-LP-1.png)![Convergence
+diagnostic plots for the Benguela
+site.](MalReBay_files/figure-html/convergence-diagnostics-LP-2.png)![Convergence
+diagnostic plots for the Benguela
+site.](MalReBay_files/figure-html/convergence-diagnostics-LP-3.png)
 
 These trace, Gelman–Rubin, histogram, and ACF plots collectively provide
 visual assurance that the MCMC chains have mixed well and stabilized.
@@ -789,16 +787,14 @@ if (!is.null(ampseq_loglik_data)) {
 } else {
   cat("Log-likelihood data for site '", site_name, "' not available.\n")
 }
-#> Warning in min(x): no non-missing arguments to min; returning Inf
-#> Warning in max(x): no non-missing arguments to max; returning -Inf
-#> Warning in min(x, na.rm = na.rm): no non-missing arguments to min; returning
-#> Inf
-#> Warning in max(x, na.rm = na.rm): no non-missing arguments to max; returning
-#> -Inf
 ```
 
 ![Convergence diagnostic plots for site
-1.](MalReBay_files/figure-html/convergence-diagnostics-ampseq-1.png)
+1.](MalReBay_files/figure-html/convergence-diagnostics-ampseq-1.png)![Convergence
+diagnostic plots for site
+1.](MalReBay_files/figure-html/convergence-diagnostics-ampseq-2.png)![Convergence
+diagnostic plots for site
+1.](MalReBay_files/figure-html/convergence-diagnostics-ampseq-3.png)
 
 #### Step 8: Comparison with match-counting algorithm
 
@@ -941,16 +937,14 @@ verbose = FALSE
 } else {
 cat("No log-likelihood data found for site: ", site_name, "\n")
 }
-#> Warning in min(x): no non-missing arguments to min; returning Inf
-#> Warning in max(x): no non-missing arguments to max; returning -Inf
-#> Warning in min(x, na.rm = na.rm): no non-missing arguments to min; returning
-#> Inf
-#> Warning in max(x, na.rm = na.rm): no non-missing arguments to max; returning
-#> -Inf
 ```
 
 ![Example of non-converged MCMC chains for the Benguela
-site.](MalReBay_files/figure-html/output-non-convergence-1.png)
+site.](MalReBay_files/figure-html/output-non-convergence-1.png)![Example
+of non-converged MCMC chains for the Benguela
+site.](MalReBay_files/figure-html/output-non-convergence-2.png)![Example
+of non-converged MCMC chains for the Benguela
+site.](MalReBay_files/figure-html/output-non-convergence-3.png)
 
 #### Identifying lack of convergence
 
