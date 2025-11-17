@@ -3,7 +3,7 @@ pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   MalReBay: MalReBay.html
-last_built: 2025-11-16T23:27Z
+last_built: 2025-11-17T00:05Z
 urls:
   reference: https://swisstph.github.io/MalReBay/reference
   article: https://swisstph.github.io/MalReBay/articles
