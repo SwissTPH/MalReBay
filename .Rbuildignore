@@ -13,9 +13,7 @@
 ^MalReBay\.Rproj$
 ^Meta$
 ^doc$
-^_pkgdown\.yml$
 ^docs$
-^pkgdown$
 ^vignettes/figure$
 ^vignettes/malrebay_vignette_outputs$
 ^vignettes/MalReBay_cache$

@@ -1,10 +1,7 @@
 ---
 title: "MalReBay"
 output:
-  html_document:
-    toc: true
-    toc_depth: 3
-    toc_float: true
+  rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{MalReBay}
   %\VignetteEngine{knitr::rmarkdown}
@@ -27,6 +24,8 @@ knitr::opts_chunk$set(
 )
 ```
 
+# Overview  
+
 ## 1. Introduction
 
 To monitor the effectiveness of antimalarial drugs, the **World Health Organization (WHO)** recommends the use of **Therapeutic Efficacy Studies (TES)**. TES are observational studies in which patients with uncomplicated malaria are treated and followed for several weeks to check if the infection clears and remains suppressed. Because patients can become re-infected during this follow-up period, distinguishing whether a recurrence is due to **recrudescence** (the reappearance of parasites from the original infection after partial clearance) or a **reinfection** (a new infection from a separate mosquito bite) is essential. This process, known as **molecular correction**, relies on comparing parasite genotypes from the initial infection and any subsequent recurrence.
@@ -45,7 +44,7 @@ Bayesian inference updates prior beliefs about $R_i$ using the observed genotypi
 
 The figure below illustrates this process, in which prior probabilities and data likelihoods are combined through Bayes’ rule to obtain the posterior probabilities that drive recurrence classification.
 
-![Overview of the Bayesian inference framework implemented in MalReBay.](figure/Bayesian_Framework2.png){width=600px}
+![Overview of the Bayesian inference framework implemented in MalReBay.](figure/Bayesian_Framework2.png){width="100%"}
 
 + Prior $P(R_i)$ is the baseline belief about recrudescence before seeing the data.
 
@@ -751,8 +750,7 @@ The package also includes an automatic convergence check: sampling will stop ear
 ## 10. Package structure and specifications
 The `MalReBay` package is organized around three main stages: data preparation, Bayesian inference with MCMC, and summarization of results.
 
-![MalReBay framework.](figure/MalReBay_Framework.png){width=600px}
-
+![MalReBay framework.](figure/MalReBay_Framework.png){width="100%"}
 
 ### 10.1 Data preparation
 
