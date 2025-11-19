@@ -138,7 +138,7 @@ the **quality and completeness of the genotyping data**, and evaluate
 the **overall polymorphism and richness of the markers**, all of which
 are important for robust downstream analyses.
 
-#### 5.1 Length-polymorphic markers
+### 5.1 Length-polymorphic markers
 
 For datasets with length-polymorphic markers, we now focus on **MOI
 (Multiplicity of Infection) and allele diversity visualizations**:
@@ -965,10 +965,8 @@ chains may not have converged:
   decays slowly across iterations, it means the chains are exploring the
   parameter space inefficiently and convergence has not been reached.
 
-#### How to improve convergence.
-
-If chains fail to converge, several adjustments can help improve
-stability and mixing:
+\####S# How to improve convergence. If chains fail to converge, several
+adjustments can help improve stability and mixing:
 
 - Increase the number of iterations: Allow more sampling time so chains
   have a better chance to explore the parameter space thoroughly.

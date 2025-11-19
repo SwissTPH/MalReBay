@@ -2,3 +2,18 @@ url: "https://swisstph.github.io/MalReBay"
 template:
   bootstrap: 5
 
+navbar:
+  left:
+    - text: "Get started"
+      href: articles/MalReBay.html
+    - text: "Reference"
+      href: reference/index.html
+  right:
+    - icon: fa-github
+      href: https://github.com/swisstph/MalReBay/
+      aria-label: GitHub repository
+
+sidebar:
+  components:
+    - toc
+

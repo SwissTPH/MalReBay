@@ -16,3 +16,5 @@
 ^docs$
 ^vignettes/malrebay_vignette_outputs$
 ^vignettes/MalReBay_cache$
+^_pkgdown\.yml$
+^vignettes/figure$

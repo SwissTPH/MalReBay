@@ -33,10 +33,7 @@
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
-<li class="nav-item"><form class="form-inline" role="search">
- <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
-</form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/swisstph/MalReBay/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/swisstph/MalReBay/" aria-label="GitHub repository"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -223,9 +220,9 @@ informative or frequent in the population</strong>, assess the
 evaluate the <strong>overall polymorphism and richness of the
 markers</strong>, all of which are important for robust downstream
 analyses.</p>
-<div class="section level4">
-<h4 id="length-polymorphic-markers-1">5.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers-1"></a>
-</h4>
+<div class="section level3">
+<h3 id="length-polymorphic-markers-1">5.1 Length-polymorphic markers<a class="anchor" aria-label="anchor" href="#length-polymorphic-markers-1"></a>
+</h3>
 <p>For datasets with length-polymorphic markers, we now focus on
 <strong>MOI (Multiplicity of Infection) and allele diversity
 visualizations</strong>:</p>
@@ -342,7 +339,7 @@ uncertainty.</p>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI analysis: No genotype data available."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/MOI-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset." width="672"></p>
+<p><img src="MalReBay_files/figure-html/MOI-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset." width="100%"></p>
 </div>
 <div class="section level5">
 <h5 id="marker-diversity">Marker diversity<a class="anchor" aria-label="anchor" href="#marker-diversity"></a>
@@ -360,7 +357,7 @@ uncertainty.</p>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping Length Polymorphic diversity plots: No data found."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/marker-diversity-length-descriptive-1.png" class="r-plt" alt="A set of pie charts showing the allele diversity for each microsatellite marker." width="672"></p>
+<p><img src="MalReBay_files/figure-html/marker-diversity-length-descriptive-1.png" class="r-plt" alt="A set of pie charts showing the allele diversity for each microsatellite marker." width="100%"></p>
 </div>
 </div>
 <div class="section level4">
@@ -1051,7 +1048,7 @@ genetic variability.</p></li>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping MOI analysis: No genotype data available."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/MOI_ampseq-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the amplicon sequencing dataset." width="672"></p>
+<p><img src="MalReBay_files/figure-html/MOI_ampseq-1.png" class="r-plt" alt="Violin plot showing the multiplicity of infection per marker for the amplicon sequencing dataset." width="100%"></p>
 </div>
 <div class="section level5">
 <h5 id="marker-diversity-1">Marker diversity<a class="anchor" aria-label="anchor" href="#marker-diversity-1"></a>
@@ -1068,7 +1065,7 @@ genetic variability.</p></li>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Skipping AmpSeq diversity plots: No data found."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p><img src="MalReBay_files/figure-html/marker-diversity-ampseq-1.png" class="r-plt" alt="A set of pie charts showing the haplotype diversity for each amplicon sequencing marker." width="672"></p>
+<p><img src="MalReBay_files/figure-html/marker-diversity-ampseq-1.png" class="r-plt" alt="A set of pie charts showing the haplotype diversity for each amplicon sequencing marker." width="100%"></p>
 </div>
 </div>
 <div class="section level4">
@@ -1593,12 +1590,8 @@ remains high or decays slowly across iterations, it means the chains are
 exploring the parameter space inefficiently and convergence has not been
 reached.</p></li>
 </ul>
-</div>
-<div class="section level4">
-<h4 id="how-to-improve-convergence-">How to improve convergence.<a class="anchor" aria-label="anchor" href="#how-to-improve-convergence-"></a>
-</h4>
-<p>If chains fail to converge, several adjustments can help improve
-stability and mixing:</p>
+<p>####S# How to improve convergence. If chains fail to converge,
+several adjustments can help improve stability and mixing:</p>
 <ul>
 <li><p>Increase the number of iterations: Allow more sampling time so
 chains have a better chance to explore the parameter space

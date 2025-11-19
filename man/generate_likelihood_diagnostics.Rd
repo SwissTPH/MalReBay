@@ -16,59 +16,18 @@ generate_likelihood_diagnostics(
 \item{all_chains_loglikelihood}{A list where each element is a numeric vector
 representing the log-likelihood history of one MCMC chain.}
 
-\item{site_name}{A character string for labeling plots and creating the output
-subdirectory when saving.}
+\item{site_name}{A character string for labeling plots.}
 
-\item{save_plot}{A logical. If \code{TRUE}, plots are saved as PNG files. If \code{FALSE}
-(the default), plots are displayed in the active R graphics device.}
+\item{save_plot}{A logical. If \code{TRUE}, plots are saved as PNG files.}
 
-\item{output_folder}{A character string specifying the path to a directory where
-plots should be saved. Only used if \code{save_plot = TRUE}.}
+\item{output_folder}{A character string specifying the path to save plots.}
 
-\item{verbose}{A logical. If \code{TRUE} (the default), prints the Gelman-Rubin
-and ESS summaries to the console.}
+\item{verbose}{A logical. If \code{TRUE}, prints diagnostic summaries.}
 }
 \value{
-An invisible list containing the calculated diagnostic results:
-\itemize{
-\item \code{gelman}: The Gelman-Rubin diagnostic result.
-\item \code{ess}: The Effective Sample Size result.
-\item \code{n_valid}: The number of valid (finite) samples per chain.
-}
+An invisible list containing the calculated diagnostic results.
 }
 \description{
-Calculates standard MCMC convergence diagnostics (Gelman-Rubin R-hat,
-Effective Sample Size) and generates diagnostic plots (traceplot, Gelman plot,
-histogram, ACF) for the log-likelihood.
-}
-\details{
-This function takes the log-likelihood history from multiple MCMC chains,
-cleans the data, and uses the \code{coda} package to compute diagnostics.
-It can either display plots in the active R graphics device or save them as
-PNG files to a specified directory.
-}
-\examples{
-# --- Example 1: Interactive Plotting ---
-# To view plots in the RStudio Plots pane (will ask before showing each plot)
-\dontrun{
-  generate_likelihood_diagnostics(all_chains, site_name = "Test Site")
-}
-
-# --- Example 2: Saving Plots to a File ---
-# Create a temporary directory for the output
-temp_dir <- tempdir()
-# Simulate some dummy MCMC chains for demonstration
-all_chains <- list(
-  chain1 = rnorm(1000, mean = -150, sd = 5),
-  chain2 = rnorm(1000, mean = -150, sd = 5)
-)
-# Run the function to save plots
-generate_likelihood_diagnostics(all_chains,
-                                site_name = "Test Site",
-                                save_plot = TRUE,
-                                output_folder = temp_dir)
-
-# Check that the files were created
-list.files(file.path(temp_dir, "convergence_diagnosis", "Test Site"))
-
+Calculates standard MCMC convergence diagnostics and generates diagnostic plots
+in a multi-stage process: 1) Gelman-Rubin, 2) Traceplot & Histogram, 3) All ACF plots.
 }
