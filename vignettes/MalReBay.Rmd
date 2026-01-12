@@ -235,8 +235,8 @@ The MCMC sampler has several parameters that control its runtime and convergence
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 1000, 
-  max_iterations = 1000,
+  chunk_size = 5000, 
+  max_iterations = 20000,
   rhat_threshold = 1.1,
   ess_threshold = 400
 )
@@ -517,8 +517,8 @@ We define the MCMC sampler parameters for this tutorial run:
 
 quick_mcmc_config <- list(
   n_chains = 4,
-  chunk_size = 1000,
-  max_iterations = 1000,
+  chunk_size = 5000,
+  max_iterations = 20000,
   rhat_threshold = 1.1,
   ess_threshold = 400     
 )
@@ -690,8 +690,8 @@ imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 1000, 
-  max_iterations = 1000, 
+  chunk_size = 3000, 
+  max_iterations = 6000, 
   rhat_threshold = 1.1,
   ess_threshold = 100
 )

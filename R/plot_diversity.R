@@ -10,8 +10,8 @@
 
 define_alleles_for_plotting <- function(genotypedata, marker_info) {
   alleles_definitions_bin <- list()
-  data_marker_columns <- grep("_\\d+$", colnames(genotypedata), value = TRUE)
-  available_base_markers <- unique(gsub("_\\d+$", "", data_marker_columns))
+  data_marker_columns <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata), value = TRUE)
+  available_base_markers <- unique(gsub("(_allele_\\d+|_\\d+)$", "", data_marker_columns))
   
   for (locus_name in available_base_markers) {
     locus_marker_info <- marker_info[marker_info$marker_id == locus_name, ]
@@ -20,7 +20,7 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
     binning_method <- locus_marker_info$binning_method[1]
     
     if (binning_method == "microsatellite") {
-      locus_cols_pattern <- paste0("^", locus_name, "_")
+      locus_cols_pattern <- paste0("^", locus_name, "(_allele_|_)\\d+")
       locus_cols_logical <- grepl(locus_cols_pattern, colnames(genotypedata))
       raw_alleles_vector <- unlist(genotypedata[, locus_cols_logical])
       unique_alleles <- sort(unique(raw_alleles_vector[!is.na(raw_alleles_vector)]))
@@ -29,10 +29,10 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
         repeat_length <- locus_marker_info$repeatlength[1]
         bins <- ceiling((unique_alleles - unique_alleles[1] + 1) / repeat_length)
         alleles_definitions_bin[[locus_name]] <- data.frame(min = tapply(unique_alleles, bins, min),
-                                                        max = tapply(unique_alleles, bins, max))
+                                                            max = tapply(unique_alleles, bins, max))
       }
     } else if (binning_method == "cluster") {
-      locus_cols_pattern <- paste0("^", locus_name, "_")
+      locus_cols_pattern <- paste0("^", locus_name, "(_allele_|_)\\d+")
       locus_cols_logical <- grepl(locus_cols_pattern, colnames(genotypedata))
       raw_alleles_vector <- unlist(genotypedata[, locus_cols_logical])
       unique_alleles <- sort(unique(raw_alleles_vector[!is.na(raw_alleles_vector)]))
@@ -42,7 +42,7 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
         breaks <- c(0, which(diff(unique_alleles) > gap_threshold), length(unique_alleles))
         bins <- findInterval(seq_along(unique_alleles), breaks)
         alleles_definitions_bin[[locus_name]] <- data.frame(min = tapply(unique_alleles, bins, min),
-                                                        max = tapply(unique_alleles, bins, max))
+                                                            max = tapply(unique_alleles, bins, max))
       }
     }
   }
@@ -118,12 +118,11 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
     ggplot2::geom_col(width = 1, color = "white") +
     ggplot2::coord_polar(theta = "y") +
     ggplot2::scale_fill_manual(values = colfunc(nrow(plot_data_df))) +
-    # Smaller labels for better proportion with pie charts
-    ggplot2::geom_text(ggplot2::aes(y = .data$pos, label = .data$Label), size = 3, color = "black") +
+    ggplot2::geom_text(ggplot2::aes(y = .data$pos, label = .data$Label), size = 2.5, color = "black") +
     ggplot2::theme_void() +
     ggplot2::theme(
       legend.position = "none",
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 12, face = "bold")
+      plot.title = ggplot2::element_text(hjust = 0.5, size = 12)
     ) +
     ggplot2::ggtitle(title_marker)
   
@@ -161,9 +160,21 @@ generate_diversity_plots <- function(genotypedata,
   if (!data_type %in% c("length_polymorphic", "ampseq")) {
     stop("Invalid data_type specified. Please use 'length_polymorphic' or 'ampseq'.")
   }
+  
   if (data_type == "length_polymorphic" && is.null(marker_info)) {
     stop("marker_info must be provided for data_type = 'length_polymorphic'.")
   }
+  
+  if (!"Sample.ID" %in% colnames(genotypedata)) {
+    # Check for case-insensitive match
+    sid_col <- grep("^sample.?id$", colnames(genotypedata), ignore.case = TRUE, value = TRUE)
+    if(length(sid_col) > 0) {
+      genotypedata$Sample.ID <- genotypedata[[sid_col[1]]]
+    } else {
+      stop("Input data must contain a 'Sample.ID' column.")
+    }
+  }
+  
   if (data_type == "ampseq") {
     if (!any(grepl(" Day ", genotypedata$Sample.ID))) {
       genotypedata$Sample.ID <- gsub("D0$", " Day 0", genotypedata$Sample.ID)
@@ -177,16 +188,20 @@ generate_diversity_plots <- function(genotypedata,
   figure_day0 <- NULL
   figure_recurrence <- NULL
   
+  # Variables to track how many rows of pie charts are in each section
+  rows_d0 <- 0
+  rows_rec <- 0
+  
   # day 0
   if (nrow(day0_data) > 0) {
     if (data_type == "length_polymorphic") {
       alleles_definitions_bin <- define_alleles_for_plotting(genotypedata = genotypedata, marker_info = marker_info)
       long_data_d0 <- day0_data %>%
-        pivot_longer(cols = matches("_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
-        filter(!is.na(.data$allele_length)) %>%
-        mutate(marker_id = gsub("_\\d+$", "", .data$marker_replicate)) %>%
-        select(.data$Sample.ID, .data$marker_id, .data$allele_length) %>%
-        distinct()
+        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
+        dplyr::filter(!is.na(.data$allele_length)) %>%
+        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
+        dplyr::select("Sample.ID", "marker_id", "allele_length") %>%
+        dplyr::distinct()
       
       if(nrow(long_data_d0) > 0) {
         binned_alleles_list_d0 <- list()
@@ -198,8 +213,7 @@ generate_diversity_plots <- function(genotypedata,
           marker_data$true_alleles <- sapply(marker_data$allele_length, function(x) bin_centers[which.min(abs(x - bin_centers))])
           binned_alleles_list_d0[[marker]] <- marker_data
         }
-        final_alleles_d0 <- bind_rows(binned_alleles_list_d0) %>% select(.data$Sample.ID, .data$marker_id, .data$true_alleles) %>% distinct()
-        
+        final_alleles_d0 <- bind_rows(binned_alleles_list_d0) %>% select("Sample.ID", "marker_id", "true_alleles") %>% distinct()
         frequency_data_d0 <- final_alleles_d0 %>% group_by(.data$marker_id, .data$true_alleles) %>% summarize(Amount = n(), .groups = 'drop')
         total_infections_d0 <- frequency_data_d0 %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
         frequency_data_d0 <- left_join(frequency_data_d0, total_infections_d0, by = "marker_id") %>% mutate(Frequency = .data$Amount / .data$TotalInfections)
@@ -212,23 +226,24 @@ generate_diversity_plots <- function(genotypedata,
         for (i in seq_along(list_markers_d0)) {
           marker_name <- list_markers_d0[i]
           plot_data <- frequency_data_d0 %>% filter(.data$marker_id == marker_name)
-          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select(.data$true_alleles, .data$Amount, .data$Frequency), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
+          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select("true_alleles", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
         }
         
         p_array_d0 <- p_array_d0[!sapply(p_array_d0, is.null)]
         if(length(p_array_d0) > 0) {
           num_cols_d0 <- min(length(p_array_d0), 7)
-          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = ceiling(length(p_array_d0) / num_cols_d0))
-          figure_day0 <- ggpubr::annotate_figure(figure_day0, top = ggpubr::text_grob("Allele Diversity at Day 0", color = "black", face = "bold", size = 20))
+          rows_d0 <- ceiling(length(p_array_d0) / num_cols_d0) 
+          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = rows_d0)
+          figure_day0 <- ggpubr::annotate_figure(figure_day0, left = ggpubr::text_grob("Day 0", rot = 90, size = 18))
         }
       }
     } else if (data_type == "ampseq") {
       long_data_d0 <- day0_data %>%
-        pivot_longer(cols = matches("_allele_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
-        filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
-        mutate(marker_id = gsub("_allele_\\d+$", "", .data$marker_replicate)) %>%
-        select(.data$Sample.ID, .data$marker_id, .data$haplotype) %>%
-        distinct()
+        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
+        dplyr::filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
+        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
+        dplyr::select("Sample.ID", "marker_id", "haplotype") %>%
+        dplyr::distinct()
       
       if(nrow(long_data_d0) > 0) {
         frequency_data_d0 <- long_data_d0 %>% group_by(.data$marker_id, .data$haplotype) %>% summarize(Amount = n(), .groups = 'drop')
@@ -243,14 +258,15 @@ generate_diversity_plots <- function(genotypedata,
         for (i in seq_along(list_markers_d0)) {
           marker_name <- list_markers_d0[i]
           plot_data <- frequency_data_d0 %>% filter(.data$marker_id == marker_name)
-          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select(.data$haplotype, .data$Amount, .data$Frequency), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
+          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select("haplotype", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
         }
         
         p_array_d0 <- p_array_d0[!sapply(p_array_d0, is.null)]
         if(length(p_array_d0) > 0) {
           num_cols_d0 <- min(length(p_array_d0), 7)
-          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = ceiling(length(p_array_d0) / num_cols_d0))
-          figure_day0 <- ggpubr::annotate_figure(figure_day0, top = ggpubr::text_grob("Haplotype Diversity at Day 0", color = "black", face = "bold", size = 20))
+          rows_d0 <- ceiling(length(p_array_d0) / num_cols_d0) 
+          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = rows_d0)
+          figure_day0 <- ggpubr::annotate_figure(figure_day0, left = ggpubr::text_grob("Day 0", rot = 90, size = 17))
         }
       }
     }
@@ -263,11 +279,11 @@ generate_diversity_plots <- function(genotypedata,
         alleles_definitions_bin <- define_alleles_for_plotting(genotypedata = genotypedata, marker_info = marker_info)
       }
       long_data_rec <- recurrence_data %>%
-        pivot_longer(cols = matches("_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
-        filter(!is.na(.data$allele_length)) %>%
-        mutate(marker_id = gsub("_\\d+$", "", .data$marker_replicate)) %>%
-        select(.data$Sample.ID, .data$marker_id, .data$allele_length) %>%
-        distinct()
+        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
+        dplyr::filter(!is.na(.data$allele_length)) %>%
+        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
+        dplyr::select("Sample.ID", "marker_id", "allele_length") %>%
+        dplyr::distinct()
       
       if(nrow(long_data_rec) > 0) {
         binned_alleles_list_rec <- list()
@@ -279,7 +295,7 @@ generate_diversity_plots <- function(genotypedata,
           marker_data$true_alleles <- sapply(marker_data$allele_length, function(x) bin_centers[which.min(abs(x - bin_centers))])
           binned_alleles_list_rec[[marker]] <- marker_data
         }
-        final_alleles_rec <- bind_rows(binned_alleles_list_rec) %>% select(.data$Sample.ID, .data$marker_id, .data$true_alleles) %>% distinct()
+        final_alleles_rec <- bind_rows(binned_alleles_list_rec) %>% select("Sample.ID", "marker_id", "true_alleles") %>% distinct()
         
         frequency_data_rec <- final_alleles_rec %>% group_by(.data$marker_id, .data$true_alleles) %>% summarize(Amount = n(), .groups = 'drop')
         total_infections_rec <- frequency_data_rec %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
@@ -293,23 +309,24 @@ generate_diversity_plots <- function(genotypedata,
         for (i in seq_along(list_markers_rec)) {
           marker_name <- list_markers_rec[i]
           plot_data <- frequency_data_rec %>% filter(.data$marker_id == marker_name)
-          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select(.data$true_alleles, .data$Amount, .data$Frequency), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
+          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select("true_alleles", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
         }
         
         p_array_rec <- p_array_rec[!sapply(p_array_rec, is.null)]
         if(length(p_array_rec) > 0) {
           num_cols_rec <- min(length(p_array_rec), 7)
-          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = ceiling(length(p_array_rec) / num_cols_rec))
-          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, top = ggpubr::text_grob("Allele Diversity at Recurrence", color = "black", face = "bold", size = 20))
+          rows_rec <- ceiling(length(p_array_rec) / num_cols_rec)
+          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = rows_rec)
+          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, left = ggpubr::text_grob("Day of Recurrence", rot = 90, size = 17))
         }
       }
     } else if (data_type == "ampseq") {
       long_data_rec <- recurrence_data %>%
-        pivot_longer(cols = matches("_allele_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
-        filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
-        mutate(marker_id = gsub("_allele_\\d+$", "", .data$marker_replicate)) %>%
-        select(.data$Sample.ID, .data$marker_id, .data$haplotype) %>%
-        distinct()
+        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
+        dplyr::filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
+        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
+        dplyr::select("Sample.ID", "marker_id", "haplotype") %>%
+        dplyr::distinct()
       
       if(nrow(long_data_rec) > 0) {
         frequency_data_rec <- long_data_rec %>% group_by(.data$marker_id, .data$haplotype) %>% summarize(Amount = n(), .groups = 'drop')
@@ -324,14 +341,15 @@ generate_diversity_plots <- function(genotypedata,
         for (i in seq_along(list_markers_rec)) {
           marker_name <- list_markers_rec[i]
           plot_data <- frequency_data_rec %>% filter(.data$marker_id == marker_name)
-          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select(.data$haplotype, .data$Amount, .data$Frequency), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
+          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select("haplotype", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
         }
         
         p_array_rec <- p_array_rec[!sapply(p_array_rec, is.null)]
         if(length(p_array_rec) > 0) {
           num_cols_rec <- min(length(p_array_rec), 7)
-          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = ceiling(length(p_array_rec) / num_cols_rec))
-          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, top = ggpubr::text_grob("Haplotype Diversity at Recurrence", color = "black", face = "bold", size = 20))
+          rows_rec <- ceiling(length(p_array_rec) / num_cols_rec)
+          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = rows_rec)
+          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, left = ggpubr::text_grob("Day of Recurrence", rot = 90, size = 17))
         }
       }
     }
@@ -339,11 +357,21 @@ generate_diversity_plots <- function(genotypedata,
   
   final_plot_list <- list(figure_day0, figure_recurrence)
   final_plot_list <- final_plot_list[!sapply(final_plot_list, is.null)]
+  plot_heights <- c()
+  if (!is.null(figure_day0)) plot_heights <- c(plot_heights, rows_d0)
+  if (!is.null(figure_recurrence)) plot_heights <- c(plot_heights, rows_rec)
   
   if (length(final_plot_list) > 0) {
-    final_figure <- ggpubr::ggarrange(plotlist = final_plot_list, ncol = 1, nrow = length(final_plot_list))
-    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.pdf"))
-    ggsave(output_path, plot = final_figure, width = 24, height = 5 * length(final_plot_list), limitsize = FALSE)
+    final_figure <- ggpubr::ggarrange(plotlist = final_plot_list, 
+                                      ncol = 1, 
+                                      nrow = length(final_plot_list),
+                                      heights = plot_heights)
+    
+    # output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.pdf"))
+    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
+    calc_height <- max(4, sum(plot_heights) * 3.5)
+    
+    ggsave(output_path, plot = final_figure, width = 24, height = calc_height, limitsize = FALSE)
     message(paste("Successfully saved combined diversity plots to:", output_path))
     invisible(final_figure)
   } else {

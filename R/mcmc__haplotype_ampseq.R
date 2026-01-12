@@ -166,7 +166,7 @@ run_one_chain_ampseq <- function(chain_id,
   }
   
   # Initialize parameters and classification
-  qq <- 0.05
+  qq <- 0.001
   q_loss <- 0.1
   prob_recrud <- 0.5
   classification <- ifelse(stats::runif(nids) < prob_recrud, 1, 0)

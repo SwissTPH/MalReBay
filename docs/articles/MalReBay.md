@@ -321,8 +321,8 @@ to ensure robust convergence.
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 1000, 
-  max_iterations = 1000,
+  chunk_size = 5000, 
+  max_iterations = 20000,
   rhat_threshold = 1.1,
   ess_threshold = 400
 )
@@ -368,8 +368,8 @@ knitr::kable(head(summary_df), caption = "Classification summary.")
 |:---|:---|---:|---:|---:|---:|
 | Benguela | BD21-002 | 0.0000000 | 7 | 7 | 7 |
 | Benguela | BD21-040 | 0.0000000 | 7 | 7 | 7 |
-| Benguela | BD21-041 | 0.9933333 | 7 | 7 | 7 |
-| Benguela | BD21-053 | 0.6266667 | 7 | 5 | 5 |
+| Benguela | BD21-041 | 0.9953333 | 7 | 7 | 7 |
+| Benguela | BD21-053 | 0.5163333 | 7 | 5 | 5 |
 | Benguela | BD21-075 | 0.0000000 | 7 | 7 | 7 |
 | Benguela | BD21-099 | 0.0000000 | 7 | 7 | 7 |
 
@@ -564,8 +564,8 @@ knitr::kable(
 |:---|:---|---:|---:|:---|:---|:---|:---|:---|:---|:---|---:|---:|
 | BD21-002 | Benguela | 0 | 7 | NI | NI | NI | NI | NI | NI | NI | 0.000 | 0.000 |
 | BD21-040 | Benguela | 1 | 7 | NI | NI | NI | R | NI | NI | NI | 0.000 | 0.000 |
-| BD21-041 | Benguela | 6 | 7 | R | NI | R | R | R | R | R | 0.993 | 1.000 |
-| BD21-053 | Benguela | 2 | 5 | NI | R | IND | NI | R | IND | NI | 0.627 | 0.312 |
+| BD21-041 | Benguela | 6 | 7 | R | NI | R | R | R | R | R | 0.995 | 1.000 |
+| BD21-053 | Benguela | 2 | 5 | NI | R | IND | NI | R | IND | NI | 0.516 | 0.312 |
 | BD21-075 | Benguela | 1 | 7 | NI | NI | NI | NI | NI | R | NI | 0.000 | 0.000 |
 | BD21-099 | Benguela | 2 | 7 | NI | NI | NI | R | NI | R | NI | 0.000 | 0.000 |
 
@@ -679,8 +679,8 @@ We define the MCMC sampler parameters for this tutorial run:
 
 quick_mcmc_config <- list(
   n_chains = 4,
-  chunk_size = 1000,
-  max_iterations = 1000,
+  chunk_size = 5000,
+  max_iterations = 20000,
   rhat_threshold = 1.1,
   ess_threshold = 400     
 )
@@ -720,9 +720,9 @@ knitr::kable(head(summary_df), caption = "Classification summary.")
 | 1    | 1         |   1.0000000 |              3 |              3 |                 3 |
 | 1    | 10        |   1.0000000 |              3 |              3 |                 3 |
 | 1    | 11        |   1.0000000 |              3 |              3 |                 3 |
-| 1    | 12        |   1.0000000 |              3 |              3 |                 3 |
+| 1    | 12        |   0.2136667 |              3 |              3 |                 3 |
 | 1    | 13        |   1.0000000 |              3 |              3 |                 3 |
-| 1    | 14        |   0.9933333 |              3 |              3 |                 3 |
+| 1    | 14        |   0.6876667 |              3 |              3 |                 3 |
 
 Classification summary.
 
@@ -857,9 +857,9 @@ knitr::kable(
 | 1         | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
 | 10        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
 | 11        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 12        | 1    |              1 |                    3 | NI   | R   | NI    |    1.000 |
+| 12        | 1    |              1 |                    3 | NI   | R   | NI    |    0.214 |
 | 13        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 14        | 1    |              3 |                    3 | R    | R   | R     |    0.993 |
+| 14        | 1    |              3 |                    3 | R    | R   | R     |    0.688 |
 
 Comparison of match-counting results and MalReBay probability for
 amplicon data.
@@ -905,8 +905,8 @@ imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 1000, 
-  max_iterations = 1000, 
+  chunk_size = 3000, 
+  max_iterations = 6000, 
   rhat_threshold = 1.1,
   ess_threshold = 100
 )

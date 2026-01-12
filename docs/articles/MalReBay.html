@@ -399,8 +399,8 @@ frequent convergence checks but increase computational time.</p></li>
 <code class="sourceCode R"><span></span>
 <span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  n_chains <span class="op">=</span> <span class="fl">4</span>, </span>
-<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>, </span>
-<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">5000</span>, </span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">20000</span>,</span>
 <span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
 <span>  ess_threshold <span class="op">=</span> <span class="fl">400</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -474,7 +474,7 @@ for each patient.</p></li>
 <tr class="odd">
 <td align="left">Benguela</td>
 <td align="left">BD21-041</td>
-<td align="right">0.9933333</td>
+<td align="right">0.9953333</td>
 <td align="right">7</td>
 <td align="right">7</td>
 <td align="right">7</td>
@@ -482,7 +482,7 @@ for each patient.</p></li>
 <tr class="even">
 <td align="left">Benguela</td>
 <td align="left">BD21-053</td>
-<td align="right">0.6266667</td>
+<td align="right">0.5163333</td>
 <td align="right">7</td>
 <td align="right">5</td>
 <td align="right">5</td>
@@ -849,7 +849,7 @@ R
 R
 </td>
 <td style="text-align:right;">
-0.993
+0.995
 </td>
 <td style="text-align:right;">
 1.000
@@ -890,7 +890,7 @@ IND
 NI
 </td>
 <td style="text-align:right;">
-0.627
+0.516
 </td>
 <td style="text-align:right;">
 0.312
@@ -1087,8 +1087,8 @@ threshold.</p></li>
 <code class="sourceCode R"><span></span>
 <span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  n_chains <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>,</span>
-<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">5000</span>,</span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">20000</span>,</span>
 <span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
 <span>  ess_threshold <span class="op">=</span> <span class="fl">400</span>     </span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -1161,7 +1161,7 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="even">
 <td align="left">1</td>
 <td align="left">12</td>
-<td align="right">1.0000000</td>
+<td align="right">0.2136667</td>
 <td align="right">3</td>
 <td align="right">3</td>
 <td align="right">3</td>
@@ -1177,7 +1177,7 @@ each patient. Let’s look at the first few rows.</p>
 <tr class="even">
 <td align="left">1</td>
 <td align="left">14</td>
-<td align="right">0.9933333</td>
+<td align="right">0.6876667</td>
 <td align="right">3</td>
 <td align="right">3</td>
 <td align="right">3</td>
@@ -1434,7 +1434,7 @@ R
 NI
 </td>
 <td style="text-align:right;">
-1.000
+0.214
 </td>
 </tr>
 <tr>
@@ -1486,7 +1486,7 @@ R
 R
 </td>
 <td style="text-align:right;">
-0.993
+0.688
 </td>
 </tr>
 </tbody>
@@ -1536,8 +1536,8 @@ reached.</p></li>
 <span></span>
 <span><span class="va">quick_mcmc_config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  n_chains <span class="op">=</span> <span class="fl">4</span>, </span>
-<span>  chunk_size <span class="op">=</span> <span class="fl">1000</span>, </span>
-<span>  max_iterations <span class="op">=</span> <span class="fl">1000</span>, </span>
+<span>  chunk_size <span class="op">=</span> <span class="fl">3000</span>, </span>
+<span>  max_iterations <span class="op">=</span> <span class="fl">6000</span>, </span>
 <span>  rhat_threshold <span class="op">=</span> <span class="fl">1.1</span>,</span>
 <span>  ess_threshold <span class="op">=</span> <span class="fl">100</span></span>
 <span><span class="op">)</span></span>
