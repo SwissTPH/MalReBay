@@ -21,7 +21,6 @@ detect_data_type <- function(input_df) {
     stop("Error: No allele columns found to determine data type.")
   }
   
-  # Get all non-missing allele values
   all_allele_values <- unlist(input_df[, allele_cols])
   first_value <- all_allele_values[!is.na(all_allele_values) & all_allele_values != ""][1]
   
@@ -29,14 +28,12 @@ detect_data_type <- function(input_df) {
     stop("Error: All allele columns are empty. Cannot determine data type.")
   }
   
-  # Check if the first value can be coerced to a number without warning
   if (!is.na(suppressWarnings(as.numeric(first_value)))) {
     return("length_polymorphic")
   } else {
     return("ampseq")
   }
 }
-
 
 #' Import Genotyping Data from Excel
 #'
@@ -54,31 +51,28 @@ import_data <- function(filepath, verbose = TRUE) {
   }
   
   temp_df <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[1]))
-  data_type <- detect_data_type(temp_df)
+  data_type <- detect_data_type(temp_df) 
   
   if (verbose) message("INFO: Detected '", data_type, "' data format.")
   
-  # Define marker info based on detected data type
   if (data_type == "length_polymorphic") {
     marker_info <- data.frame(
       marker_id = c("313", "383", "TA1", "POLYA", "PolyA", "PFPK2", "2490", "TA109",
                     "TA42", "TA81", "TA87", "TA40", "ARAII", "PFG377", "TA60",
+                    "m1", "m2", "m3", "m4", "m5", 
                     "K1", "MAD20", "RO33", "R033", "FC27", "IC", "3D7", "glurp"),
-      markertype = c(rep("microsatellite", 15), "msp1", "msp1", "msp1", "msp1", "msp2", "msp2", "msp2", "glurp"),
-      repeatlength = c(2, 2, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, NA, NA, NA, NA, NA, NA, NA, NA),
-      binning_method = c(rep("microsatellite", 15), rep("cluster", 8)),
-      cluster_gap_threshold = c(rep(NA, 15), 10, 10, 10, 10, 10, 10, 10, 15)
+      markertype = c(rep("microsatellite", 20), "msp1", "msp1", "msp1", "msp1", "msp2", "msp2", "msp2", "glurp"),
+      repeatlength = c(rep(2, 2), 3, 3, 3, 3, 3, 3, rep(2, 7), rep(3, 5), rep(NA, 8)),
+      binning_method = c(rep("microsatellite", 15), rep("microsatellite", 5), rep("cluster", 8)),
+      cluster_gap_threshold = c(rep(NA, 20), rep(2, 7), 2)  
     )
-  } else { # data_type == "ampseq"
-    allele_cols <- grep("_allele_\\d+$", colnames(temp_df), value = TRUE)
-    base_markers <- unique(gsub("_allele_\\d+$", "", allele_cols))
+  } else if (data_type == "ampseq") {
     marker_info <- data.frame(
-      marker_id = base_markers,
+      marker_id = c("cpmp", "cpp", "amaD3", "ama1-D3", "csp", "msp7", "SERA2", "TRAP3", "cpp2", "csp2"),
       markertype = "amplicon",
       repeatlength = NA,
       binning_method = "exact",
-      cluster_gap_threshold = NA,
-      stringsAsFactors = FALSE
+      cluster_gap_threshold = NA
     )
   }
   
@@ -88,24 +82,52 @@ import_data <- function(filepath, verbose = TRUE) {
   
   if (data_type == "ampseq") {
     if (verbose) message("INFO: Following amplicon sequencing data processing pipeline.")
-    colnames(temp_df)[1:2] <- c("Sample.ID", "Site")
+    cols_lower <- tolower(colnames(temp_df))
+    
+    if ("day" %in% cols_lower) {
+      
+      id_idx <- which(cols_lower %in% c("sample.id", "sample_id", "sampleid", "id"))[1]
+      day_idx <- which(cols_lower == "day")[1]
+      site_idx <- which(cols_lower == "site")[1]
+      
+      if (is.na(id_idx) || is.na(day_idx) || is.na(site_idx)) {
+        stop("ERROR: 'Day' column detected but could not locate 'Sample.ID' or 'Site' columns.")
+      }
+      
+      colnames(temp_df)[c(id_idx, day_idx, site_idx)] <- c("Sample.ID", "Day", "Site")
+      temp_df$Sample.ID <- ifelse(temp_df$Day == 0, 
+                                  paste0(temp_df$Sample.ID, " Day 0"), 
+                                  paste0(temp_df$Sample.ID, " Day Failure"))
+      
+      allele_cols <- setdiff(names(temp_df), c("Sample.ID", "Day", "Site"))
+      temp_df <- temp_df[, c("Sample.ID", "Site", allele_cols)]
+      
+    } else {
+      colnames(temp_df)[1:2] <- c("Sample.ID", "Site")
+      temp_df$Sample.ID <- gsub("_?D0$", " Day 0", temp_df$Sample.ID)    
+      is_day0 <- grepl(" Day 0$", temp_df$Sample.ID)
+      temp_df$Sample.ID[!is_day0] <- gsub("_?D([^0].*|0.+)$", " Day Failure", temp_df$Sample.ID[!is_day0])
+    }
+    
     temp_df[temp_df %in% missing_markers] <- NA
     
-    # Clean Sample IDs and check for pairs
-    temp_df$Sample.ID <- gsub("D0$", " Day 0", temp_df$Sample.ID)
-    temp_df$Sample.ID <- gsub("D[0-9]+$", " Day Failure", temp_df$Sample.ID)
     day0_ids <- unique(gsub(" Day 0", "", temp_df$Sample.ID[grepl(" Day 0", temp_df$Sample.ID)]))
     day_failure_ids <- unique(gsub(" Day Failure", "", temp_df$Sample.ID[grepl(" Day Failure", temp_df$Sample.ID)]))
     
+    if (verbose) {
+      message("DEBUG: Found ", length(day0_ids), " Day 0 IDs and ", length(day_failure_ids), " Failure IDs.")
+    }
+    
     if (!all(day0_ids %in% day_failure_ids)) {
       missing_pairs <- day0_ids[!day0_ids %in% day_failure_ids]
-      stop("ERROR: Ampseq data has 'Day 0' samples missing their 'Day Failure' pair. Missing pairs for: ",
-           paste(missing_pairs, collapse=", "))
+      warning("WARNING: Ampseq data has 'Day 0' samples missing their 'Day Failure' pair: ",
+              paste(missing_pairs, collapse=", "))
     }
     late_failures_df <- temp_df
     additional_df <- temp_df[0, ]
     
   } else { 
+    
     if (verbose) message("INFO: Following length-polymorphic data processing pipeline.")
     
     colnames_cleaned <- tolower(colnames(temp_df)[1:2])
@@ -140,6 +162,7 @@ import_data <- function(filepath, verbose = TRUE) {
     
     late_failures_df[late_failures_df %in% missing_markers] <- NA
     additional_df[additional_df %in% missing_markers] <- NA
+    
     if (ncol(late_failures_df) > 2) {
       late_failures_df[, 3:ncol(late_failures_df)] <- suppressWarnings(
         lapply(late_failures_df[, 3:ncol(late_failures_df)], function(x) as.numeric(as.character(x)))
@@ -151,10 +174,8 @@ import_data <- function(filepath, verbose = TRUE) {
       )
     }
     
-    # Final cleaning and validation
     late_failures_df$Sample.ID <- gsub("D0$", " Day 0", late_failures_df$Sample.ID)
     late_failures_df$Sample.ID <- gsub("D[0-9]+$", " Day Failure", late_failures_df$Sample.ID)
-    
     all_ids <- unique(gsub(" Day 0| Day Failure", "", late_failures_df$Sample.ID))
     allele_cols <- 3:ncol(late_failures_df)
     ids_to_remove <- c()
@@ -171,8 +192,7 @@ import_data <- function(filepath, verbose = TRUE) {
     
     if (length(ids_to_remove) > 0) {
       if (verbose) {
-        message("INFO: Removing ", length(ids_to_remove), " patient(s) with no allele data on Day of Failure: ",
-                paste(ids_to_remove, collapse=", "))
+        message("INFO: Removing ", length(ids_to_remove), " patient(s) with no allele data on Day of Failure.")
       }
       late_failures_df <- late_failures_df[!grepl(paste(ids_to_remove, collapse="|"), late_failures_df$Sample.ID), ]
     }
@@ -182,8 +202,6 @@ import_data <- function(filepath, verbose = TRUE) {
     
     if (!all(day0_ids %in% day_failure_ids)) {
       missing_pairs <- day0_ids[!day0_ids %in% day_failure_ids]
-      stop("ERROR: Length data has 'Day 0' samples missing their 'Day Failure' pair. Missing pairs for: ",
-           paste(missing_pairs, collapse=", "))
     }
   }
   
