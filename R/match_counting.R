@@ -68,8 +68,8 @@ assign_clusters <- function(alleles, threshold) {
 
 perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   
-  # Universal ID parsing that handles both formats
-  id_pattern <- "(D[0-9]+| Day 0| Day Failure)$"
+  # 1. Universal ID parsing (Kept from your current version)
+  id_pattern <- "(_?D[0-9]+| Day 0| Day Failure)$"
   
   paired_data <- genotypedata_latefailures %>%
     dplyr::mutate(
@@ -80,15 +80,24 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   patient_ids <- unique(paired_data$Patient.ID)
   nids <- length(patient_ids)
   
+  # Identify markers
   marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(paired_data), value = TRUE)
   locinames <- unique(gsub("(_allele_\\d+|_\\d+)$", "", marker_cols))
+  
+  # Ensure we only use loci present in marker_info
+  locinames <- intersect(locinames, marker_info$marker_id)
   nloci <- length(locinames)
   
+  # 2. Lookups (Restored from your original version)
+  bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
+  bin_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
+  cluster_thresh_lookup <- stats::setNames(marker_info$cluster_gap_threshold, marker_info$marker_id)
+  
+  # Initialize output
   number_matches <- rep(NA, nids)
   match_output <- matrix("", nids, nloci) 
   colnames(match_output) <- locinames
   number_loci_compared <- rep(NA, nids)
-  bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
   
   for (i in 1:nids) {
     current_patient_id <- patient_ids[i]
@@ -96,7 +105,9 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
     day0_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day 0")
     dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day X")
     
+    # Check for valid pair
     if (nrow(day0_row) != 1 || nrow(dayf_row) != 1) {
+      match_output[i, ] <- "ERR"
       next
     }
     
@@ -107,33 +118,69 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
       current_locus <- locinames[j]
       locus_cols <- grep(paste0("^", current_locus, "(_allele_\\d+|_\\d+)$"), colnames(paired_data), value = TRUE)
       
-      day0_alleles <- as.character(unlist(day0_row[, locus_cols]))
-      dayf_alleles <- as.character(unlist(dayf_row[, locus_cols]))
-      day0_alleles <- day0_alleles[!is.na(day0_alleles)]
-      dayf_alleles <- dayf_alleles[!is.na(dayf_alleles)]
+      method <- bin_method_lookup[current_locus]
+      
+      # Extract alleles
+      day0_alleles <- unlist(day0_row[, locus_cols])
+      dayf_alleles <- unlist(dayf_row[, locus_cols])
+      day0_alleles <- day0_alleles[!is.na(day0_alleles) & day0_alleles != ""]
+      dayf_alleles <- dayf_alleles[!is.na(dayf_alleles) & dayf_alleles != ""]
       
       if (length(day0_alleles) > 0 && length(dayf_alleles) > 0) {
         nloci_temp <- nloci_temp + 1
-        is_match <- all(dayf_alleles %in% day0_alleles)
+        is_match <- FALSE 
+        
+        # 3. Logic Branching (Restored and fixed)
+        if (is.na(method) || method == "amplicon" || method == "exact") {
+          # Standard exact string matching
+          is_match <- any(dayf_alleles %in% day0_alleles)
+          
+        } else if (method == "microsatellite") {
+          # Numeric matching with repeat length tolerance
+          d0_num <- as.numeric(day0_alleles)
+          df_num <- as.numeric(dayf_alleles)
+          bin_size <- bin_lookup[current_locus]
+          
+          # Check if any allele in Day Failure has a match in Day 0 within the bin size
+          is_match <- any(sapply(df_num, function(df) any(abs(df - d0_num) <= bin_size)))
+          
+        } else if (method == "cluster") {
+          # Clustering logic
+          d0_num <- as.numeric(day0_alleles)
+          df_num <- as.numeric(dayf_alleles)
+          thresh <- cluster_thresh_lookup[current_locus]
+          
+          all_vals <- unique(c(d0_num, df_num))
+          cluster_map <- assign_clusters(all_vals, thresh)
+          
+          d0_clusters <- unique(cluster_map[as.character(d0_num)])
+          df_clusters <- unique(cluster_map[as.character(df_num)])
+          
+          # Check if all failure clusters were present at Day 0
+          is_match <- any(df_clusters %in% d0_clusters)
+        }
         
         if (is_match) {
           nmatches_temp <- nmatches_temp + 1
-          match_output[i, j] <- "R"
+          match_output[i, j] <- "R"   # Recrudescence
         } else {
-          match_output[i, j] <- "NI"
+          match_output[i, j] <- "NI"  # New Infection
         }
       } else {
-        match_output[i, j] <- "IND"
+        match_output[i, j] <- "IND"   # Indeterminate
       }
     }
     number_matches[i] <- nmatches_temp
     number_loci_compared[i] <- nloci_temp
   }
   
+  # Prepare final dataframe
   match_results_df <- as.data.frame(match_output)
   match_results_df$Sample.ID <- patient_ids
   match_results_df$Number_Matches <- number_matches
   match_results_df$Number_Loci_Compared <- number_loci_compared
+  
+  # Reorder columns
   match_results_df <- match_results_df[, c("Sample.ID", "Number_Matches", "Number_Loci_Compared", locinames)]
   
   return(match_results_df)
