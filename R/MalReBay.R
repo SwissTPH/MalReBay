@@ -4,12 +4,12 @@
 #' This is the main function of the `MalReBay` package. It runs the
 #' complete Bayesian analysis workflow to classify parasite infections as either
 #' recrudescence or reinfection based on genotyping data. The function takes a processed data 
-#' object from `import_data()`, runs MCMC simulation with automatic convergence 
+#' object, runs MCMC simulation with automatic convergence 
 #' checking, and summarizes the final results.
 #'
 #' @details
-#' The function operates by first importing and validating the data from the
-#' provided Excel file. It automatically detects the data type (length-polymorphic
+#' The function operates by validating the data from the
+#' provided input object. It automatically detects the data type (length-polymorphic
 #' or amplicon sequencing) and selects the appropriate MCMC engine. The MCMC simulation
 #' is run in parallel across multiple chains and proceeds in chunks, stopping
 #' automatically when convergence criteria are met or the maximum number of
@@ -20,96 +20,61 @@
 #' \itemize{
 #'   \item \strong{`n_chains`}: Number of parallel chains to run. (Default: 4).
 #'   \item \strong{`chunk_size`}: Number of iterations per chunk. After each chunk,
-#'     convergence is assessed. (Default: 10000).
+#'     convergence is assessed. (Default: 1000).
 #'   \item \strong{`max_iterations`}: The maximum total number of iterations before
-#'     the simulation is forcibly stopped, even if not converged. (Default: 100000).
+#'     the simulation is forcibly stopped. (Default: 10000).
 #'   \item \strong{`burn_in_frac`}: The fraction of initial samples to discard
 #'     from each chain before summarizing results. (Default: 0.25).
-#'   \item \strong{`rhat_threshold`}: The Gelman-Rubin diagnostic threshold for
-#'     convergence. (Default: 1.01).
-#'   \item \strong{`ess_threshold`}: The Effective Sample Size threshold for
-#'     convergence. (Default: 400).
 #'   \item \strong{`record_hidden_alleles`}: A logical flag. If `TRUE`, the full
-#'     state of imputed hidden alleles is saved. This can generate very large
-#'     output files and is mainly for debugging. (Default: FALSE).
+#'     state of imputed hidden alleles is saved. (Default: FALSE).
 #' }
-#' Any parameters not specified in the list will use the default values.
 #'
-#' @param imported_data A list object returned by the `import_data()`
-#'   function. This list must contain `$late_failures` (data.frame),
-#'   `$additional` (data.frame), `$marker_info` (data.frame), and
-#'   `$data_type` (character string).
-#' @param mcmc_config A list of MCMC configuration parameters. See Details for
-#'   a full list of options and their defaults.
+#' @param imported_data A list object (typically from an import helper) containing:
+#'   \itemize{
+#'     \item \code{late_failures}: Data frame of paired Day 0/Day Failure samples.
+#'     \item \code{additional}: Data frame of background/population samples.
+#'     \item \code{marker_info}: Data frame with marker names and repeat lengths.
+#'     \item \code{data_type}: Character, either "length_polymorphic" or "ampseq".
+#'   }
+#' @param mcmc_config A list of MCMC configuration parameters. See Details.
 #' @param output_folder A character string specifying the path to the folder where
 #'   all results (summary CSVs, diagnostic plots) will be saved. The folder
-#'   will be created if it does not exist.
+#'   will be created if it does not exist. If a \code{convergence_diagnosis}
+#'   sub-folder exists from a previous run, it will be automatically updated.
 #' @param n_workers An integer specifying the number of parallel cores to use.
-#'   Defaults to 1 (sequential). If `n_workers > 1`, the analysis will be
-#'   parallelized by site using the 'future' package.
-#' @param verbose A logical. If `TRUE` (the default), the function will print
-#'   progress messages, warnings about missing markers, and other information
-#'   to the console. If `FALSE`, it will run silently, only showing critical
-#'   errors.
-#' @param output_folder A character string specifying the path to the folder where
-#'   all results (summary CSVs, diagnostic plots) will be saved. The folder
-#'   will be created if it does not exist. **Note:** If a `convergence_diagnosis`
-#'   sub-folder exists from a previous run, it will be automatically removed to
-#'   ensure that all diagnostic plots are from the current analysis.
-#'   
-#'   
-#' @return
-#' A list containing three elements:
-#' \item{summary}{A data frame summarizing the main results for each patient...}
-#' \item{marker_details}{A detailed data frame providing the mean likelihood ratio...}
-#' \item{mcmc_loglikelihoods}{A list containing the raw MCMC log-likelihood chains 
-#'   for each site, which can be passed to `generate_likelihood_diagnostics()`.}
-#' CSV files and diagnostic plots are also saved to the `output_folder`.
+#'   Defaults to 1. If \code{n_workers > 1}, the analysis is parallelized by site.
+#' @param verbose A logical. If \code{TRUE}, the function prints progress messages.
 #'
+#' @return A list containing three elements:
+#' \item{summary}{A data frame summarizing the classification probability for each patient.}
+#' \item{marker_details}{A detailed data frame providing the mean likelihood ratio and distance per marker.}
+#' \item{comparison}{A comparison table matching Bayesian results with basic match-counting logic.}
+#' 
 #' @importFrom utils modifyList write.csv
-#' @importFrom dplyr bind_rows rename left_join full_join
+#' @importFrom dplyr bind_rows rename left_join select mutate
 #' @importFrom future plan multisession sequential availableCores
+#' @importFrom ggplot2 ggplot aes geom_jitter geom_violin geom_text scale_fill_brewer facet_grid labs theme_classic ggsave
+#' @importFrom tidyr pivot_longer crossing replace_na
+#' @importFrom grDevices png dev.off
+#' @importFrom graphics hist
 #'
 #' @export
 #' 
 #' @examples
-#' # 1. Get the path to the example data file
-#' example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
-#'                             package = "MalReBay")
-#'
-#' # 2. Create a temporary directory for the results
-#' temp_output_dir <- file.path(tempdir(), "MalReBay_example")
-#' dir.create(temp_output_dir, showWarnings = FALSE)
-#'
-#' # 3. Define a minimal MCMC configuration for a quick run
-#' # NOTE: For a real analysis, use more iterations.
-#' quick_mcmc_config <- list(
-#'   n_chains = 2,
-#'   max_iterations = 500,
-#'   chunk_size = 500
-#' )
-#'
 #' \dontrun{
-#' # 4. Import and process the data first
-#' processed_data <- import_data(filepath = example_file)
+#' # 1. Import and process the data
+#' processed_data <- import_data(filepath = "my_data.xlsx")
 #'
-#' # 5. Run the analysis using the processed data object and 2 cores
-#' results_list <- classify_infections(
+#' # 2. Run the analysis
+#' results <- classify_infections(
 #'   imported_data = processed_data,
-#'   mcmc_config = quick_mcmc_config,
-#'   output_folder = temp_output_dir,
-#'   n_workers = 2,
-#'   verbose = TRUE
+#'   n_workers = 2
 #' )
-#'
-#' # 6. View the top rows of the main summary table
-#' print(head(results_list$summary))
 #' }
-classify_infections <- function(imported_data,
-                                mcmc_config,
-                                output_folder,
-                                n_workers = 1,
-                                verbose = TRUE) {
+classify_infections <- function(imported_data, mcmc_config = list(), output_folder = "results", n_workers = 1, verbose = TRUE){
+  
+  # Validation and Directory Setup
+  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
   
   required_elements <- c("late_failures", "additional", "marker_info", "data_type")
   if (!is.list(imported_data) || !all(required_elements %in% names(imported_data))) {
@@ -124,217 +89,172 @@ classify_infections <- function(imported_data,
     if (verbose) message("INFO: Removing existing convergence diagnosis folder to ensure fresh results.")
     unlink(convergence_dir, recursive = TRUE)
   }
- 
+  
+  config <- utils::modifyList(list(
+    n_chains = 4, chunk_size = 1000, max_iterations = 10000, 
+    burn_in_frac = 0.25, record_hidden_alleles = FALSE
+  ), mcmc_config)
+  
+  # Extract original data
   genotypedata_latefailures <- imported_data$late_failures
-  additional_genotypedata <- imported_data$additional
-  marker_information <- imported_data$marker_info
-  data_type <- imported_data$data_type
+  additional_genotypedata   <- imported_data$additional
+  marker_information        <- imported_data$marker_info
+  data_type                 <- imported_data$data_type
   
-  # Clean column names
-  colnames(genotypedata_latefailures) <- trimws(colnames(genotypedata_latefailures))
-  if (nrow(additional_genotypedata) > 0) {
-    colnames(additional_genotypedata) <- trimws(colnames(additional_genotypedata))
-  }
-  colnames(genotypedata_latefailures) <- gsub("R033_", "RO33_", colnames(genotypedata_latefailures))
-  colnames(additional_genotypedata) <- gsub("R033_", "RO33_", colnames(additional_genotypedata))
+  # Marker identification
+  marker_suffix_regex <- "(_allele_|_)\\d+$"
+  allele_cols <- colnames(genotypedata_latefailures)[3:ncol(genotypedata_latefailures)]
   
-  defaults <- list(n_chains = 4,
-                   rhat_threshold = 1.01,
-                   ess_threshold = 400,
-                   chunk_size = 10000,
-                   max_iterations = 100000,
-                   burn_in_frac = 0.25,
-                   record_hidden_alleles = FALSE)
-  config <- utils::modifyList(defaults, mcmc_config)
+  # Define the variables exactly as you have them
+  base_names_in_data <- gsub(marker_suffix_regex, "", allele_cols)
+  markers_to_use     <- intersect(marker_information$marker_id, unique(base_names_in_data))
   
-  if (data_type == "length_polymorphic") {
-    data_marker_columns <- grep("_\\d+$", colnames(genotypedata_latefailures), value = TRUE)
-    available_base_markers <- unique(gsub("_\\d+$", "", data_marker_columns))
-    requested_base_markers <- marker_information$marker_id
-    markers_to_use <- intersect(requested_base_markers, available_base_markers)
-    
-    if (length(markers_to_use) == 0) {
-      stop("None of the markers specified in `marker_information` were found in the input data.")
-    }
-    missing_markers <- setdiff(requested_base_markers, available_base_markers)
-    if (length(missing_markers) > 0 && verbose) {
-      warning("The following requested markers were NOT found and will be ignored: ",
-              paste(missing_markers, collapse = ", "), call. = FALSE)
-    }
-    
-    extra_markers_in_data <- setdiff(available_base_markers, requested_base_markers)
-    if (length(extra_markers_in_data) > 0 && verbose) {
-      message("INFO: The following markers were found in your data but not requested: ",
-              paste(extra_markers_in_data, collapse = ", "))
-    }
-    if (verbose) message("Proceeding with analysis for these markers: ", paste(markers_to_use, collapse = ", "))
-    
-  } else if (data_type == "ampseq") {
-    data_marker_columns <- grep("_allele_\\d+$", colnames(genotypedata_latefailures), value = TRUE)
-    available_base_markers <- unique(gsub("_allele_\\d+$", "", data_marker_columns))
-    requested_base_markers <- marker_information$marker_id
-    markers_to_use <- intersect(requested_base_markers, available_base_markers)
-    
-    if (length(markers_to_use) == 0) {
-      stop("None of the markers from the ampseq data were found in the marker_information sheet.")
-    }
-    if (verbose) {
-      message("Amplicon sequencing data detected. The following haplotype markers will be used for analysis: ",
-              paste(markers_to_use, collapse = ", "))
-    }
-  } else {
-    stop("Unknown data type detected: ", data_type)
-  }
+  if (length(markers_to_use) == 0) stop("No matching markers found between metadata and data.")
   
-  final_marker_info <- marker_information[marker_information$marker_id %in% markers_to_use, ]
-  all_marker_base_names <- if (data_type == "ampseq") {
-    gsub("_allele_\\d+$", "", data_marker_columns)
-  } else {
-    gsub("_\\d+$", "", data_marker_columns)
-  }
-  final_marker_cols <- data_marker_columns[all_marker_base_names %in% markers_to_use]
+  # Select the valid allele columns
+  id_cols <- allele_cols[base_names_in_data %in% markers_to_use]
   
-  id_cols <- setdiff(colnames(genotypedata_latefailures), grep("_allele_\\d+|_\\d+$", colnames(genotypedata_latefailures), value = TRUE))
-  latefailures_subset <- genotypedata_latefailures[, c(id_cols, final_marker_cols)]
-  additional_subset <- if (nrow(additional_genotypedata) > 0) {
-    additional_genotypedata[, c(id_cols, final_marker_cols)]
+  # Create subsets
+  latefailures_subset <- genotypedata_latefailures[, c(colnames(genotypedata_latefailures)[1:2], id_cols)]
+  additional_subset  <- if (nrow(additional_genotypedata) > 0) {
+    additional_genotypedata[, c(colnames(additional_genotypedata)[1:2], id_cols)]
   } else {
     additional_genotypedata
   }
   
-  if (verbose) message("The model is running MCMC analysis...")
+  final_marker_info <- marker_information[marker_information$marker_id %in% markers_to_use, ]
   
+  if (verbose) message("INFO: Using markers: ", paste(markers_to_use, collapse = ", "))
+  
+  # MCMC parallelization setup
   old_plan <- future::plan()
   on.exit(future::plan(old_plan), add = TRUE)
   
+  # Determine worker count
+  avail_cores <- future::availableCores()
+  workers_to_use <- min(n_workers, avail_cores)
   
-  if (n_workers == 1) {
-    if (verbose) message("INFO: Running analysis sequentially (n_workers = 1).")
-    future::plan(future::sequential)
+  if (workers_to_use > 1) {
+    if (verbose) message("INFO: Running in parallel on ", workers_to_use, " cores.")
+    future::plan(future::multisession, workers = workers_to_use)
   } else {
-    available_cores <- future::availableCores()
-    if (n_workers > available_cores) {
-      if (verbose) {
-        message("INFO: 'n_workers' (", n_workers, ") exceeds available cores (", available_cores, "). Using ", available_cores, " cores.")
-      }
-      n_workers <- available_cores
-    }
-    if (verbose) message("INFO: Running analysis in parallel on ", n_workers, " cores.")
-    future::plan(future::multisession, workers = n_workers)
+    future::plan(future::sequential)
   }
   
+  # MCMC engine
   results <- run_all_sites(
     genotypedata_latefailures = latefailures_subset,
-    additional_genotypedata = additional_subset,
-    marker_info_subset = final_marker_info,
-    mcmc_config = config,
-    data_type = data_type,
-    output_folder = output_folder,
-    verbose = verbose
+    additional_genotypedata   = additional_subset,
+    marker_info_subset        = final_marker_info,
+    mcmc_config               = config,
+    data_type                 = data_type,
+    output_folder             = output_folder,
+    verbose                   = verbose
   )
   
   if (is.null(results) || length(results$ids) == 0) {
-    warning("MCMC results are empty. No summary table can be generated.", call. = FALSE)
-    return(
-      list(
-        summary = data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()),
-        marker_details = NULL
-      )
-    )
+    warning("MCMC results are empty.")
+    return(NULL)
   }
   
-  summary_list_probs <- list()
-  for (site_name in names(results$ids)) {
-    site_ids <- results$ids[[site_name]]
-    site_probs_matrix <- results$classifications[[site_name]]
-    
-    if (is.null(site_ids) || is.null(site_probs_matrix) || length(site_ids) == 0 || nrow(site_probs_matrix) == 0) {
-      next
-    }
-    
-    probabilities <- rowMeans(site_probs_matrix, na.rm = TRUE)
-    summary_list_probs[[site_name]] <- data.frame(
-      Site = site_name,
-      Sample.ID = site_ids,
-      Probability = probabilities,
+  # Processing output files
+  summary_list <- list()
+  details_list <- list()
+  convergence_list <- list() # This collects the R-hat/ESS for the final table
+  
+  for (site in names(results$ids)) {
+    # Calculate Probabilities
+    summary_list[[site]] <- data.frame(
+      Site = site, Sample.ID = results$ids[[site]],
+      Probability = rowMeans(results$classifications[[site]], na.rm = TRUE),
       stringsAsFactors = FALSE
     )
-  }
-  
-  if (length(summary_list_probs) == 0) {
-    warning("No probability data was successfully summarized across all sites.", call. = FALSE)
-    return(
-      list(
-        summary = data.frame(Site=character(), Sample.ID=character(), Probability=numeric(), N_Available_D0=integer(), N_Available_DF=integer(), N_Comparable_Loci=integer()),
-        marker_details = NULL
+    
+    # Capture Diagnostics
+    diag_vals <- NULL 
+    if (!is.null(results$all_chains_loglikelihood[[site]])) {
+      diag_vals <- plot_likelihood_diagnostics(
+        results$all_chains_loglikelihood[[site]], 
+        site, 
+        output_folder = output_folder,
+        verbose = verbose
       )
-    )
-  }
-  
-  probabilities_df <- dplyr::bind_rows(summary_list_probs)
-  locus_summary_df <- dplyr::bind_rows(results$locus_summary, .id = "Site")
-  locus_summary_df <- dplyr::rename(locus_summary_df,
-                                    Sample.ID = "patient_id",
-                                    N_Available_D0 = "n_available_d0",
-                                    N_Available_DF = "n_available_df",
-                                    N_Comparable_Loci = "n_comparable_loci")
-  
-  summary_df <- dplyr::left_join(probabilities_df, locus_summary_df, by = c("Sample.ID", "Site"))
-  
-  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  csv_path <- file.path(output_folder, "probability_of_recrudescence_summary.csv")
-  utils::write.csv(summary_df, csv_path, row.names = FALSE)
-  if (verbose) message("Summary table saved to: ", csv_path)
-  
-  marker_details_list <- list()
-  for (site_name in names(results$ids)) {
-    if (is.null(results$locus_lrs[[site_name]])) next
-    
-    site_ids <- results$ids[[site_name]]
-    site_lrs <- results$locus_lrs[[site_name]]
-    site_dists <- results$locus_dists[[site_name]]
-    marker_names <- results$locinames[[site_name]] %||% dimnames(site_lrs)[[2]] %||% paste0("Locus_", seq_len(dim(site_lrs)[2]))
-    
-    mean_lrs <- apply(site_lrs, c(1, 2), mean, na.rm = TRUE)
-    mean_dists <- apply(site_dists, c(1, 2), mean, na.rm = TRUE)
-    
-    if (length(site_ids) == nrow(mean_lrs) && length(marker_names) == ncol(mean_lrs)) {
-      dimnames(mean_lrs) <- list(site_ids, marker_names)
-    }
-    if (length(site_ids) == nrow(mean_dists) && length(marker_names) == ncol(mean_dists)) {
-      dimnames(mean_dists) <- list(site_ids, marker_names)
     }
     
-    lrs_df <- as.data.frame(as.table(mean_lrs), stringsAsFactors = FALSE)
-    colnames(lrs_df) <- c("Sample.ID", "Marker", "Mean_Likelihood_Ratio")
+    # Store R-hat and ESS into the convergence_list
+    if (!is.null(diag_vals)) {
+      convergence_list[[site]] <- data.frame(
+        Site = site,
+        Gelman_Rubin_Rhat = if(!is.null(diag_vals$gelman)) round(diag_vals$gelman$psrf[1,1], 4) else NA,
+        Effective_Sample_Size = if(!is.null(diag_vals$ess)) round(as.numeric(diag_vals$ess), 2) else NA,
+        stringsAsFactors = FALSE
+      )
+    }
     
-    dists_df <- as.data.frame(as.table(mean_dists), stringsAsFactors = FALSE)
-    colnames(dists_df) <- c("Sample.ID", "Marker", "Mean_Distance")
-    
-    site_marker_details <- dplyr::full_join(lrs_df, dists_df, by = c("Sample.ID", "Marker"))
-    site_marker_details$Site <- site_name
-    marker_details_list[[site_name]] <- site_marker_details
+    # Marker Details
+    lrs  <- apply(results$locus_lrs[[site]], c(1, 2), mean, na.rm = TRUE)
+    dsts <- apply(results$locus_dists[[site]], c(1, 2), mean, na.rm = TRUE)
+    site_details <- as.data.frame(as.table(lrs))
+    colnames(site_details) <- c("Sample.ID", "Marker", "Mean_LR")
+    site_details$Mean_Distance <- as.vector(dsts)
+    site_details$Site <- site
+    details_list[[site]] <- site_details
   }
   
-  marker_details_df <- NULL
-  if (length(marker_details_list) > 0) {
-    marker_details_df <- dplyr::bind_rows(marker_details_list)
-    marker_details_df$Interpretation <- ifelse(marker_details_df$Mean_Likelihood_Ratio > 1, "Supports Recrudescence", "Supports Reinfection/Error")
-    marker_csv_path <- file.path(output_folder, "marker_level_summary.csv")
-    utils::write.csv(marker_details_df, marker_csv_path, row.names = FALSE)
-    if (verbose) message("Detailed marker-level summary saved to: ", marker_csv_path)
+  final_summary <- dplyr::bind_rows(summary_list) %>%
+    dplyr::left_join(dplyr::bind_rows(results$locus_summary, .id = "Site") %>%
+                       dplyr::rename(Sample.ID=patient_id, N_Available_D0=n_available_d0, 
+                                     N_Available_DF=n_available_df, N_Comparable_Loci=n_comparable_loci),
+                     by = c("Sample.ID", "Site"))
+  
+  marker_details_df <- dplyr::bind_rows(details_list) %>%
+    dplyr::mutate(Interpretation = ifelse(Mean_LR > 1, "Recrudescence", "Reinfection/Error"))
+  
+  # Plots & Diversity
+  all_genotypedata_for_plots <- dplyr::bind_rows(latefailures_subset, additional_subset)
+  if (nrow(all_genotypedata_for_plots) > 0) {
+    plot_markers_diversity(all_genotypedata_for_plots, data_type, final_marker_info, output_folder = output_folder)
+    plot_moi(all_genotypedata_for_plots, output_folder = output_folder)
   }
   
-  return(
-    list(
-      summary = summary_df,
-      marker_details = marker_details_df,
-      mcmc_loglikelihoods = results$all_chains_loglikelihood
-    )
-  )
-}
-
-# Helper function for NULL coalescing
-`%||%` <- function(a, b) {
-  if (!is.null(a)) a else b
+  # Posteriror Probability Histogram
+  if (nrow(final_summary) > 0) {    
+    grDevices::png(file.path(output_folder, "recrudescence_probability_histogram.png"), 
+                   width = 8, height = 6, units = "in", res = 300)
+    graphics::hist(as.numeric(as.character(final_summary$Probability)), 
+                   breaks = seq(0, 1, by = 0.05), # Force bins from 0 to 1
+                   col = "skyblue",
+                   main = "Posterior Probability Distribution",
+                   xlab = "Probability of Recrudescence", ylab = "Number of Patients")
+    grDevices::dev.off()
+    if(verbose) message("INFO: Probability histogram saved to ", output_folder)
+  }
+  
+  
+  # Match counting comparison
+  match_results <- perform_match_counting(latefailures_subset, final_marker_info)
+  final_comparison_table <- genotypedata_latefailures %>%
+    dplyr::mutate(Patient.ID = gsub(" (Day 0|Day Failure)$", "", Sample.ID)) %>%
+    dplyr::left_join(match_results, by = c("Patient.ID" = "Sample.ID")) %>%
+    dplyr::left_join(dplyr::select(final_summary, Sample.ID, Probability, N_Comparable_Loci), 
+                     by = c("Patient.ID" = "Sample.ID"))
+  
+  # Export the Global MCMC Convergence Summary
+  if (length(convergence_list) > 0) {
+    mcmc_summary_df <- dplyr::bind_rows(convergence_list)
+    utils::write.csv(mcmc_summary_df, file.path(output_folder, "mcmc_convergence_summary.csv"), row.names = FALSE)
+    if (verbose) message("INFO: Global MCMC convergence summary saved to: ", output_folder)
+  }
+  
+  # Write Files
+  utils::write.csv(final_summary, file.path(output_folder, "posterior_probabilities.csv"), row.names = FALSE)
+  utils::write.csv(marker_details_df, file.path(output_folder, "markers_classification_analysis.csv"), row.names = FALSE)
+  utils::write.csv(final_comparison_table, file.path(output_folder, "bayesian_match_counting_comparison.csv"), row.names = FALSE)
+  
+  return(list(
+    summary = final_summary, 
+    marker_details = marker_details_df, 
+    comparison = final_comparison_table,
+    mcmc_loglikelihoods = results$all_chains_loglikelihood 
+  ))
 }

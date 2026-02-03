@@ -1,7 +1,9 @@
+#' @importFrom rlang .data
+NULL
+
 utils::globalVariables(c(
-  ".data", "Amount", "Frequency", "Haplotype", "Label", "M2490", "M313", "M383", 
-  "MOI", "PFPK2", "POLYA", "PatientID", "Sample.ID", "SampleID_raw", "Site", 
-  "TA1", "TA109", "Timepoint", "TotalInfections", "allele", "allele_length", 
-  "csum", "marker_id", "marker_replicate", "mean_moi", "pos", "true_alleles",
-  "label_y_pos"
+  "patient_id", "n_available_d0", "n_available_df", "n_comparable_loci",
+  "Mean_LR", "Probability", "N_Comparable_Loci", "Sample.ID", "Site",
+  "Interpretation", "Mean_Distance", "Patient.ID", "Number_Matches",
+  ".data"
 ))

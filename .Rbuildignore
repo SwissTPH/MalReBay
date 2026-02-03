@@ -18,3 +18,4 @@
 ^vignettes/MalReBay_cache$
 ^_pkgdown\.yml$
 ^vignettes/figure$
+^pkgdown$

@@ -4,10 +4,12 @@
 \alias{import_data}
 \title{Import Genotyping Data from Excel}
 \usage{
-import_data(filepath, verbose = TRUE)
+import_data(filepath, marker_filepath = NULL, verbose = TRUE)
 }
 \arguments{
 \item{filepath}{The full path to the input Excel file.}
+
+\item{marker_filepath}{Path to Excel file containing marker metadata (optional if marker_info sheet is present)}
 
 \item{verbose}{Logical. If TRUE, prints progress and data-cleaning messages.}
 }

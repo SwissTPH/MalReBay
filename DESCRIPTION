@@ -31,8 +31,8 @@ Suggests:
     patchwork,
     rmarkdown,
     rJava,
-    readxl,
     stringr,
+    purrr,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 VignetteBuilder: knitr
@@ -45,10 +45,10 @@ Imports:
     ggplot2,
     gtools,
     magrittr,
-    PfRecur,
-    purrr,
     RColorBrewer,
     tidyr,
     ggpubr,
     forcats,
-    scales
+    scales,
+    readxl,
+    rlang

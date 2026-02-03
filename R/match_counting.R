@@ -17,8 +17,8 @@
 #'   \item **`microsatellite`**: A match occurs if for every Day 0 allele, there
 #'     is a Day of Failure allele within the specified `repeatlength` tolerance,
 #'     OR vice-versa.
-#'   \item **`cluster`**: Alleles from both time points are first grouped into
-#'     clusters based on the `cluster_gap_threshold`. A match occurs if the set
+#'   \item **`msp_glurp`**: Alleles from both time points are first grouped into
+#'     clusters based on the `repeatlength`. A match occurs if the set
 #'     of Day 0 clusters is a subset of the Day of Failure clusters, OR vice-versa.
 #'   \item **`exact`** (e.g., for ampseq data): A match occurs if the set of
 #'     Day 0 alleles is a subset of the Day of Failure alleles, OR vice-versa.
@@ -91,7 +91,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   # 2. Lookups (Restored from your original version)
   bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
   bin_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
-  cluster_thresh_lookup <- stats::setNames(marker_info$cluster_gap_threshold, marker_info$marker_id)
+  cluster_thresh_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
   
   # Initialize output
   number_matches <- rep(NA, nids)
@@ -144,7 +144,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
           # Check if any allele in Day Failure has a match in Day 0 within the bin size
           is_match <- any(sapply(df_num, function(df) any(abs(df - d0_num) <= bin_size)))
           
-        } else if (method == "cluster") {
+        } else if (method == "msp_glurp") {
           # Clustering logic
           d0_num <- as.numeric(day0_alleles)
           df_num <- as.numeric(dayf_alleles)

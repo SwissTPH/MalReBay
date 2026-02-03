@@ -6,7 +6,7 @@ type and separating sheets into a structured list.
 ## Usage
 
 ``` r
-import_data(filepath, verbose = TRUE)
+import_data(filepath, marker_filepath = NULL, verbose = TRUE)
 ```
 
 ## Arguments
@@ -14,6 +14,11 @@ import_data(filepath, verbose = TRUE)
 - filepath:
 
   The full path to the input Excel file.
+
+- marker_filepath:
+
+  Path to Excel file containing marker metadata (optional if marker_info
+  sheet is present)
 
 - verbose:
 

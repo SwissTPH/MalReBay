@@ -6,54 +6,49 @@
 \usage{
 classify_infections(
   imported_data,
-  mcmc_config,
-  output_folder,
+  mcmc_config = list(),
+  output_folder = "results",
   n_workers = 1,
   verbose = TRUE
 )
 }
 \arguments{
-\item{imported_data}{A list object returned by the \code{import_data()}
-function. This list must contain \verb{$late_failures} (data.frame),
-\verb{$additional} (data.frame), \verb{$marker_info} (data.frame), and
-\verb{$data_type} (character string).}
+\item{imported_data}{A list object (typically from an import helper) containing:
+\itemize{
+\item \code{late_failures}: Data frame of paired Day 0/Day Failure samples.
+\item \code{additional}: Data frame of background/population samples.
+\item \code{marker_info}: Data frame with marker names and repeat lengths.
+\item \code{data_type}: Character, either "length_polymorphic" or "ampseq".
+}}
 
-\item{mcmc_config}{A list of MCMC configuration parameters. See Details for
-a full list of options and their defaults.}
+\item{mcmc_config}{A list of MCMC configuration parameters. See Details.}
 
 \item{output_folder}{A character string specifying the path to the folder where
 all results (summary CSVs, diagnostic plots) will be saved. The folder
-will be created if it does not exist. \strong{Note:} If a \code{convergence_diagnosis}
-sub-folder exists from a previous run, it will be automatically removed to
-ensure that all diagnostic plots are from the current analysis.}
+will be created if it does not exist. If a \code{convergence_diagnosis}
+sub-folder exists from a previous run, it will be automatically updated.}
 
 \item{n_workers}{An integer specifying the number of parallel cores to use.
-Defaults to 1 (sequential). If \code{n_workers > 1}, the analysis will be
-parallelized by site using the 'future' package.}
+Defaults to 1. If \code{n_workers > 1}, the analysis is parallelized by site.}
 
-\item{verbose}{A logical. If \code{TRUE} (the default), the function will print
-progress messages, warnings about missing markers, and other information
-to the console. If \code{FALSE}, it will run silently, only showing critical
-errors.}
+\item{verbose}{A logical. If \code{TRUE}, the function prints progress messages.}
 }
 \value{
 A list containing three elements:
-\item{summary}{A data frame summarizing the main results for each patient...}
-\item{marker_details}{A detailed data frame providing the mean likelihood ratio...}
-\item{mcmc_loglikelihoods}{A list containing the raw MCMC log-likelihood chains
-for each site, which can be passed to \code{generate_likelihood_diagnostics()}.}
-CSV files and diagnostic plots are also saved to the \code{output_folder}.
+\item{summary}{A data frame summarizing the classification probability for each patient.}
+\item{marker_details}{A detailed data frame providing the mean likelihood ratio and distance per marker.}
+\item{comparison}{A comparison table matching Bayesian results with basic match-counting logic.}
 }
 \description{
 This is the main function of the \code{MalReBay} package. It runs the
 complete Bayesian analysis workflow to classify parasite infections as either
 recrudescence or reinfection based on genotyping data. The function takes a processed data
-object from \code{import_data()}, runs MCMC simulation with automatic convergence
+object, runs MCMC simulation with automatic convergence
 checking, and summarizes the final results.
 }
 \details{
-The function operates by first importing and validating the data from the
-provided Excel file. It automatically detects the data type (length-polymorphic
+The function operates by validating the data from the
+provided input object. It automatically detects the data type (length-polymorphic
 or amplicon sequencing) and selects the appropriate MCMC engine. The MCMC simulation
 is run in parallel across multiple chains and proceeds in chunks, stopping
 automatically when convergence criteria are met or the maximum number of
@@ -64,52 +59,24 @@ Key parameters include:
 \itemize{
 \item \strong{\code{n_chains}}: Number of parallel chains to run. (Default: 4).
 \item \strong{\code{chunk_size}}: Number of iterations per chunk. After each chunk,
-convergence is assessed. (Default: 10000).
+convergence is assessed. (Default: 1000).
 \item \strong{\code{max_iterations}}: The maximum total number of iterations before
-the simulation is forcibly stopped, even if not converged. (Default: 100000).
+the simulation is forcibly stopped. (Default: 10000).
 \item \strong{\code{burn_in_frac}}: The fraction of initial samples to discard
 from each chain before summarizing results. (Default: 0.25).
-\item \strong{\code{rhat_threshold}}: The Gelman-Rubin diagnostic threshold for
-convergence. (Default: 1.01).
-\item \strong{\code{ess_threshold}}: The Effective Sample Size threshold for
-convergence. (Default: 400).
 \item \strong{\code{record_hidden_alleles}}: A logical flag. If \code{TRUE}, the full
-state of imputed hidden alleles is saved. This can generate very large
-output files and is mainly for debugging. (Default: FALSE).
+state of imputed hidden alleles is saved. (Default: FALSE).
 }
-Any parameters not specified in the list will use the default values.
 }
 \examples{
-# 1. Get the path to the example data file
-example_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
-                            package = "MalReBay")
-
-# 2. Create a temporary directory for the results
-temp_output_dir <- file.path(tempdir(), "MalReBay_example")
-dir.create(temp_output_dir, showWarnings = FALSE)
-
-# 3. Define a minimal MCMC configuration for a quick run
-# NOTE: For a real analysis, use more iterations.
-quick_mcmc_config <- list(
-  n_chains = 2,
-  max_iterations = 500,
-  chunk_size = 500
-)
-
 \dontrun{
-# 4. Import and process the data first
-processed_data <- import_data(filepath = example_file)
+# 1. Import and process the data
+processed_data <- import_data(filepath = "my_data.xlsx")
 
-# 5. Run the analysis using the processed data object and 2 cores
-results_list <- classify_infections(
+# 2. Run the analysis
+results <- classify_infections(
   imported_data = processed_data,
-  mcmc_config = quick_mcmc_config,
-  output_folder = temp_output_dir,
-  n_workers = 2,
-  verbose = TRUE
+  n_workers = 2
 )
-
-# 6. View the top rows of the main summary table
-print(head(results_list$summary))
 }
 }
