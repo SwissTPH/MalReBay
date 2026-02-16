@@ -503,7 +503,7 @@ run_one_chain <- function(chain_id,
       state_classification = state_classification,
       state_parameters     = state_parameters,
       state_alleles0       = state_alleles0,
-      allelstate_allelesfesf       = state_allelesf,
+      state_allelesf       = state_allelesf,
       state_loglikelihood  = state_loglikelihood,
       locus_lrs      = state_locus_lr,
       locus_dists    = state_locus_dist
