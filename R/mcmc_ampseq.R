@@ -60,7 +60,6 @@
 #' @keywords internal
 #' @noRd
 #'
-
 run_one_chain_ampseq <- function(chain_id,
                                  nruns, burnin, record_interval,
                                  nids, ids, nloci, maxMOI, locinames,
@@ -92,6 +91,7 @@ run_one_chain_ampseq <- function(chain_id,
       locus <- locinames[j]
       locicolumns <- grepl(paste0("^", locus, "_"), colnames(genotypedata_RR))
       
+      # Extract alleles for day 0
       d0_alleles <- as.character(genotypedata_RR[row_idx_d0[1], locicolumns])
       d0_alleles <- d0_alleles[!is.na(d0_alleles) & d0_alleles != "NA"]
       patient_max_moi0 <- max(patient_max_moi0, length(d0_alleles))
@@ -99,6 +99,7 @@ run_one_chain_ampseq <- function(chain_id,
         recoded0[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(d0_alleles))] <- d0_alleles
       }
       
+      # Extract alleles for day of recurrence
       df_alleles <- as.character(genotypedata_RR[row_idx_df[1], locicolumns])
       df_alleles <- df_alleles[!is.na(df_alleles) & df_alleles != "NA"]
       patient_max_moif <- max(patient_max_moif, length(df_alleles))
@@ -106,21 +107,40 @@ run_one_chain_ampseq <- function(chain_id,
         recodedf[i, (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + length(df_alleles))] <- df_alleles
       }
     }
+    # MOI is defined as the maximum number of alleles seen across all markers for that patient
     MOI0[i] <- patient_max_moi0
     MOIf[i] <- patient_max_moif
   }
   
+  # Keep track of which alleles were truly observed vs. which will be imputed
   is_observed0 <- !is.na(recoded0)
   is_observedf <- !is.na(recodedf)
   original_recoded0 <- recoded0
   original_recodedf <- recodedf
   
-  
+  # processing additional data
   recoded_additional_neutral <- matrix(NA_character_, 0, maxMOI * nloci)
   if (!is.null(additional_neutral) && nrow(additional_neutral) > 0) {
-    # Logic to process additional_neutral would go here if needed
+    n_additional <- nrow(additional_neutral)
+    recoded_additional_neutral <- matrix(NA_character_, n_additional, maxMOI * nloci)
+    
+    for (i in 1:n_additional) {
+      for (j in 1:nloci) {
+        locus <- locinames[j]
+        locicolumns <- grepl(paste0("^", locus, "_"), colnames(additional_neutral))
+        extra_alleles <- as.character(additional_neutral[i, locicolumns])
+        extra_alleles <- extra_alleles[!is.na(extra_alleles) & extra_alleles != "NA"]
+        
+        if (length(extra_alleles) > 0) {
+          n_to_fill <- min(length(extra_alleles), maxMOI)
+          cols_to_fill <- (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + n_to_fill)
+          recoded_additional_neutral[i, cols_to_fill] <- extra_alleles[1:n_to_fill]
+        }
+      }
+    }
   }
   
+  # Initial calculation of allele frequencies using all available data
   frequencies_RR <- calculate_frequencies(
     genotypedata = rbind(genotypedata_RR, additional_neutral),
     alleles_definitions = NULL,
@@ -131,8 +151,10 @@ run_one_chain_ampseq <- function(chain_id,
   hiddenf <- matrix(NA_integer_, nids, maxMOI * nloci)
   
   # Initial imputation of hidden alleles
+  # If MOI > number of observed alleles at a specific locus, we impute 'hidden' alleles
   for (i in 1:nids) {
     for (j in 1:nloci) {
+      # Day 0 allele imputation
       d0_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
       n_observed_d0 <- sum(!is.na(recoded0[i, d0_cols]))
       n_to_impute_d0 <- MOI0[i] - n_observed_d0
@@ -148,6 +170,7 @@ run_one_chain_ampseq <- function(chain_id,
       }
       hidden0[i, d0_cols[!is.na(recoded0[i, d0_cols])]] <- 0
       
+      # Day of recurrence allele imputation
       df_cols <- (maxMOI*(j-1)+1):(maxMOI*j)
       n_observed_df <- sum(!is.na(recodedf[i, df_cols]))
       n_to_impute_df <- MOIf[i] - n_observed_df
@@ -166,18 +189,18 @@ run_one_chain_ampseq <- function(chain_id,
   }
   
   # Initialize parameters and classification
-  qq <- 0.001
+  qq <- 0.01
   q_loss <- 0.1
   prob_recrud <- 0.5
   classification <- ifelse(stats::runif(nids) < prob_recrud, 1, 0)
   num_records <- floor((nruns - burnin) / record_interval)
   
+  # Pre-allocate storage for chain history
   classification_history <- matrix(NA, nids, num_records)
   parameters_history <- matrix(NA, 4 + (2 * nloci), num_records)
   loglikelihood_history <- rep(NA_real_, num_records)
   locus_lrs_history <- array(NA, c(nids, nloci, num_records))
   locus_dists_history <- array(NA, c(nids, nloci, num_records))
-  
   alleles0_history <- if (record_hidden_alleles) array(NA, c(nids, maxMOI * nloci, num_records)) else NULL
   allelesf_history <- if (record_hidden_alleles) array(NA, c(nids, maxMOI * nloci, num_records)) else NULL
   
@@ -186,6 +209,7 @@ run_one_chain_ampseq <- function(chain_id,
     mindistance <- matrix(NA_integer_, nids, nloci)
     locus_lrs_this_step <- matrix(1.0, nrow = nids, ncol = nloci)
     
+    # Likelihood Ratio Calculation (Per Locus)
     for (i in 1:nids) {
       for (j in 1:nloci) {
         d0_alleles <- unique(recoded0[i, (maxMOI*(j-1)+1):(maxMOI*j)])
@@ -195,6 +219,7 @@ run_one_chain_ampseq <- function(chain_id,
         if (length(d0_alleles) == 0 || length(df_alleles) == 0 || !is_locus_comparable[i, j]) {
           next
         }
+        # Prob(Recrudescence): penalty for mismatches (qq) and lost alleles (q_loss)
         probs_per_failure_allele <- sapply(df_alleles, function(allele) {
           ifelse(allele %in% d0_alleles, 1 - qq, qq)
         })
@@ -203,6 +228,7 @@ run_one_chain_ampseq <- function(chain_id,
         prob_part2 <- q_loss ^ length(lost_alleles)
         prob_recrud_locus <- prob_part1 * prob_part2
         
+        # Prob(Reinfection): based on population allele frequencies
         matched_indices <- match(df_alleles, frequencies_RR$allele_codes[[j]])
         valid_indices <- !is.na(matched_indices)
         
@@ -217,13 +243,14 @@ run_one_chain_ampseq <- function(chain_id,
       }
     }
     
+    # Classification Update
     likelihoodratio <- apply(locus_lrs_this_step, 1, function(r) prod(pmax(r, 1e-10)))
     prior_odds <- prob_recrud / (1 - prob_recrud + 1e-10)
     posterior_odds <- likelihoodratio * prior_odds    
-    
     prob_is_recrudescence <- posterior_odds / (1 + posterior_odds)
     classification <- ifelse(stats::runif(nids) < prob_is_recrudescence, 1, 0)
     
+    # Hidden Allele Updates (Metropolis-Hastings)
     for (i in 1:nids) {
       updated_states <- switch_hidden_ampseq(x = i, hidden0 = hidden0, hiddenf = hiddenf, 
                                              recoded0 = recoded0, recodedf = recodedf,
@@ -237,7 +264,7 @@ run_one_chain_ampseq <- function(chain_id,
       recodedf <- temp_recodedf
     }
     
-    
+    # Calculated from the number of lost vs retained alleles in recrudescent patients
     n_lost <- 0
     n_retained <- 0
     recrud_indices <- which(classification == 1)
@@ -260,17 +287,25 @@ run_one_chain_ampseq <- function(chain_id,
     q_loss_posterior_beta <- 1 + n_retained
     q_loss <- stats::rbeta(1, q_loss_posterior_alpha, q_loss_posterior_beta)
     
-    tempdata <- rbind(recoded0, recodedf)
+    # Updated frequencies using Day 0 alleles from reinfections + all Failure alleles + background data
+    reinfection_indices <- which(classification == 0)
+    reinfection_d0_data <- recoded0[reinfection_indices, , drop = FALSE]
+    full_data_for_freqs <- rbind(reinfection_d0_data, recodedf, recoded_additional_neutral)
+    
     new_freq_matrix <- frequencies_RR$freq_matrix
     for (locus_idx in 1:nloci) {
-      new_row <- findposteriorfrequencies(locus_index = locus_idx, tempdata = tempdata, 
-                                          maxMOI = maxMOI, frequencies_RR = frequencies_RR)
+      new_row <- findposteriorfrequencies(locus_index = locus_idx, 
+                                          tempdata = full_data_for_freqs, 
+                                          maxMOI = maxMOI, 
+                                          frequencies_RR = frequencies_RR)
       n_alleles_locus <- frequencies_RR$n_alleles[locus_idx]
       if (length(new_row) > 0 && !any(is.na(new_row)) && n_alleles_locus > 0) {
         new_freq_matrix[locus_idx, 1:n_alleles_locus] <- new_row
       }
     }
     frequencies_RR$freq_matrix <- new_freq_matrix
+    
+    # Record the parameter history
     if (iter > burnin && (iter - burnin) %% record_interval == 0) {
       record_idx <- (iter - burnin) / record_interval
       loglik_val <- sum(log(pmax(likelihoodratio, 1e-10)))
@@ -279,6 +314,8 @@ run_one_chain_ampseq <- function(chain_id,
       parameters_history[1, record_idx] <- qq
       parameters_history[2, record_idx] <- prob_recrud
       parameters_history[3, record_idx] <- q_loss 
+      
+      # Calculate Expected Heterozygosity (He) per locus
       he_per_locus <- 1 - rowSums(frequencies_RR$freq_matrix^2, na.rm = TRUE)
       parameters_history[(5 + nloci):(5 + 2 * nloci - 1), record_idx] <- he_per_locus
       
