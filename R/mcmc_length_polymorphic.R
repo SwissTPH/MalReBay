@@ -12,7 +12,7 @@
 #' \enumerate{
 #'   \item **Data Recoding and Discretization:** Raw allele fragment lengths are
 #'     converted ("recoded") into discrete integer bins based on the definitions
-#'     provided in `alleles_definitions_RR`. This is a critical step for binned data.
+#'     provided in `allele_definitions`. This is a critical step for binned data.
 #'   \item **MOI Calculation & State Initialization:** Determines the Multiplicity of
 #'     Infection (MOI) and creates matrices to hold the model's state.
 #'   \item **Initial Imputation:** Guesses the identity of unobserved ("hidden")
@@ -35,15 +35,15 @@
 #'   iterations, burn-in period, and recording frequency.
 #' @param nids,ids,nloci,maxMOI,locinames Core dimensions and metadata for the
 #'   analysis.
-#' @param genotypedata_RR,additional_neutral Data frames with primary paired
+#' @param late_failures_site,additional_site Data frames with primary paired
 #'   samples and additional baseline samples.
-#' @param alleles_definitions_RR A list containing the allele bin definitions
+#' @param allele_definitions A list containing the allele bin definitions
 #'   (lower and upper bounds) for each locus. Crucial for recoding raw data.
 #' @param marker_info A data frame containing metadata for each genetic marker.
 #' @param record_hidden_alleles A logical flag. If `TRUE`, the full state of
 #'   imputed hidden raw allele values is saved.
 #' @param is_locus_comparable A logical matrix indicating for each patient and
-#'   locus whether data exists for both Day 0 and Day of Failure.
+#'   locus whether data exists for both Day 0 and Day of recurrence.
 #'
 #' @return A list containing the full history of the MCMC chain after burn-in.
 #'   The list includes the following components:
@@ -51,7 +51,7 @@
 #'     recrudescence, 0 for reinfection).}
 #'   \item{state_parameters}{Matrix of key model hyperparameters over time.}
 #'   \item{state_alleles0, state_allelesf}{Optional arrays of the imputed raw
-#'     allele values for Day 0 and Day of Failure samples.}
+#'     allele values for Day 0 and Day of recurrence samples.}
 #'   \item{state_loglikelihood}{Vector of the overall log-likelihood at each
 #'     recorded step.}
 #'   \item{locus_lrs, locus_dists}{Arrays containing the per-locus likelihood
@@ -63,7 +63,7 @@
 run_one_chain <- function(chain_id,
                           nruns, burnin, record_interval,
                           nids, ids, nloci, maxMOI, locinames,
-                          genotypedata_RR, additional_neutral, alleles_definitions_RR,
+                          late_failures_site, additional_site, allele_definitions,
                           marker_info, record_hidden_alleles = FALSE, is_locus_comparable ) 
 {  
 
@@ -72,9 +72,9 @@ run_one_chain <- function(chain_id,
   MOIf <- rep(0, nids)
   for (i in 1:nids) {
     for (j in 1:nloci) {
-      locicolumns <- grepl(paste(locinames[j], "_", sep = ""), colnames(genotypedata_RR))
-      nalleles0 <- sum(!is.na(genotypedata_RR[grepl(paste(ids[i], "Day 0"), genotypedata_RR$Sample.ID), locicolumns]))
-      nallelesf <- sum(!is.na(genotypedata_RR[grepl(paste(ids[i], "Day Failure"), genotypedata_RR$Sample.ID), locicolumns]))
+      locicolumns <- grepl(paste(locinames[j], "_", sep = ""), colnames(late_failures_site))
+      nalleles0 <- sum(!is.na(late_failures_site[grepl(paste(ids[i], "Day 0"), late_failures_site$Sample.ID), locicolumns]))
+      nallelesf <- sum(!is.na(late_failures_site[grepl(paste(ids[i], "recurrence"), late_failures_site$Sample.ID), locicolumns]))
       MOI0[i] <- max(MOI0[i], nalleles0)
       MOIf[i] <- max(MOIf[i], nallelesf)
     }
@@ -94,10 +94,10 @@ run_one_chain <- function(chain_id,
   hidden_crossfamilyf <- matrix(0, nids, maxMOI * nloci)
   recrf <- matrix(NA, nids, nloci)
   recr_repeatsf <- matrix(NA, nids, nloci) 
-  if (length(additional_neutral) > 0 && nrow(additional_neutral) > 0) {
-    recoded_additional_neutral <- matrix(0, nrow(additional_neutral), maxMOI * nloci)
+  if (length(additional_site) > 0 && nrow(additional_site) > 0) {
+    recoded_additional_site <- matrix(0, nrow(additional_site), maxMOI * nloci)
   }
-  recoded_additional_neutral <- matrix(0, nrow = 0, ncol = maxMOI * nloci)
+  recoded_additional_site <- matrix(0, nrow = 0, ncol = maxMOI * nloci)
   mindistance <- matrix(0, nids, nloci)
   alldistance <- array(NA, c(nids, nloci, maxMOI * maxMOI))
   allrecrf <- array(NA, c(nids, nloci, maxMOI * maxMOI))
@@ -105,8 +105,8 @@ run_one_chain <- function(chain_id,
   
   for (j in 1:nloci) {
     locus = locinames[j]
-    locicolumns = grepl(paste0(locus, "_"), colnames(genotypedata_RR))
-    oldalleles = as.matrix(genotypedata_RR[, locicolumns])
+    locicolumns = grepl(paste0(locus, "_"), colnames(late_failures_site))
+    oldalleles = as.matrix(late_failures_site[, locicolumns])
     if (is.null(dim(oldalleles))) { oldalleles = matrix(oldalleles, ncol=1) }
     ncolumns = ncol(oldalleles)
     newalleles = matrix(NA, nrow = nrow(oldalleles), ncol = ncolumns)
@@ -115,7 +115,7 @@ run_one_chain <- function(chain_id,
       temp_recode_col <- numeric(nrow(oldalleles))
       for (row_index in 1:nrow(oldalleles)) {
         # Assuming recodeallele is defined elsewhere
-        recode_val <- recodeallele(alleles_definitions_RR[[j]], oldalleles[row_index, i])
+        recode_val <- recodeallele(allele_definitions[[j]], oldalleles[row_index, i])
         
         if (length(recode_val) != 1 || is.na(recode_val)) {
           temp_recode_col[row_index] <- NA 
@@ -131,20 +131,20 @@ run_one_chain <- function(chain_id,
     oldalleles = matrix(as.numeric(oldalleles), nrow = nrow(oldalleles), ncol = ncolumns)
     oldalleles[is.na(oldalleles)] = 0
     oldalleles[newalleles == 0] = 0
-    day0_rows = grepl("Day 0", genotypedata_RR$Sample.ID)
-    dayf_rows = grepl("Day Failure", genotypedata_RR$Sample.ID)
+    day0_rows = grepl("Day 0", late_failures_site$Sample.ID)
+    dayf_rows = grepl("recurrence", late_failures_site$Sample.ID)
     alleles0[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = oldalleles[day0_rows, , drop=FALSE]
     allelesf[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = oldalleles[dayf_rows, , drop=FALSE]
     recoded0[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = newalleles[day0_rows, , drop=FALSE]
     recodedf[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = newalleles[dayf_rows, , drop=FALSE]
   }
   
-  if (length(additional_neutral) > 0 && nrow(additional_neutral) > 0) {
-    recoded_additional_neutral = matrix(0, nrow = nrow(additional_neutral), ncol = maxMOI * nloci)
+  if (length(additional_site) > 0 && nrow(additional_site) > 0) {
+    recoded_additional_site = matrix(0, nrow = nrow(additional_site), ncol = maxMOI * nloci)
     for (j in 1:nloci) {
       locus = locinames[j]
-      locicolumns = grepl(paste0(locus, "_"), colnames(additional_neutral))
-      oldalleles = as.matrix(additional_neutral[, locicolumns])
+      locicolumns = grepl(paste0(locus, "_"), colnames(additional_site))
+      oldalleles = as.matrix(additional_site[, locicolumns])
       if (is.null(dim(oldalleles))) { oldalleles = matrix(oldalleles, ncol = 1) }
       ncolumns = ncol(oldalleles)
       newalleles = matrix(NA, nrow = nrow(oldalleles), ncol = ncolumns)
@@ -152,7 +152,7 @@ run_one_chain <- function(chain_id,
       for (i in 1:ncolumns) {
         temp_recode_col <- numeric(nrow(oldalleles))
         for (row_index in 1:nrow(oldalleles)) {
-          recode_val <- recodeallele(alleles_definitions_RR[[j]], oldalleles[row_index, i])
+          recode_val <- recodeallele(allele_definitions[[j]], oldalleles[row_index, i])
           
           if (length(recode_val) != 1 || is.na(recode_val)) {
             temp_recode_col[row_index] <- NA
@@ -168,11 +168,11 @@ run_one_chain <- function(chain_id,
       oldalleles = matrix(as.numeric(oldalleles), nrow = nrow(oldalleles), ncol = ncolumns)
       oldalleles[is.na(oldalleles)] = 0
       oldalleles[newalleles == 0] = 0
-      recoded_additional_neutral[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = newalleles
+      recoded_additional_site[, (maxMOI*(j-1)+1):(maxMOI*(j-1)+ncolumns)] = newalleles
     }
   } 
   
-  frequencies_RR <- calculate_frequencies(rbind(genotypedata_RR, additional_neutral), alleles_definitions_RR, marker_info)
+  allele_frequencies <- calculate_frequencies(rbind(late_failures_site, additional_site), allele_definitions, marker_info)
   
   ## assign random hidden alleles and classifications
   for (i in 1:nids) {
@@ -183,13 +183,13 @@ run_one_chain <- function(chain_id,
       whichmissing0 = ((maxMOI*(j-1)+1) : (maxMOI*(j)))[which(alleles0[i,(maxMOI*(j-1)+1) : (maxMOI*(j-1)+MOI0[i])] == 0)];
         if (nalleles0 > 0) { hidden0[i,whichnotmissing0] = 0 }
         if (nmissing0 > 0) { 
-          n_alleles_locus <- frequencies_RR$n_alleles[j]
-          allele_freqs = frequencies_RR$freq_matrix[j, 1:n_alleles_locus]
+          n_alleles_locus <- allele_frequencies$n_alleles[j]
+          allele_freqs = allele_frequencies$freq_matrix[j, 1:n_alleles_locus]
           if(is.na(n_alleles_locus) || n_alleles_locus == 0 || length(allele_freqs) == 0) next
 
           newhiddenalleles0 = sample(1:n_alleles_locus, nmissing0, replace=TRUE, prob=allele_freqs)
           recoded0[i,whichmissing0] = newhiddenalleles0
-          alleles0[i,whichmissing0] = rowMeans(alleles_definitions_RR[[j]])[newhiddenalleles0]
+          alleles0[i,whichmissing0] = rowMeans(allele_definitions[[j]])[newhiddenalleles0]
           hidden0[i,whichmissing0] = 1 }
 
           nallelesf = sum(allelesf[i,(maxMOI*(j-1)+1) : (maxMOI*(j))] != 0); nmissingf = MOIf[i] - nallelesf; whichnotmissingf =
@@ -198,13 +198,13 @@ run_one_chain <- function(chain_id,
           if (nallelesf > 0) { hiddenf[i,whichnotmissingf] = 0 }
           if (nmissingf > 0) { 
 
-            n_alleles_locus <- frequencies_RR$n_alleles[j]
+            n_alleles_locus <- allele_frequencies$n_alleles[j]
 
-            allele_freqs <- frequencies_RR$freq_matrix[j, 1:n_alleles_locus]
+            allele_freqs <- allele_frequencies$freq_matrix[j, 1:n_alleles_locus]
             if(is.na(n_alleles_locus) || n_alleles_locus == 0 || length(allele_freqs) == 0) next
             newhiddenallelesf <- sample(1:n_alleles_locus, nmissingf, replace=TRUE, prob=allele_freqs)
             recodedf[i,whichmissingf] <- newhiddenallelesf
-            allelesf[i,whichmissingf] <- rowMeans(alleles_definitions_RR[[j]])[newhiddenallelesf]
+            allelesf[i,whichmissingf] <- rowMeans(allele_definitions[[j]])[newhiddenallelesf]
             hiddenf[i,whichmissingf] <- 1
             }
       }
@@ -213,7 +213,7 @@ run_one_chain <- function(chain_id,
   
   qq <- mean(c(hidden0, hiddenf), na.rm = TRUE)
   if (is.na(qq)) qq <- 0.1 
-  dvect <- stats::dgeom(0:(round(max(sapply(1:nloci, function(x) diff(range(c(alleles_definitions_RR[[x]]))))))), 0.75)
+  dvect <- stats::dgeom(0:(round(max(sapply(1:nloci, function(x) diff(range(c(allele_definitions[[x]]))))))), 0.75)
   qq_crossfamily <- 10^-3 
 
   getmode <- function(v) {
@@ -224,7 +224,7 @@ run_one_chain <- function(chain_id,
   }
 
   mode_allele_lengths = lapply(1:nloci, function (j) {
-    sapply(1:nrow(alleles_definitions_RR[[j]]), function (y) {
+    sapply(1:nrow(allele_definitions[[j]]), function (y) {
       getmode(c(
         alleles0[,((j-1)*maxMOI+1):(j*maxMOI)][recoded0[,((j-1)*maxMOI+1):(j*maxMOI)]==y],
         allelesf[,((j-1)*maxMOI+1):(j*maxMOI)][recodedf[,((j-1)*maxMOI+1):(j*maxMOI)]==y]
@@ -235,7 +235,7 @@ run_one_chain <- function(chain_id,
   for(i in 1:nloci) {
     na_indices <- which(is.na(mode_allele_lengths[[i]]))
     if(length(na_indices) > 0) {
-      mode_allele_lengths[[i]][na_indices] <- rowMeans(alleles_definitions_RR[[i]][na_indices, , drop=FALSE])
+      mode_allele_lengths[[i]][na_indices] <- rowMeans(allele_definitions[[i]][na_indices, , drop=FALSE])
     }
   }
   ## randomly assign recrudescences/reinfections for this chain
@@ -282,7 +282,7 @@ run_one_chain <- function(chain_id,
     }
   }
   correction_distance_matrix <- list()
-  for (i in 1:nloci) { correction_distance_matrix[[i]] <- as.matrix(stats::dist(rowMeans(alleles_definitions_RR[[i]]))) }
+  for (i in 1:nloci) { correction_distance_matrix[[i]] <- as.matrix(stats::dist(rowMeans(allele_definitions[[i]]))) }
   
   num_records <- floor((nruns - burnin) / record_interval)
   state_classification <- matrix(NA, nids, num_records)
@@ -352,7 +352,7 @@ run_one_chain <- function(chain_id,
           return(NA)
         }
         # The probability is just the frequency of that allele type.
-        return(frequencies_RR$freq_matrix[y, recr_allele])
+        return(allele_frequencies$freq_matrix[y, recr_allele])
       })
       epsilon <- 1e-10
       ratios <- numerator / (denominators + epsilon)
@@ -396,7 +396,7 @@ run_one_chain <- function(chain_id,
         mindistance = mindistance, alldistance = alldistance, allrecrf = allrecrf,
         recr0 = recr0, recrf = recrf, recr_repeats0 = recr_repeats0, recr_repeatsf = recr_repeatsf,
         nloci = nloci, maxMOI = maxMOI, MOI0 = MOI0, MOIf = MOIf, qq = qq, dvect = dvect,
-        alleles_definitions_RR = alleles_definitions_RR, frequencies_RR = frequencies_RR,
+        allele_definitions = allele_definitions, allele_frequencies = allele_frequencies,
         correction_distance_matrix = correction_distance_matrix,
         marker_info = marker_info,
         mode_allele_lengths = mode_allele_lengths,
@@ -458,18 +458,18 @@ run_one_chain <- function(chain_id,
     reinfection_indices <- which(classification == 0)
     reinfection_d0_data <- recoded0[reinfection_indices, , drop = FALSE]
     
-    full_data <- rbind(reinfection_d0_data, recodedf, recoded_additional_neutral)
+    full_data <- rbind(reinfection_d0_data, recodedf, recoded_additional_site)
     
-    new_freq_matrix <- frequencies_RR$freq_matrix
+    new_freq_matrix <- allele_frequencies$freq_matrix
     
     for (locus_idx in 1:nloci) {
       new_row <- findposteriorfrequencies(
         locus_index = locus_idx, 
         tempdata = full_data, 
         maxMOI = maxMOI, 
-        frequencies_RR = frequencies_RR
+        allele_frequencies = allele_frequencies
       )
-      n_alleles_locus <- frequencies_RR$n_alleles[locus_idx]
+      n_alleles_locus <- allele_frequencies$n_alleles[locus_idx]
       if (length(new_row) > 0 && !any(is.na(new_row)) && n_alleles_locus > 0) {
         new_freq_matrix[locus_idx, 1:n_alleles_locus] <- new_row
       }
@@ -483,8 +483,8 @@ run_one_chain <- function(chain_id,
       state_parameters[1, record_idx] <<- qq
       state_parameters[2, record_idx] <<- qq_crossfamily
       state_parameters[3, record_idx] <<- dposterior
-      state_parameters[4:(4+nloci-1), record_idx] <<- apply(frequencies_RR$freq_matrix, 1, max)
-      state_parameters[(4+nloci):(4+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(frequencies_RR$freq_matrix[x, 1:frequencies_RR$n_alleles[x]]^2))
+      state_parameters[4:(4+nloci-1), record_idx] <<- apply(allele_frequencies$freq_matrix, 1, max)
+      state_parameters[(4+nloci):(4+2*nloci-1), record_idx] <<- sapply(1:nloci, function (x) sum(allele_frequencies$freq_matrix[x, 1:allele_frequencies$n_alleles[x]]^2))
       state_loglikelihood[record_idx] <<- ifelse(is.finite(loglik_val), loglik_val, NA)
       state_locus_lr[,, record_idx] <<- locus_lrs_this_step
       state_locus_dist[,, record_idx] <<- mindistance

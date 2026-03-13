@@ -8,7 +8,7 @@ plot_moi(
   genotypedata,
   marker_pattern = "(_allele_\\\\d+|_\\\\d+)$",
   output_folder = NULL,
-  filename = "moi_per_marker_by_site.pdf"
+  filename = "moi_per_marker_by_site.png"
 )
 }
 \arguments{

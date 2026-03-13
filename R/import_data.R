@@ -15,7 +15,11 @@ import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
   
   # Load Primary Data (Sheet 1)
   temp_df <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[1]))
-  if (ncol(temp_df) < 3) stop("ERROR: Input data must have at least 3 columns (Metadata + Alleles).")
+  
+  # Need ID, Site/Day, and at least 2 allele columns to be valid for processing
+  if (ncol(temp_df) < 4) {
+    stop("ERROR: Input data must have at least 4 columns (e.g., ID, Site, and at least 2 allele columns).")
+  }
 
   # Detect data type based on first allele value
   # Look at columns 4 onwards to find the first actual allele value
@@ -46,15 +50,20 @@ import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
   cols_lower <- tolower(colnames(temp_df))
   
   if ("day" %in% cols_lower) {
-    # If "Day" column exists, merge ID and Day, then use Site as 2nd col
-    id_idx <- which(cols_lower %in% c("sample.id", "sample_id", "sampleid", "id"))[1]
-    day_idx <- which(cols_lower == "day")[1]
+    # If "Day" column exists, merge ID and Day, then use Site as second column
+    id_idx   <- which(cols_lower %in% c("sample.id", "sample_id", "sampleid",
+                                        "id", "patientid", "patient_id"))[1]
+    day_idx  <- which(cols_lower == "day")[1]
     site_idx <- which(cols_lower == "site")[1]
+    
+    # Validate all required columns were found before subsetting
+    if (is.na(id_idx))   stop("ERROR: Cannot find ID column.")
+    if (is.na(site_idx)) stop("ERROR: Cannot find Site column.")
     
     # Create the standardized dataframe
     late_failures_df <- data.frame(
-      Sample.ID = paste0(temp_df[[id_idx]], " Day ", ifelse(temp_df[[day_idx]] == 0, "0", "Failure")),
-      Site = temp_df[[site_idx]],
+      Sample.ID = paste0(temp_df[[id_idx]], ifelse(temp_df[[day_idx]] == 0, " Day 0", " recurrence")),
+      Site      = temp_df[[site_idx]],
       temp_df[, -c(id_idx, day_idx, site_idx), drop = FALSE],
       check.names = FALSE
     )
@@ -62,36 +71,19 @@ import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
     # No Day column: Assume Col 1 is ID, Col 2 is Site (standard format)
     colnames(temp_df)[1:2] <- c("Sample.ID", "Site")
     
-    # Clean ID names to ensure "Day 0" or "Day Failure" suffix
-    temp_df$Sample.ID <- gsub("_?D0$| Day 0$", " Day 0", temp_df$Sample.ID)
+    # Clean ID names to ensure " Day 0" or " recurrence" suffix
+    temp_df$Sample.ID <- gsub("_?D0$| D0$| Day 0$", " Day 0", temp_df$Sample.ID)
     is_day0 <- grepl(" Day 0$", temp_df$Sample.ID)
-    temp_df$Sample.ID[!is_day0] <- gsub("_?D[1-9][0-9]*$| Day Failure$", " Day Failure", temp_df$Sample.ID[!is_day0])
+    temp_df$Sample.ID[!is_day0] <- gsub("(_D[0-9A-Za-z]+|D[0-9]+)$| recurrence$| Day Failure$", " recurrence", temp_df$Sample.ID[!is_day0])
     
-    # If it wasn't already suffixed, force suffix based on common logic
-    unlabelled <- !grepl(" Day (0|Failure)$", temp_df$Sample.ID)
+    # Unlabelled check
+    unlabelled <- !grepl(" Day 0$| recurrence$", temp_df$Sample.ID)
     temp_df$Sample.ID[unlabelled] <- paste(temp_df$Sample.ID[unlabelled], "Day 0")
     
     late_failures_df <- temp_df
   }
-
-  # Process the additional sheet (Sheet 2)
-  additional_df <- late_failures_df[0, ] # Default empty
-  if (data_type == "length_polymorphic" && length(sheet_names) > 1) {
-    raw_add <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
-    if (nrow(raw_add) > 0) {
-      # Apply same 3-column metadata logic to sheet 2
-      if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
-        additional_df <- raw_add
-      } else {
-        additional_df <- data.frame(
-          Sample.ID = paste0(raw_add[[1]], " Day ", ifelse(raw_add[[2]] == 0, "0", "Failure")),
-          Site = raw_add[[3]], raw_add[, -c(1, 2, 3), drop = FALSE], check.names = FALSE
-        )
-      }
-    }
-  }
-
-  # Data cleaning
+  
+  # Cleaning missing values
   missing_alleles <- c("N/A", "-", "NA", "na", "", " ", "Failed", "failed", "0")
   
   clean_data <- function(df) {
@@ -103,31 +95,84 @@ import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
     }
     return(df)
   }
-
+  
   late_failures_df <- clean_data(late_failures_df)
-  additional_df <- clean_data(additional_df)
 
-  # 6. Remove "Failure" rows that are entirely empty (No allele data)
-  allele_cols <- 3:ncol(late_failures_df)
-  if (length(allele_cols) > 0) {
-    is_failure <- grepl("Day Failure", late_failures_df$Sample.ID)
-    empty_alleles <- rowSums(!is.na(late_failures_df[, allele_cols, drop = FALSE])) == 0
-    to_remove_ids <- unique(gsub(" Day Failure", "", late_failures_df$Sample.ID[is_failure & empty_alleles]))
+  # Process the additional sheet (Sheet 2)
+  additional_df <- late_failures_df[0, ] # Default empty
+  if (data_type == "length_polymorphic" && length(sheet_names) > 1) {
+    raw_add <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
+    if (nrow(raw_add) > 0) {
+      # Apply same 3-column metadata logic to sheet 2
+      if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
+        additional_df <- raw_add
+      } else {
+        additional_clean <- data.frame(
+          Sample.ID = paste0(raw_add[[1]], " Day ", ifelse(raw_add[[2]] == 0, "0", "recurrence")),
+          Site = raw_add[[3]], raw_add[, -c(1, 2, 3), drop = FALSE], check.names = FALSE
+        )
+        additional_df <- clean_data(additional_clean)
+      }
+    }
+  }
+
+  # Remove "Failure" rows that are entirely empty (No allele data)
+  allele_idx <- 3:ncol(late_failures_df)
+  
+  if (length(allele_idx) > 0) {
+    is_failure <- grepl("recurrence", late_failures_df$Sample.ID)
+    empty_alleles <- rowSums(!is.na(late_failures_df[, allele_idx, drop = FALSE])) == 0
+    to_remove_ids <- unique(gsub(" recurrence", "", late_failures_df$Sample.ID[is_failure & empty_alleles]))
     
     if (length(to_remove_ids) > 0) {
-      if (verbose) message("INFO: Removing ", length(to_remove_ids), " patient(s) with no data on Day Failure.")
+      if (verbose) message("INFO: Removing ", length(to_remove_ids), " patient(s) with no data on recurrence.")
       pattern <- paste(to_remove_ids, collapse = "|")
       late_failures_df <- late_failures_df[!grepl(pattern, late_failures_df$Sample.ID), ]
     }
   }
 
-  # Check if all Day 0 samples have corresponding Day Failure samples
+  # Check if all Day 0 samples have corresponding recurrence samples
   day0_ids <- gsub(" Day 0", "", late_failures_df$Sample.ID[grepl(" Day 0", late_failures_df$Sample.ID)])
-  fail_ids <- gsub(" Day Failure", "", late_failures_df$Sample.ID[grepl(" Day Failure", late_failures_df$Sample.ID)])
+  fail_ids <- gsub(" recurrence", "", late_failures_df$Sample.ID[grepl(" recurrence", late_failures_df$Sample.ID)])
   
   missing_pairs <- setdiff(day0_ids, fail_ids)
   if (length(missing_pairs) > 0 && verbose) {
-    warning("WARNING: 'Day 0' samples missing their 'Day Failure' pair: ", paste(missing_pairs, collapse=", "))
+    warning("WARNING: 'Day 0' samples missing their 'recurrence' pair: ", paste(missing_pairs, collapse=", "))
+  }
+  
+  # Filter to markers that are actually present in the data
+  marker_suffix_regex <- "(_allele_|_)\\d+$"
+  allele_colnames <- colnames(late_failures_df)[3:ncol(late_failures_df)]
+  base_names_in_data <- gsub(marker_suffix_regex, "", allele_colnames)
+  
+  markers_to_use <- intersect(marker_info$marker_id, unique(base_names_in_data))
+  if (length(markers_to_use) == 0) stop("No matching markers found between metadata and data.")
+  
+  # Subset dataframes to only include columns belonging to valid markers
+  valid_cols <- allele_colnames[base_names_in_data %in% markers_to_use]
+  
+  if (nrow(additional_df) > 0) {
+    missing_cols <- setdiff(valid_cols, colnames(additional_df))
+    if (length(missing_cols) > 0) {
+      stop("ERROR: Additional data sheet is missing marker columns found in the main sheet: ", 
+           paste(missing_cols, collapse = ", "))
+    }
+    
+    extra_cols <- setdiff(colnames(additional_df)[3:ncol(additional_df)], valid_cols)
+    if (length(extra_cols) > 0 && verbose) {
+      message("INFO: Dropping ", length(extra_cols), " extra column(s) from additional data: ", 
+              paste(extra_cols, collapse = ", "))
+    }
+    # Sync additional_df columns
+    additional_df <- additional_df[, c(colnames(additional_df)[1:2], valid_cols)]
+  }
+  
+  # Subset main data and metadata to final selection
+  late_failures_df <- late_failures_df[, c(colnames(late_failures_df)[1:2], valid_cols)]
+  marker_info <- marker_info[marker_info$marker_id %in% markers_to_use, ]
+  
+  if (verbose) {
+    message("INFO: Using ", length(markers_to_use), " markers: ", paste(markers_to_use, collapse = ", "))
   }
 
   return(list(

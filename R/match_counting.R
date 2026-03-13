@@ -69,12 +69,12 @@ assign_clusters <- function(alleles, threshold) {
 perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   
   # 1. Universal ID parsing (Kept from your current version)
-  id_pattern <- "(_?D[0-9]+| Day 0| Day Failure)$"
+  id_pattern <- "(_?D[0-9]+| Day 0| recurrence)$"
   
   paired_data <- genotypedata_latefailures %>%
     dplyr::mutate(
       Patient.ID = trimws(gsub(id_pattern, "", .data$Sample.ID)),
-      Day = ifelse(grepl("D0|Day 0", .data$Sample.ID), "Day 0", "Day X")
+      Day = ifelse(grepl("Day 0", .data$Sample.ID), "Day 0", "recurrence")
     )
   
   patient_ids <- unique(paired_data$Patient.ID)
@@ -103,7 +103,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
     current_patient_id <- patient_ids[i]
     
     day0_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day 0")
-    dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day X")
+    dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "recurrence")
     
     # Check for valid pair
     if (nrow(day0_row) != 1 || nrow(dayf_row) != 1) {
@@ -141,7 +141,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
           df_num <- as.numeric(dayf_alleles)
           bin_size <- bin_lookup[current_locus]
           
-          # Check if any allele in Day Failure has a match in Day 0 within the bin size
+          # Check if any allele in recurrence has a match in Day 0 within the bin size
           is_match <- any(sapply(df_num, function(df) any(abs(df - d0_num) <= bin_size)))
           
         } else if (method == "msp_glurp") {

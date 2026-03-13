@@ -11,7 +11,7 @@
 #' Gibbs sampling framework. The key steps within each iteration are:
 #' \enumerate{
 #'   \item **Data Preparation:** Extracts and recodes observed alleles for Day 0
-#'     and Day of Failure samples. The Multiplicity of Infection (MOI) for each
+#'     and Day of recurrence samples. The Multiplicity of Infection (MOI) for each
 #'     sample is determined.
 #'   \item **Initial Imputation:** Guesses the identity of unobserved ("hidden")
 #'     alleles for infections where the MOI is greater than the number of observed
@@ -36,7 +36,7 @@
 #' @param nids,ids,nloci,maxMOI,locinames Core dimensions and metadata for the
 #'   analysis: number of patient IDs, the IDs themselves, number of loci, max
 #'   MOI, and locus names.
-#' @param genotypedata_RR,additional_neutral Data frames containing the primary
+#' @param late_failures_site,additional_site Data frames containing the primary
 #'   paired samples and additional baseline samples, respectively.
 #' @param marker_info A data frame containing metadata for each genetic marker.
 #' @param is_locus_comparable A logical matrix indicating for each patient and
@@ -63,7 +63,7 @@
 run_one_chain_ampseq <- function(chain_id,
                                  nruns, burnin, record_interval,
                                  nids, ids, nloci, maxMOI, locinames,
-                                 genotypedata_RR, additional_neutral,
+                                 late_failures_site, additional_site,
                                  marker_info,
                                  is_locus_comparable,
                                  record_hidden_alleles = FALSE)
@@ -80,8 +80,8 @@ run_one_chain_ampseq <- function(chain_id,
   # Data extraction from wide format (remains the same)
   for (i in 1:nids) {
     patient_id <- ids[i]
-    row_idx_d0 <- which(genotypedata_RR$Sample.ID == paste(patient_id, "Day 0"))
-    row_idx_df <- which(genotypedata_RR$Sample.ID == paste(patient_id, "Day Failure"))
+    row_idx_d0 <- which(late_failures_site$Sample.ID == paste(patient_id, "Day 0"))
+    row_idx_df <- which(late_failures_site$Sample.ID == paste(patient_id, "recurrence"))
     
     if (length(row_idx_d0) == 0 || length(row_idx_df) == 0) { next }
     patient_max_moi0 <- 0
@@ -89,10 +89,10 @@ run_one_chain_ampseq <- function(chain_id,
     
     for (j in 1:nloci) {
       locus <- locinames[j]
-      locicolumns <- grepl(paste0("^", locus, "_"), colnames(genotypedata_RR))
+      locicolumns <- grepl(paste0("^", locus, "_"), colnames(late_failures_site))
       
       # Extract alleles for day 0
-      d0_alleles <- as.character(genotypedata_RR[row_idx_d0[1], locicolumns])
+      d0_alleles <- as.character(late_failures_site[row_idx_d0[1], locicolumns])
       d0_alleles <- d0_alleles[!is.na(d0_alleles) & d0_alleles != "NA"]
       patient_max_moi0 <- max(patient_max_moi0, length(d0_alleles))
       if (length(d0_alleles) > 0) {
@@ -100,7 +100,7 @@ run_one_chain_ampseq <- function(chain_id,
       }
       
       # Extract alleles for day of recurrence
-      df_alleles <- as.character(genotypedata_RR[row_idx_df[1], locicolumns])
+      df_alleles <- as.character(late_failures_site[row_idx_df[1], locicolumns])
       df_alleles <- df_alleles[!is.na(df_alleles) & df_alleles != "NA"]
       patient_max_moif <- max(patient_max_moif, length(df_alleles))
       if (length(df_alleles) > 0) {
@@ -119,30 +119,30 @@ run_one_chain_ampseq <- function(chain_id,
   original_recodedf <- recodedf
   
   # processing additional data
-  recoded_additional_neutral <- matrix(NA_character_, 0, maxMOI * nloci)
-  if (!is.null(additional_neutral) && nrow(additional_neutral) > 0) {
-    n_additional <- nrow(additional_neutral)
-    recoded_additional_neutral <- matrix(NA_character_, n_additional, maxMOI * nloci)
+  recoded_additional_site <- matrix(NA_character_, 0, maxMOI * nloci)
+  if (!is.null(additional_site) && nrow(additional_site) > 0) {
+    n_additional <- nrow(additional_site)
+    recoded_additional_site <- matrix(NA_character_, n_additional, maxMOI * nloci)
     
     for (i in 1:n_additional) {
       for (j in 1:nloci) {
         locus <- locinames[j]
-        locicolumns <- grepl(paste0("^", locus, "_"), colnames(additional_neutral))
-        extra_alleles <- as.character(additional_neutral[i, locicolumns])
+        locicolumns <- grepl(paste0("^", locus, "_"), colnames(additional_site))
+        extra_alleles <- as.character(additional_site[i, locicolumns])
         extra_alleles <- extra_alleles[!is.na(extra_alleles) & extra_alleles != "NA"]
         
         if (length(extra_alleles) > 0) {
           n_to_fill <- min(length(extra_alleles), maxMOI)
           cols_to_fill <- (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + n_to_fill)
-          recoded_additional_neutral[i, cols_to_fill] <- extra_alleles[1:n_to_fill]
+          recoded_additional_site[i, cols_to_fill] <- extra_alleles[1:n_to_fill]
         }
       }
     }
   }
   
   # Initial calculation of allele frequencies using all available data
-  frequencies_RR <- calculate_frequencies(
-    genotypedata = rbind(genotypedata_RR, additional_neutral),
+  allele_frequencies <- calculate_frequencies(
+    genotypedata = rbind(late_failures_site, additional_site),
     alleles_definitions = NULL,
     marker_info = marker_info
   )
@@ -161,9 +161,9 @@ run_one_chain_ampseq <- function(chain_id,
       if (n_to_impute_d0 > 0) {
         indices_to_fill_d0 <- d0_cols[is.na(recoded0[i, d0_cols])][1:n_to_impute_d0]
         hidden0[i, indices_to_fill_d0] <- 1
-        possible_alleles <- frequencies_RR$allele_codes[[j]]
+        possible_alleles <- allele_frequencies$allele_codes[[j]]
         if (length(possible_alleles) > 0) {
-          allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
+          allele_freqs <- allele_frequencies$freq_matrix[j, 1:allele_frequencies$n_alleles[j]]
           new_alleles <- sample(possible_alleles, n_to_impute_d0, replace=TRUE, prob=allele_freqs)
           recoded0[i, indices_to_fill_d0] <- new_alleles
         }
@@ -177,9 +177,9 @@ run_one_chain_ampseq <- function(chain_id,
       if(n_to_impute_df > 0) {
         indices_to_fill_df <- df_cols[is.na(recodedf[i, df_cols])][1:n_to_impute_df]
         hiddenf[i, indices_to_fill_df] <- 1
-        possible_alleles <- frequencies_RR$allele_codes[[j]]
+        possible_alleles <- allele_frequencies$allele_codes[[j]]
         if (length(possible_alleles) > 0) {
-          allele_freqs <- frequencies_RR$freq_matrix[j, 1:frequencies_RR$n_alleles[j]]
+          allele_freqs <- allele_frequencies$freq_matrix[j, 1:allele_frequencies$n_alleles[j]]
           new_alleles <- sample(possible_alleles, n_to_impute_df, replace=TRUE, prob=allele_freqs)
           recodedf[i, indices_to_fill_df] <- new_alleles
         }
@@ -229,13 +229,13 @@ run_one_chain_ampseq <- function(chain_id,
         prob_recrud_locus <- prob_part1 * prob_part2
         
         # Prob(Reinfection): based on population allele frequencies
-        matched_indices <- match(df_alleles, frequencies_RR$allele_codes[[j]])
+        matched_indices <- match(df_alleles, allele_frequencies$allele_codes[[j]])
         valid_indices <- !is.na(matched_indices)
         
         if (!any(valid_indices)) {
           prob_reinfect_locus <- 1e-10
         } else {
-          freqs <- frequencies_RR$freq_matrix[j, matched_indices[valid_indices]]
+          freqs <- allele_frequencies$freq_matrix[j, matched_indices[valid_indices]]
           prob_reinfect_locus <- prod(freqs, na.rm = TRUE)
         }
         locus_lrs_this_step[i, j] <- prob_recrud_locus / (prob_reinfect_locus + 1e-10)
@@ -255,7 +255,7 @@ run_one_chain_ampseq <- function(chain_id,
       updated_states <- switch_hidden_ampseq(x = i, hidden0 = hidden0, hiddenf = hiddenf, 
                                              recoded0 = recoded0, recodedf = recodedf,
                                              classification = classification, qq = qq, q_loss = q_loss,
-                                             frequencies_RR = frequencies_RR, nloci = nloci, maxMOI = maxMOI)
+                                             allele_frequencies = allele_frequencies, nloci = nloci, maxMOI = maxMOI)
       temp_recoded0 <- updated_states$recoded0
       temp_recodedf <- updated_states$recodedf
       temp_recoded0[is_observed0] <- original_recoded0[is_observed0]
@@ -287,23 +287,23 @@ run_one_chain_ampseq <- function(chain_id,
     q_loss_posterior_beta <- 1 + n_retained
     q_loss <- stats::rbeta(1, q_loss_posterior_alpha, q_loss_posterior_beta)
     
-    # Updated frequencies using Day 0 alleles from reinfections + all Failure alleles + background data
+    # Updated frequencies using Day 0 alleles from reinfections + all recurrence alleles + background data
     reinfection_indices <- which(classification == 0)
     reinfection_d0_data <- recoded0[reinfection_indices, , drop = FALSE]
-    full_data_for_freqs <- rbind(reinfection_d0_data, recodedf, recoded_additional_neutral)
+    full_data_for_freqs <- rbind(reinfection_d0_data, recodedf, recoded_additional_site)
     
-    new_freq_matrix <- frequencies_RR$freq_matrix
+    new_freq_matrix <- allele_frequencies$freq_matrix
     for (locus_idx in 1:nloci) {
       new_row <- findposteriorfrequencies(locus_index = locus_idx, 
                                           tempdata = full_data_for_freqs, 
                                           maxMOI = maxMOI, 
-                                          frequencies_RR = frequencies_RR)
-      n_alleles_locus <- frequencies_RR$n_alleles[locus_idx]
+                                          allele_frequencies = allele_frequencies)
+      n_alleles_locus <- allele_frequencies$n_alleles[locus_idx]
       if (length(new_row) > 0 && !any(is.na(new_row)) && n_alleles_locus > 0) {
         new_freq_matrix[locus_idx, 1:n_alleles_locus] <- new_row
       }
     }
-    frequencies_RR$freq_matrix <- new_freq_matrix
+    allele_frequencies$freq_matrix <- new_freq_matrix
     
     # Record the parameter history
     if (iter > burnin && (iter - burnin) %% record_interval == 0) {
@@ -316,7 +316,7 @@ run_one_chain_ampseq <- function(chain_id,
       parameters_history[3, record_idx] <- q_loss 
       
       # Calculate Expected Heterozygosity (He) per locus
-      he_per_locus <- 1 - rowSums(frequencies_RR$freq_matrix^2, na.rm = TRUE)
+      he_per_locus <- 1 - rowSums(allele_frequencies$freq_matrix^2, na.rm = TRUE)
       parameters_history[(5 + nloci):(5 + 2 * nloci - 1), record_idx] <- he_per_locus
       
       locus_lrs_history[,, record_idx] <- locus_lrs_this_step

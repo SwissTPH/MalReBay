@@ -30,5 +30,5 @@ Invisibly returns the final combined ggplot object.
 \description{
 This function creates pie charts to visualize allele or haplotype
 diversity at Day 0 and at the day of recurrence. It saves the combined plot
-as a PDF file.
+as an image.
 }

@@ -8,7 +8,7 @@
 #'
 #' @details
 #' The function iterates through each locus and applies a binning method as
-#' specified in the `marker_info_subset` data frame.
+#' specified in the `marker_info` data frame.
 #' \itemize{
 #'   \item For the **`msp_glurp`** method, it identifies significant gaps between
 #'     the unique sorted allele sizes to define bin boundaries.
@@ -24,7 +24,7 @@
 #'
 #' @param genotypedata A data frame containing the combined and cleaned
 #'   genotyping data for all samples.
-#' @param marker_info_subset A data frame containing the metadata for the
+#' @param marker_info A data frame containing the metadata for the
 #'   markers to be processed, specifically the `binning_method` and
 #'   `repeatlength` columns.
 #' @param maxk An integer. The maximum number of allele bins to define per
@@ -37,14 +37,14 @@
 #' @keywords internal
 #' @noRd
 #'
-define_alleles <- function(genotypedata, marker_info_subset, maxk = Inf) {
+define_alleles <- function(genotypedata, marker_info, maxk = Inf) {
   
-  locus_names <- marker_info_subset$marker_id
+  locus_names <- marker_info$marker_id
   final_alleles <- vector("list", length(locus_names))
   names(final_alleles) <- locus_names
   
   for (locus_name in locus_names) {
-    marker_details <- marker_info_subset[marker_info_subset$marker_id == locus_name, ]
+    marker_details <- marker_info[marker_info$marker_id == locus_name, ]
     current_binning_method <- marker_details$binning_method
     
     message(paste("    -> Binning method is:", current_binning_method))
@@ -158,7 +158,7 @@ define_alleles <- function(genotypedata, marker_info_subset, maxk = Inf) {
 #' too far from any bin center, which is useful for handling outliers or clear
 #' genotyping errors.
 #'
-#' @param alleles_definitions_subset A two-column matrix (`lower`, `upper`)
+#' @param locus_allele_bins A two-column matrix (`lower`, `upper`)
 #'   defining the allele bins for a *single* genetic marker.
 #' @param proposed A single, raw numeric allele value to be categorized.
 #' @param max_distance_allowed A numeric threshold. If the absolute distance
@@ -166,19 +166,19 @@ define_alleles <- function(genotypedata, marker_info_subset, maxk = Inf) {
 #'   `NA_integer_` is returned. Default is `Inf` (no limit).
 #'
 #' @return An integer representing the row index of the best-matching bin in
-#'   `alleles_definitions_subset`. Returns `NA_integer_` if the input is `NA`
+#'   `locus_allele_bins`. Returns `NA_integer_` if the input is `NA`
 #'   or if the match is invalidated by `max_distance_allowed`.
 #'
 #' @keywords internal
 #' @noRd
 #'
 #'
-recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allowed = Inf) {
-  if (is.na(proposed) || is.null(alleles_definitions_subset) || nrow(alleles_definitions_subset) == 0) {
+recodeallele <- function(locus_allele_bins, proposed, max_distance_allowed = Inf) {
+  if (is.na(proposed) || is.null(locus_allele_bins) || nrow(locus_allele_bins) == 0) {
     return(NA_integer_)
   }
   
-  bin_centers <- rowMeans(alleles_definitions_subset, na.rm = TRUE)
+  bin_centers <- rowMeans(locus_allele_bins, na.rm = TRUE)
   closest_bin_index <- which.min(abs(proposed - bin_centers))
   min_distance <- abs(proposed - bin_centers[closest_bin_index])
   if (min_distance > max_distance_allowed) {
@@ -200,7 +200,7 @@ recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allo
 #' This function serves as a major pre-processing step. Its workflow is as follows:
 #' \enumerate{
 #'   \item It first calculates the Multiplicity of Infection (MOI) for each
-#'     patient's Day 0 and Day of Failure samples.
+#'     patient's Day 0 and Day of recurrence samples.
 #'   \item It then iterates through each genetic locus, applying the correct
 #'     recoding strategy based on the `binning_method` in `marker_info`:
 #'     \itemize{
@@ -215,7 +215,7 @@ recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allo
 #' }
 #'
 #' @param genotypedata A data frame containing the combined genotyping data for all samples.
-#' @param alleles_definitions A named list where each element corresponds to a
+#' @param allele_definitions A named list where each element corresponds to a
 #'   locus and contains the allele bin definitions matrix for that locus.
 #' @param marker_info A data frame containing marker metadata, used to determine
 #'   the `binning_method` for each locus.
@@ -223,9 +223,9 @@ recodeallele <- function(alleles_definitions_subset, proposed, max_distance_allo
 #' @return A list containing two elements:
 #' \item{observeddatamatrix}{A list where each element is a named locus. Each
 #'   of these contains a character vector (one entry per patient) summarizing
-#'   their recoded Day 0 and Day of Failure alleles in the "D0/DF" format.}
+#'   their recoded Day 0 and Day of recurrence alleles in the "D0/DF" format.}
 #' \item{MOI}{A matrix with patient IDs as rownames, containing the calculated
-#'   MOI for Day 0 (`MOI0`) and Day of Failure (`MOIf`).}
+#'   MOI for Day 0 (`MOI0`) and Day of recurrence (`MOIf`).}
 #'
 #' @keywords internal
 #' @noRd
@@ -242,7 +242,7 @@ recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
     for (j in 1:nloci) {
       locicolumns <- grepl(paste0("^", locinames[j], "_"), colnames(genotypedata))
       nalleles0 <- sum(!is.na(genotypedata[grepl(paste(ids[i], "Day 0"), genotypedata$Sample.ID), locicolumns]))
-      nallelesf <- sum(!is.na(genotypedata[grepl(paste(ids[i], "Day Failure"), genotypedata$Sample.ID), locicolumns]))
+      nallelesf <- sum(!is.na(genotypedata[grepl(paste(ids[i], "recurrence"), genotypedata$Sample.ID), locicolumns]))
       MOI0[i] <- max(MOI0[i], nalleles0)
       MOIf[i] <- max(MOIf[i], nallelesf)
     }
@@ -264,7 +264,7 @@ recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
     if (binning_method %in% c("microsatellite", "msp_glurp")) {
       current_definitions <- alleles_definitions[[locus_name]]
       recoded_matrix <- apply(raw_alleles_matrix, MARGIN = c(1, 2), FUN = function(cell_value) {
-        recodeallele(alleles_definitions_subset = current_definitions, proposed = cell_value)
+        recodeallele(locus_allele_bins = current_definitions, proposed = cell_value)
       })
       
     } else if (binning_method == "exact") {
@@ -282,7 +282,7 @@ recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
     for (i_patient_idx in 1:nids) {
       patient_id_str <- ids[i_patient_idx]
       day0_logical_idx <- grepl(paste(patient_id_str, "Day 0"), genotypedata$Sample.ID)
-      dayf_logical_idx <- grepl(paste(patient_id_str, "Day Failure"), genotypedata$Sample.ID)
+      dayf_logical_idx <- grepl(paste(patient_id_str, "recurrence"), genotypedata$Sample.ID)
       
       day0_alleles <- recoded_matrix[day0_logical_idx, , drop = FALSE]
       day0_unique_sorted <- sort(unique(day0_alleles[!is.na(day0_alleles)]))
@@ -328,7 +328,7 @@ recode_alleles <- function(genotypedata, alleles_definitions, marker_info) {
 #'
 #' @param genotypedata A data frame containing all raw allele observations from
 #'   all samples (from both `late_failures` and `additional` data).
-#' @param alleles_definitions A list where each element corresponds to a locus
+#' @param allele_definitionsA list where each element corresponds to a locus
 #'   and contains the allele bin definitions for that locus, as created by
 #'   the `define_alleles` function.
 #' @param marker_info A data frame containing marker metadata, used to determine
@@ -463,7 +463,7 @@ calculate_frequencies <- function(genotypedata, alleles_definitions, marker_info
 #'   locus and MOI. It's a key component of the MCMC state.
 #' @param maxMOI An integer specifying the maximum multiplicity of infection,
 #'   which determines the number of columns per locus in `tempdata`.
-#' @param frequencies_RR The list object containing population genetic
+#' @param allele_frequencies The list object containing population genetic
 #'   statistics, as generated by `calculate_frequencies3`. This provides the
 #'   number of alleles (`n_alleles`) and their codes (`allele_codes`) for the
 #'   locus.
@@ -477,16 +477,16 @@ calculate_frequencies <- function(genotypedata, alleles_definitions, marker_info
 #' @noRd
 #'
 
-findposteriorfrequencies =  function(locus_index, tempdata, maxMOI, frequencies_RR) {
+findposteriorfrequencies =  function(locus_index, tempdata, maxMOI, allele_frequencies) {
   data_cols <- (1:maxMOI) + (locus_index - 1) * maxMOI
   locus_data <- tempdata[, data_cols]
-  n_alleles <- frequencies_RR$n_alleles[locus_index]
+  n_alleles <- allele_frequencies$n_alleles[locus_index]
   
   if (is.na(n_alleles) || n_alleles == 0) {
-    max_alleles_in_matrix <- ncol(frequencies_RR$freq_matrix)
+    max_alleles_in_matrix <- ncol(allele_frequencies$freq_matrix)
     return(rep(NA, max_alleles_in_matrix))
   }
-  allele_levels <- frequencies_RR$allele_codes[[locus_index]]
+  allele_levels <- allele_frequencies$allele_codes[[locus_index]]
   freq_prior_alpha <- rep(1, n_alleles)
   observed_counts <- table(factor(c(locus_data), levels = allele_levels))
   freq_posterior_alpha <- freq_prior_alpha + observed_counts

@@ -39,7 +39,7 @@
 #'   all samples (both observed and imputed).
 #' @param classification A vector of the current classification state for all patients.
 #' @param qq The current estimate of the genotyping error/mutation probability.
-#' @param frequencies_RR The list object containing population genetic statistics,
+#' @param allele_frequencies The list object containing population genetic statistics,
 #'   including allele codes (`allele_codes`) and their frequencies (`freq_matrix`).
 #' @param nloci,maxMOI Core dimensions of the analysis (number of loci and max MOI).
 #'
@@ -51,7 +51,7 @@
 #' @noRd
 #'
 switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
-                                 classification, qq, q_loss, frequencies_RR, nloci, maxMOI) { 
+                                 classification, qq, q_loss, allele_frequencies, nloci, maxMOI) { 
   
   # Identify all positions currently marked as 'hidden' (imputed) for this patient
   hidden_positions <- which(c(hidden0[x,], hiddenf[x,]) == 1)
@@ -75,14 +75,14 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   }
   
   # Retrieve valid allele codes for the selected locus from the frequency matrix
-  possible_alleles <- frequencies_RR$allele_codes[[chosenlocus]]
+  possible_alleles <- allele_frequencies$allele_codes[[chosenlocus]]
   if (length(possible_alleles) == 0) {
     return(list(recoded0=recoded0, recodedf=recodedf))
   }
   
   # Propose a new allele value sampled proportional to population frequencies
   # new_id <- sample(possible_alleles, 1)
-  allele_freqs <- frequencies_RR$freq_matrix[chosenlocus, 1:length(possible_alleles)]
+  allele_freqs <- allele_frequencies$freq_matrix[chosenlocus, 1:length(possible_alleles)]
   if(any(is.na(allele_freqs)) || sum(allele_freqs) == 0) {
     new_id <- sample(possible_alleles, 1)
   } else {
@@ -93,7 +93,7 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   calculate_log_lik <- function(patient_recoded0, patient_recodedf) {
     log_lik_total <- 0
     for (locus_idx in 1:nloci) {
-      # Extract unique alleles for current locus at Day 0 and Day Failure
+      # Extract unique alleles for current locus at Day 0 and recurrence
       d0_alleles <- unique(patient_recoded0[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)])
       d0_alleles <- d0_alleles[!is.na(d0_alleles)]
       
@@ -116,8 +116,8 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
         }  
       } else { # REINFECTION
         # Use population allele frequencies to calculate the probability of the recurrence genotype
-        freqs <- frequencies_RR$freq_matrix[locus_idx, ]
-        allele_codes <- frequencies_RR$allele_codes[[locus_idx]]
+        freqs <- allele_frequencies$freq_matrix[locus_idx, ]
+        allele_codes <- allele_frequencies$allele_codes[[locus_idx]]
         matched_indices <- match(df_alleles, allele_codes)
         
         if (any(is.na(matched_indices))) {
@@ -141,9 +141,9 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   }
   
   log_lik_new <- calculate_log_lik(recoded0_new, recodedf_new)
-  old_freq <- frequencies_RR$freq_matrix[chosenlocus, which(possible_alleles == old_id)]
+  old_freq <- allele_frequencies$freq_matrix[chosenlocus, which(possible_alleles == old_id)]
   if(length(old_freq)==0) old_freq <- 0
-  new_freq <- frequencies_RR$freq_matrix[chosenlocus, which(possible_alleles == new_id)]
+  new_freq <- allele_frequencies$freq_matrix[chosenlocus, which(possible_alleles == new_id)]
   if(length(new_freq)==0) new_freq <- 0
   
   # Calculate the log acceptance ratio

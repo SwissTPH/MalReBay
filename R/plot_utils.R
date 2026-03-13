@@ -20,22 +20,26 @@
 #'
 #' @export
 plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
-                                            site_name,
-                                            save_plot = TRUE,
-                                            output_folder = NULL,
-                                            verbose = TRUE) {
+                                        site_name,
+                                        save_plot     = TRUE,
+                                        output_folder = NULL,
+                                        verbose       = TRUE) {
   
   if (save_plot && is.null(output_folder)) {
     stop("`output_folder` must be provided when `save_plot = TRUE`.", call. = FALSE)
   }
   
+  # Clean site_name for use in file names
+  safe_site_name <- gsub(" ", "_", site_name)
+  
   site_dir <- NULL
   if (save_plot) {
-    site_dir <- file.path(output_folder, "convergence_diagnosis", site_name)
+    site_dir <- file.path(output_folder, "convergence_diagnosis", safe_site_name)
     if (dir.exists(site_dir)) unlink(site_dir, recursive = TRUE)
     dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   }
   
+  # Data cleaning
   clean_chains <- lapply(all_chains_loglikelihood, function(x) x[is.finite(x)])
   clean_chains <- Filter(function(x) length(x) >= 2, clean_chains)
   
@@ -45,118 +49,161 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
   }
   
   loglikelihood_mcmc <- tryCatch({
-    mlist <- lapply(clean_chains, coda::mcmc)
+    mlist  <- lapply(clean_chains, coda::mcmc)
     mclist <- coda::as.mcmc.list(mlist)
     coda::varnames(mclist) <- " "
     mclist
-  }, error = function(e) { return(NULL) })
+  }, error = function(e) NULL)
   
   if (is.null(loglikelihood_mcmc)) return(invisible(NULL))
-
+  
+  # Convergence diagnostics
   gelman_result <- NULL
   if (length(loglikelihood_mcmc) > 1) {
-    gelman_result <- tryCatch(coda::gelman.diag(loglikelihood_mcmc, autoburnin = FALSE), error = function(e) NULL)
+    gelman_result <- tryCatch(
+      coda::gelman.diag(loglikelihood_mcmc, autoburnin = FALSE),
+      error = function(e) NULL
+    )
   }
   ess_result <- tryCatch(coda::effectiveSize(loglikelihood_mcmc), error = function(e) NULL)
-
+  
   if (verbose) {
     cat("Convergence Diagnostics for:", site_name, "\n")
     if (!is.null(gelman_result)) { cat("Gelman-Rubin R-hat:\n"); print(gelman_result) }
-    if (!is.null(ess_result)) { cat("\nEffective Sample Size (ESS):\n"); print(ess_result) }
+    if (!is.null(ess_result))    { cat("\nEffective Sample Size (ESS):\n"); print(ess_result) }
   }
   
-  plot_diagnostics <- function() {
-    
-    #  Gelman-Rubin Plot
-    if (length(loglikelihood_mcmc) > 1) {
-      tryCatch({
-        coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE,
-                          col = c("black", "indianred"))
-        graphics::title(main = "Gelman-Rubin Diagnostic")
-      }, error = function(e) {
-        plot(1, type="n", axes=FALSE, ann=FALSE); text(1, 1, "Gelman plot unavailable", col = "red")
-      })
-    } else {
-      plot.new(); text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
-    }
-    
-    # Pause for user to see the first plot in an interactive session
-    if (interactive()) readline(prompt="Press [enter] to continue to next plot...")
-    
-    # Traceplot and Histogram
-    layout(matrix(c(1, 2), nrow = 2, byrow = TRUE))
-    par(mar = c(4.1, 4.1, 3.5, 1.1))
-    
-    # Traceplot
-    colors <- grDevices::rainbow(length(loglikelihood_mcmc))
-    matplot(do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
-            type = "l", lty = 1, col = colors,
-            main = "Traceplot", ylab = "Log-Likelihood", xlab = "Iterations")
-    legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)),
-           col = colors, lty = 1, bty = "n", cex = 0.8)
-    
-    # Histogram
-    hist(unlist(clean_chains), breaks = 40,
-         main = "Posterior Density",
-         xlab = "Log-Likelihood", col = "steelblue", border = "white")
-    
-
-    if (interactive()) readline(prompt="Press [enter] to continue to ACF plots...")
-    
-    # ACF Plots
-    n_chains <- length(clean_chains)
-    plot_dims <- grDevices::n2mfrow(n_chains) 
-    par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
-    
-    for (i in seq_along(clean_chains)) {
-      # Plot ACF for the current chain
-      stats::acf(clean_chains[[i]], lag.max = 50, main = "")
-      # Add a clear title
-      graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
-    }
-    
-    # Reset plotting parameters to default
-    layout(1)
-    par(mfrow = c(1, 1))
-  }
-  
-  if (save_plot) {
-    
-    # Gelman Plot
-    gelman_path <- file.path(site_dir, paste0("1_gelman_plot_", site_name, ".png"))
-    grDevices::png(gelman_path, width = 1000, height = 700, res = 120)
-    if (length(loglikelihood_mcmc) > 1) {
-      tryCatch(coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE, main = "Gelman-Rubin Diagnostic", col = c("black", "indianred")),
-               error = function(e){ plot.new(); text(0.5, 0.5, "Gelman plot failed", col="red") })
-    } else {
-      plot.new(); text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
-    }
-    grDevices::dev.off()
-    
-    # File 2: Traceplot and Histogram
-    trace_hist_path <- file.path(site_dir, paste0("2_trace_hist_plot_", site_name, ".png"))
-    grDevices::png(trace_hist_path, width = 1000, height = 1000, res = 120)
-    layout(matrix(c(1, 2), nrow = 2, byrow = TRUE)); par(mar = c(4.1, 4.1, 3.5, 1.1))
-    colors <- grDevices::rainbow(length(loglikelihood_mcmc)); matplot(do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)), type = "l", lty = 1, col = colors, main = "Traceplot", ylab = "Log-Likelihood", xlab = "Iterations"); legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)), col = colors, lty = 1, bty = "n", cex = 0.8)
-    hist(unlist(clean_chains), breaks = 40, main = "Posterior Density", xlab = "Log-Likelihood", col = "steelblue", border = "white")
-    grDevices::dev.off()
-    
-    # File 3: ACF Plots
-    acf_path <- file.path(site_dir, paste0("3_acf_plots_", site_name, ".png"))
-    grDevices::png(acf_path, width = 1200, height = 1000, res = 120)
-    n_chains <- length(clean_chains); plot_dims <- grDevices::n2mfrow(n_chains); par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
-    for (i in seq_along(clean_chains)) { stats::acf(clean_chains[[i]], lag.max = 50, main = ""); graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2) }
-    grDevices::dev.off()
-    
-    layout(1); par(mfrow = c(1,1))
-    
+  # Gelman-Rubin diagnostic plot
+  if (save_plot) grDevices::png(
+    file.path(site_dir, paste0(safe_site_name, "_gelman_rubin.png")),
+    width = 1000, height = 700, res = 120
+  )
+  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
+  if (length(loglikelihood_mcmc) > 1) {
+    tryCatch(
+      coda::gelman.plot(
+        loglikelihood_mcmc,
+        autoburnin = FALSE,
+        main       = paste(site_name, "- Gelman-Rubin Diagnostic"),
+        col        = c("black", "indianred")
+      ),
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, "Gelman plot failed", col = "red")
+      }
+    )
   } else {
-   
-    plot_diagnostics()
+    plot.new()
+    text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
   }
+  par(old_par)
+  if (save_plot) grDevices::dev.off()
+  
+  # Traceplot for chain mixing
+  if (save_plot) grDevices::png(
+    file.path(site_dir, paste0(safe_site_name, "_traceplot.png")),
+    width = 1000, height = 600, res = 120
+  )
+  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
+  colors  <- grDevices::rainbow(length(loglikelihood_mcmc))
+  matplot(
+    do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
+    type = "l", lty = 1, col = colors,
+    main = paste(site_name, "- Traceplot"),
+    ylab = "Log-Likelihood",
+    xlab = "Iterations"
+  )
+  legend(
+    "topright",
+    legend = paste("Chain", seq_along(loglikelihood_mcmc)),
+    col    = colors,
+    lty    = 1,
+    bty    = "n",
+    cex    = 0.8
+  )
+  par(old_par)
+  if (save_plot) grDevices::dev.off()
+  
+  # Log-likelihood Distribution
+  if (save_plot) grDevices::png(
+    file.path(site_dir, paste0(safe_site_name, "_log_likelihood_distribution.png")),
+    width = 1000, height = 600, res = 120
+  )
+  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
+  hist(
+    unlist(clean_chains),
+    breaks = 40,
+    main   = paste(site_name, "- Log-Likelihood Distribution"),
+    xlab   = "Log-Likelihood",
+    col    = "steelblue",
+    border = "white"
+  )
+  par(old_par)
+  if (save_plot) grDevices::dev.off()
+  
+  # Autocorrelation
+  if (save_plot) grDevices::png(
+    file.path(site_dir, paste0(safe_site_name, "_autocorrelation.png")),
+    width = 1200, height = 1000, res = 120
+  )
+  plot_dims <- grDevices::n2mfrow(length(clean_chains))
+  old_par   <- par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
+  for (i in seq_along(clean_chains)) {
+    stats::acf(clean_chains[[i]], lag.max = 50, main = "")
+    graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
+  }
+  par(old_par)  
+  if (save_plot) grDevices::dev.off()
   
   invisible(list(gelman = gelman_result, ess = ess_result))
 }
+
+
+#' Plot Posterior Probability Histogram
+#'
+#' Creates and saves a histogram of posterior probabilities of recrudescence
+#' for all patients. This is an internal function called automatically by
+#' \code{\link{MalReBay}}.
+#'
+#' @param summary_results A list returned by \code{\link{summarise_results}},
+#'   containing a \code{posterior_probabilities} data frame with a
+#'   \code{Probability} column.
+#' @param output_folder A string specifying the directory where the histogram
+#'   PNG will be saved. Defaults to \code{"results"}.
+#' @param verbose Logical. If \code{TRUE}, prints a message when the file is
+#'   saved. Defaults to \code{TRUE}.
+#'
+#' @return Invisibly returns the file path of the saved PNG. Returns
+#'   \code{invisible(NULL)} if no probabilities are available to plot.
+#'
+#' @keywords internal
+plot_probability_histogram <- function(summary_results, output_folder = "results", verbose = TRUE) {
+  
+  posterior_probabilities <- summary_results$posterior_probabilities
+  
+  if (is.null(posterior_probabilities) || nrow(posterior_probabilities) == 0) {
+    warning("No posterior probabilities to plot.")
+    return(invisible(NULL))
+  }
+  
+  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
+  
+  path <- file.path(output_folder, "recrudescence_probability_histogram.png")
+  grDevices::png(path, width = 8, height = 6, units = "in", res = 300)
+  graphics::hist(
+    as.numeric(as.character(posterior_probabilities$Probability)),
+    breaks = seq(0, 1, by = 0.05),
+    col    = "skyblue",
+    main   = "Posterior Probability Distribution",
+    xlab   = "Probability of Recrudescence",
+    ylab   = "Number of Patients"
+  )
+  grDevices::dev.off()
+  
+  if (verbose) message("INFO: Probability histogram saved to: ", output_folder)
+  invisible(path)
+}
+
 
 
 #' Plot Multiplicity of Infection (MOI)
@@ -177,7 +224,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
 plot_moi <- function(genotypedata,
                      marker_pattern = "(_allele_\\d+|_\\d+)$",
                      output_folder = NULL,
-                     filename = "moi_per_marker_by_site.pdf") {
+                     filename = "moi_per_marker_by_site.png") {
   
   # Validating if the site column is available
   if (!"Site" %in% colnames(genotypedata)) {
@@ -410,7 +457,7 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #'
 #' @description This function creates pie charts to visualize allele or haplotype
 #' diversity at Day 0 and at the day of recurrence. It saves the combined plot
-#' as a PDF file.
+#' as an image.
 #'
 #' @param genotypedata A dataframe containing the genotyping data.
 #' @param data_type A string, either "length_polymorphic" or "ampseq".

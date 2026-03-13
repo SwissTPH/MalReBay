@@ -2,9 +2,9 @@
 #'
 #' @description
 #' manages MCMC runs
-#' @param genotypedata_latefailures Data frame of late treatment failure samples.
-#' @param additional_genotypedata Additional neutral marker data.
-#' @param marker_info_subset Marker definitions used for allele matching.
+#' @param late_failures Data frame of late treatment failure samples.
+#' @param additional Additional neutral marker data.
+#' @param marker_info Marker definitions used for allele matching.
 #' @param mcmc_config List of MCMC configuration options.
 #' @param data_type Either "ampseq" or "length".
 #' @param output_folder Directory where results will be saved.
@@ -15,12 +15,12 @@
 #' @noRd
 #'
 run_all_sites <- function(
-    genotypedata_latefailures,
-    additional_genotypedata,
-    marker_info_subset,
+    late_failures,
+    additional,
+    marker_info,
     mcmc_config,
     data_type,
-    output_folder,
+    output_folder = NULL,
     verbose = TRUE) { 
   
   n_chains <- mcmc_config$n_chains
@@ -31,7 +31,7 @@ run_all_sites <- function(
   burn_in_frac <- mcmc_config$burn_in_frac
   record_hidden_alleles <- mcmc_config$record_hidden_alleles
   
-  site_names <- as.character(unique(genotypedata_latefailures$Site))
+  site_names <- as.character(unique(late_failures$Site))
   local_sites_classification <- list()
   local_sites_alleles0 <- list()
   local_sites_allelesf <- list()
@@ -44,9 +44,9 @@ run_all_sites <- function(
   
   for (site in site_names) {
     jobname <- site
-    genotypedata_RR <- genotypedata_latefailures[genotypedata_latefailures$Site == site, ]
-    additional_neutral <- additional_genotypedata[additional_genotypedata$Site == site, ]
-    ids <- unique(gsub(" Day 0", "", genotypedata_RR$Sample.ID[grepl("Day 0", genotypedata_RR$Sample.ID)]))
+    late_failures_site <- late_failures[late_failures$Site == site, ]
+    additional_site <- additional[additional$Site == site, ]
+    ids <- unique(gsub(" Day 0", "", late_failures_site$Sample.ID[grepl("Day 0", late_failures_site$Sample.ID)]))
     nids <- length(ids)
     
     if (verbose) message("Number of patient pairs (nids) found for site '", site, "': ", nids)
@@ -61,41 +61,41 @@ run_all_sites <- function(
     
     if (data_type == "ampseq") {
       if (verbose) message("INFO: Preparing AMPSEQ MCMC engine for site: ", site)
-      marker_cols <- grep("_allele_\\d+$", colnames(genotypedata_RR), value = TRUE)
-      maxMOI <- if (length(marker_cols) > 0) max(as.numeric(gsub(".*_allele_", "", marker_cols)), na.rm = TRUE) else 0
-      locinames <- unique(gsub("_allele_\\d+$", "", marker_cols))
+      marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(late_failures_site), value = TRUE)
+      maxMOI      <- if (length(marker_cols) > 0) max(as.numeric(gsub(".*(_allele_|_)(\\d+)$", "\\2", marker_cols)), na.rm = TRUE) else 0
+      locinames   <- unique(gsub("(_allele_\\d+|_\\d+)$", "", marker_cols))
       local_sites_locinames[[site]] <- locinames
       nloci <- length(locinames)
       mcmc_engine_function <- run_one_chain_ampseq
       engine_args <- list(
         nids = nids, ids = ids, nloci = nloci, maxMOI = maxMOI, locinames = locinames,
-        genotypedata_RR = genotypedata_RR[, -which(names(genotypedata_RR) == "Site")],
-        additional_neutral = additional_neutral[, -which(names(additional_neutral) == "Site")],
-        marker_info = marker_info_subset,
+        late_failures_site = late_failures_site[, -which(names(late_failures_site) == "Site")],
+        additional_site = additional_site[, -which(names(additional_site) == "Site")],
+        marker_info = marker_info,
         record_hidden_alleles = record_hidden_alleles
       )
       
     } else { 
       if (verbose) message("INFO: Preparing LENGTH-POLYMORPHIC MCMC engine for site: ", site)
-      alleles_definitions_RR <- suppressMessages(define_alleles(
-        genotypedata = rbind(genotypedata_RR, additional_neutral),
-        marker_info_subset = marker_info_subset
+      allele_definitions <- suppressMessages(define_alleles(
+        genotypedata = rbind(late_failures_site, additional_site),
+        marker_info = marker_info
       ))
       
-      locinames <- names(alleles_definitions_RR)
+      locinames <- names(allele_definitions)
       local_sites_locinames[[site]] <- locinames
       nloci <- length(locinames)
       
-      marker_cols <- grep("_\\d+$", colnames(genotypedata_RR), value = TRUE)
+      marker_cols <- grep("_\\d+$", colnames(late_failures_site), value = TRUE)
       maxMOI <- if (length(marker_cols) > 0) max(as.numeric(gsub(".*_", "", marker_cols)), na.rm = TRUE) else 0
       
       mcmc_engine_function <- run_one_chain
       engine_args <- list(
         nids = nids, ids = ids, nloci = nloci, maxMOI = maxMOI, locinames = locinames,
-        genotypedata_RR = genotypedata_RR[, -which(names(genotypedata_RR) == "Site")],
-        additional_neutral = additional_neutral[, -which(names(additional_neutral) == "Site")],
-        alleles_definitions_RR = alleles_definitions_RR,
-        marker_info = marker_info_subset,
+        late_failures_site = late_failures_site[, -which(names(late_failures_site) == "Site")],
+        additional_site = additional_site[, -which(names(additional_site) == "Site")],
+        allele_definitions = allele_definitions,
+        marker_info = marker_info,
         record_hidden_alleles = record_hidden_alleles
       )
     }
@@ -116,12 +116,12 @@ run_all_sites <- function(
     for (i in 1:nrow(locus_summary)) {
       patient_id <- locus_summary$patient_id[i]
       pattern_d0 <- paste0("\\b", patient_id, " Day 0\\b")
-      pattern_df <- paste0("\\b", patient_id, " Day Failure\\b")
-      d0_row <- genotypedata_RR[grepl(pattern_d0, genotypedata_RR$Sample.ID), ]
-      df_row <- genotypedata_RR[grepl(pattern_df, genotypedata_RR$Sample.ID), ]
+      pattern_df <- paste0("\\b", patient_id, " recurrence\\b")
+      d0_row <- late_failures_site[grepl(pattern_d0, late_failures_site$Sample.ID), ]
+      df_row <- late_failures_site[grepl(pattern_df, late_failures_site$Sample.ID), ]
       if (nrow(d0_row) == 0 || nrow(df_row) == 0) { next }
       for (locus_name in locinames) {
-        locus_cols <- grep(paste0("^", locus_name, "_"), colnames(genotypedata_RR), value = TRUE)
+        locus_cols <- grep(paste0("^", locus_name, "_"), colnames(late_failures_site), value = TRUE)
         has_d0_allele <- any(!is.na(d0_row[, locus_cols]))
         has_df_allele <- any(!is.na(df_row[, locus_cols]))
         if (has_d0_allele) locus_summary$n_available_d0[i] <- locus_summary$n_available_d0[i] + 1
@@ -184,8 +184,6 @@ run_all_sites <- function(
     }
     
     
-    
-    site_char <- as.character(site)
     if (length(full_chain_results) > 0) {
       num_total_samples_per_chain <- ncol(full_chain_results[[1]]$state_parameters)
       burn_in_samples_per_chain <- floor(burn_in_frac * num_total_samples_per_chain)
@@ -200,8 +198,8 @@ run_all_sites <- function(
         local_sites_locus_dists[[site]] <- final_dists
         local_sites_classification[[site]] <- final_classification
         local_sites_ids[[site]] <- ids
-        local_sites_locus_summary[[site_char]] <- locus_summary
-        local_sites_locinames[[site_char]] <- locinames
+        local_sites_locus_summary[[site]] <- locus_summary
+        local_sites_locinames[[site]] <- locinames
       } else {
         if (verbose) message("INFO: The number of iterations for '", site, "', was less than or equal to the burn-in. No post-burn-in samples to summarize.")
       }
