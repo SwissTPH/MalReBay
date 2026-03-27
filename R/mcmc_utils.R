@@ -20,7 +20,11 @@
 #' @seealso \code{\link{summarise_results}} for post-processing the output.
 #'
 #' @keywords internal
-classify_infections <- function(imported_data, mcmc_config = list(), n_workers = 1, verbose = TRUE) {
+classify_infections <- function(imported_data, 
+                                mcmc_config = system.file("extdata", "default_mcmc_config.xlsx", package = "MalReBay"),
+                                n_workers = 1, 
+                                verbose = TRUE
+                                ) {
   
   # Validate imported_data structure
   required_elements <- c("late_failures", "additional", "marker_info", "data_type")
@@ -31,16 +35,10 @@ classify_infections <- function(imported_data, mcmc_config = list(), n_workers =
     )
   }
   
-  # Build config with defaults
-  config <- utils::modifyList(list(
-    n_chains              = 4,
-    chunk_size            = 500,
-    max_iterations        = 1000,
-    burn_in_frac          = 0.25,
-    rhat_threshold        = 1.1,
-    ess_threshold         = 200,
-    record_hidden_alleles = FALSE
-  ), mcmc_config)
+  # mcmc configuration 
+  config <- as.data.frame(readxl::read_excel(mcmc_config))
+  config$parameter <- trimws(config$parameter)
+  config <- setNames(as.list(config$value), config$parameter)
   
   # Extract data
   late_failures <- imported_data$late_failures
@@ -49,25 +47,23 @@ classify_infections <- function(imported_data, mcmc_config = list(), n_workers =
   data_type     <- imported_data$data_type
   
   # Parallelization setup
-  old_plan <- future::plan()
-  on.exit(future::plan(old_plan), add = TRUE)
-  
-  avail_cores    <- future::availableCores()
+  avail_cores    <- parallel::detectCores(logical = FALSE)
   workers_to_use <- min(n_workers, avail_cores)
   
   if (workers_to_use > 1) {
-    if (verbose) message("INFO: Running in parallel on ", workers_to_use, " cores.")
-    future::plan(future::multisession, workers = workers_to_use)
+    cl <- parallel::makeCluster(workers_to_use)
+    doParallel::registerDoParallel(cl)
+    on.exit({ parallel::stopCluster(cl); foreach::registerDoSEQ() }, add = TRUE)
   } else {
-    future::plan(future::sequential)
+    foreach::registerDoSEQ()
   }
-  
   # Run MCMC
   results <- run_all_sites(
     late_failures = late_failures,
     additional    = additional,
     marker_info   = marker_info,
     mcmc_config   = config,
+    output_folder = NULL,  
     data_type     = data_type,
     verbose       = verbose
   )
@@ -138,7 +134,10 @@ summarise_results <- function(mcmc_results, imported_data, output_folder = NULL,
     summary_list[[site]] <- data.frame(
       Site        = site,
       Sample.ID   = mcmc_results$ids[[site]],
-      Probability = rowMeans(mcmc_results$classifications[[site]], na.rm = TRUE),
+      Probability = {
+        if (is.null(dim(mcmc_results$classifications[[site]]))) cls
+        else rowMeans(mcmc_results$classifications[[site]], na.rm = TRUE)
+      },
       stringsAsFactors = FALSE
     )
     
@@ -203,72 +202,68 @@ summarise_results <- function(mcmc_results, imported_data, output_folder = NULL,
   ))
 }
 
-#' Save Classification Results to CSV
+#' Save Classification Results and Generate Plots
 #'
-#' Writes the summarised MCMC classification results to CSV files in the
-#' specified output folder. This is an internal function called automatically
-#' by \code{\link{MalReBay}}.
+#' Writes MCMC results to CSV files and generates descriptive and 
+#' result-based plots (Diversity, MOI, and Posterior Histograms).
 #'
-#' The following files are written:
-#' \describe{
-#'   \item{\code{posterior_probabilities.csv}}{Per-patient posterior
-#'     probabilities of recrudescence with locus availability summaries.}
-#'   \item{\code{bayesian_match_counting_comparison.csv}}{Combined allele
-#'     match counting and posterior probability results per sample.}
-#'   \item{\code{mcmc_convergence_summary.csv}}{Per-site Gelman-Rubin R-hat
-#'     and effective sample size diagnostics. Only written if convergence
-#'     diagnostics are available.}
-#' }
-#'
-#' @param summary_results A list returned by \code{\link{summarise_results}}.
-#' @param output_folder A string path to the directory where CSV files will
-#'   be saved. Created recursively if it does not exist. Defaults to
-#'   \code{"results"}.
-#' @param verbose Logical. If \code{TRUE}, prints a message confirming where
-#'   files were saved. Defaults to \code{TRUE}.
-#'
-#' @return Invisibly returns a named character vector of file paths written:
-#'   \describe{
-#'     \item{\code{posterior_probabilities}}{Path to the posterior
-#'       probabilities CSV.}
-#'     \item{\code{comparison}}{Path to the match counting comparison CSV.}
-#'     \item{\code{convergence}}{Path to the convergence summary CSV.
-#'       Only present if convergence data is available.}
-#'   }
-#'
-#' @seealso \code{\link{summarise_results}} for generating the input to this
-#'   function.
+#' @param summary_results List from \code{summarise_results}.
+#' @param imported_data List from \code{import_data}.
+#' @param output_folder Path to save files. If \code{NULL}, plots are printed
+#'   to the R plot window and CSVs are not saved.
+#' @param verbose Logical.
 #'
 #' @keywords internal
-save_results <- function(summary_results, output_folder = "results", verbose = TRUE) {
+save_results <- function(summary_results, imported_data, output_folder = NULL, verbose = TRUE) {
+  
+  # Generate descriptive plots
+  all_data <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
+  
+  if (nrow(all_data) > 0) {
+    p_div <- plot_markers_diversity(
+      all_data, 
+      imported_data$data_type, 
+      imported_data$marker_info, 
+      output_folder = output_folder
+    )
+    if (!is.null(p_div)) print(p_div)
+    
+    p_moi <- plot_moi(all_data, output_folder = output_folder)
+    if (!is.null(p_moi)) print(p_moi)
+  }
+  
+  # Generate posterior probabilities histograms
+  p_hist <- plot_probability_histogram(summary_results, output_folder = output_folder, verbose = verbose)
+  if (!is.null(p_hist)) print(p_hist)
+  
+  # Save CSV Data
+  if (is.null(output_folder)) {
+    if (verbose) message("INFO: No output folder provided. CSV files not saved.")
+    return(invisible(NULL))
+  }
   
   if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
   
-  if (!is.list(summary_results) ||
-      !all(c("posterior_probabilities", "comparison", "convergence") %in% names(summary_results))) {
-    stop("'summary_results' must be a valid list returned by summarise_results().", call. = FALSE)
-  }
+  # Save CSVs
+  utils::write.csv(
+    summary_results$posterior_probabilities, 
+    file.path(output_folder, "posterior_probabilities.csv"), 
+    row.names = FALSE
+  )
   
-  paths <- c()
+  utils::write.csv(
+    summary_results$comparison, 
+    file.path(output_folder, "bayesian_match_counting_comparison.csv"), 
+    row.names = FALSE
+  )
   
-  # Posterior probabilities
-  path_pp <- file.path(output_folder, "posterior_probabilities.csv")
-  utils::write.csv(summary_results$posterior_probabilities, path_pp, row.names = FALSE)
-  paths["posterior_probabilities"] <- path_pp
-  
-  # Comparison table
-  path_ct <- file.path(output_folder, "bayesian_match_counting_comparison.csv")
-  utils::write.csv(summary_results$comparison, path_ct, row.names = FALSE)
-  paths["comparison"] <- path_ct
-  
-  # Convergence summary
   if (!is.null(summary_results$convergence)) {
-    path_cv <- file.path(output_folder, "mcmc_convergence_summary.csv")
-    utils::write.csv(summary_results$convergence, path_cv, row.names = FALSE)
-    paths["convergence"] <- path_cv
+    utils::write.csv(
+      summary_results$convergence, 
+      file.path(output_folder, "mcmc_convergence_summary.csv"), 
+      row.names = FALSE
+    )
   }
   
-  if (verbose) message("INFO: Results saved to: ", output_folder)
-  
-  invisible(paths)
+  invisible(NULL)
 }

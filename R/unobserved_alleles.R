@@ -117,7 +117,7 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         penalty_denominator <- qq_crossfamily^hidden_crossfamily0[x, chosen] 
 
         method <- marker_info$binning_method[chosenlocus]
-        if (method == "cluster") {
+        if (method == "msp_glurp") {
           current_threshold <- marker_info$repeatlength[chosenlocus]
           obs_lengths <- allelesf[x, which(hiddenf[x,] == 0 & floor((0:(ncol(allelesf)-1))/maxMOI)+1 == chosenlocus)]
           if (sum(!is.na(obs_lengths)) > 0) {
@@ -133,7 +133,7 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         if (method == "microsatellite") {
             numerator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,new]+1], na.rm=TRUE) * repeatednew) * penalty_numerator
             denominator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,old]+1], na.rm=TRUE) * repeatedold) * penalty_denominator
-        } else if (method == "cluster") {
+        } else if (method == "msp_glurp") {
             threshold <- marker_info$repeatlength[chosenlocus]
             probs_new <- ifelse(correction_distance_matrix[[chosenlocus]][,new] <= threshold, 1 - qq_crossfamily, qq_crossfamily)
             numerator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus] * probs_new, na.rm=TRUE) * repeatednew) * penalty_numerator
@@ -198,7 +198,7 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         penalty_denominator <- qq_crossfamily^hidden_crossfamilyf[x, chosen]
 
         method <- marker_info$binning_method[chosenlocus]
-        if (method == "cluster") {
+        if (method == "msp_glurp") {
           current_threshold <- marker_info$repeatlength[chosenlocus]
           obs_lengths <- allelesf[x, which(hiddenf[x,] == 0 & floor((0:(ncol(allelesf)-1))/maxMOI)+1 == chosenlocus)]
           if (sum(!is.na(obs_lengths)) > 0) {
@@ -214,7 +214,7 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
         if (method == "microsatellite") {
             numerator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,new]+1], na.rm=TRUE) * repeatednew) * penalty_numerator
             denominator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus]*dvect[correction_distance_matrix[[chosenlocus]][,old]+1], na.rm=TRUE) * repeatedold) * penalty_denominator
-        } else if (method == "cluster") {
+        } else if (method == "msp_glurp") {
             threshold <- marker_info$repeatlength[chosenlocus]
             probs_new <- ifelse(correction_distance_matrix[[chosenlocus]][,new] <= threshold, 1 - qq_crossfamily, qq_crossfamily)
             numerator <- (sum(allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus] * probs_new, na.rm=TRUE) * repeatednew) * penalty_numerator
@@ -290,11 +290,11 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
           newallrecrf = recodedf[x,maxMOI*(chosenlocus-1)+allpossiblerecrud[,2]]
           epsilon <- 1e-9; method <- marker_info$binning_method[chosenlocus]
           calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
-              if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "cluster") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
-              den_probs <- sapply(recrf_vec, function(recr_allele) { if (is.na(recr_allele)) return(NA); if (method == "microsatellite") { pop_probs <- dvect[correction_mat[, recr_allele] + 1] } else if (method == "cluster") { pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily) }; sum(freq_mat * pop_probs, na.rm = TRUE) })
+              if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "msp_glurp") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
+              den_probs <- sapply(recrf_vec, function(recr_allele) { if (is.na(recr_allele)) return(NA); if (method == "microsatellite") { pop_probs <- dvect[correction_mat[, recr_allele] + 1] } else if (method == "msp_glurp") { pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily) }; sum(freq_mat * pop_probs, na.rm = TRUE) })
               mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
           }
-          threshold <- if(method == "cluster") marker_info$repeatlength[chosenlocus] else NA
+          threshold <- if(method == "msp_glurp") marker_info$repeatlength[chosenlocus] else NA
           likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatednew * penalty_numerator
           likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatedold * penalty_denominator
           
@@ -363,18 +363,18 @@ switch_hidden_length = function(x, hidden0, hiddenf, recoded0, recodedf, alleles
            epsilon <- 1e-9; 
            method <- marker_info$binning_method[chosenlocus]
            calculate_likelihood <- function(distances_vec, recrf_vec, freq_mat, correction_mat, method, threshold) {
-               if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "cluster") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
+               if (method == "microsatellite") { num_probs <- dvect[round(distances_vec) + 1] } else if (method == "msp_glurp") { num_probs <- ifelse(distances_vec <= threshold, 1 - qq_crossfamily, qq_crossfamily) } else { num_probs <- ifelse(distances_vec == 0, 1 - qq_crossfamily, qq_crossfamily) }
                den_probs <- sapply(recrf_vec, function(recr_allele) { if (is.na(recr_allele)) return(NA); 
                if (method == "microsatellite") { 
                 pop_probs <- dvect[correction_mat[, recr_allele] + 1] 
-                } else if (method == "cluster") { 
+                } else if (method == "msp_glurp") { 
                   pop_probs <- ifelse(correction_mat[, recr_allele] <= threshold, 1 - qq_crossfamily, qq_crossfamily) 
                   } else { 
                     pop_probs <- ifelse(correction_mat[, recr_allele] == 0, 1 - qq_crossfamily, qq_crossfamily) }; 
                     sum(freq_mat * pop_probs, na.rm = TRUE) })
                mean(num_probs / (den_probs + epsilon), na.rm = TRUE)
            }
-           threshold <- if(method == "cluster") marker_info$repeatlength[chosenlocus] else NA
+           threshold <- if(method == "msp_glurp") marker_info$repeatlength[chosenlocus] else NA
            likelihoodnew <- calculate_likelihood(newalldistance, newallrecrf, allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatednew * penalty_numerator
            likelihoodold <- calculate_likelihood(alldistance[x, chosenlocus, ], allrecrf[x, chosenlocus, ], allele_frequencies$freq_matrix[chosenlocus, 1:n_alleles_locus], correction_distance_matrix[[chosenlocus]], method, threshold) * repeatedold * penalty_denominator
            alpha <- 0

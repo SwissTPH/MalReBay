@@ -6,7 +6,7 @@
 \usage{
 classify_infections(
   imported_data,
-  mcmc_config = list(),
+  mcmc_config = system.file("extdata", "default_mcmc_config.xlsx", package = "MalReBay"),
   n_workers = 1,
   verbose = TRUE
 )

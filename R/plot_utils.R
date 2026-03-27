@@ -24,40 +24,41 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
                                         save_plot     = TRUE,
                                         output_folder = NULL,
                                         verbose       = TRUE) {
-  
+
   if (save_plot && is.null(output_folder)) {
     stop("`output_folder` must be provided when `save_plot = TRUE`.", call. = FALSE)
   }
-  
-  # Clean site_name for use in file names
+
   safe_site_name <- gsub(" ", "_", site_name)
-  
+
   site_dir <- NULL
   if (save_plot) {
     site_dir <- file.path(output_folder, "convergence_diagnosis", safe_site_name)
     if (dir.exists(site_dir)) unlink(site_dir, recursive = TRUE)
     dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  
-  # Data cleaning
+
+  # --- Data cleaning --------------------------------------------------------
   clean_chains <- lapply(all_chains_loglikelihood, function(x) x[is.finite(x)])
   clean_chains <- Filter(function(x) length(x) >= 2, clean_chains)
-  
+
   if (length(clean_chains) == 0) {
     warning("No valid chains for site '", site_name, "'. Skipping.", call. = FALSE)
     return(invisible(NULL))
   }
-  
+
   loglikelihood_mcmc <- tryCatch({
     mlist  <- lapply(clean_chains, coda::mcmc)
     mclist <- coda::as.mcmc.list(mlist)
     coda::varnames(mclist) <- " "
     mclist
   }, error = function(e) NULL)
-  
+
   if (is.null(loglikelihood_mcmc)) return(invisible(NULL))
-  
-  # Convergence diagnostics
+
+  # --- Convergence diagnostics ----------------------------------------------
+
+  # Classical Gelman-Rubin (Gelman & Rubin 1992, Brooks & Gelman 1998)
   gelman_result <- NULL
   if (length(loglikelihood_mcmc) > 1) {
     gelman_result <- tryCatch(
@@ -65,20 +66,93 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
       error = function(e) NULL
     )
   }
-  ess_result <- tryCatch(coda::effectiveSize(loglikelihood_mcmc), error = function(e) NULL)
-  
+
+  # Classical ESS (coda)
+  ess_result <- tryCatch(
+    coda::effectiveSize(loglikelihood_mcmc),
+    error = function(e) NULL
+  )
+
+  # Rank-normalised R-hat + bulk and tail ESS (Vehtari et al. 2021)
+  draws_matrix <- tryCatch(
+    do.call(cbind, lapply(clean_chains, as.numeric)),
+    error = function(e) NULL
+  )
+
+  rhat_rank <- tryCatch(
+    posterior::rhat(draws_matrix),
+    error = function(e) NA_real_
+  )
+  ess_bulk <- tryCatch(
+    posterior::ess_bulk(draws_matrix),
+    error = function(e) NA_real_
+  )
+  ess_tail <- tryCatch(
+    posterior::ess_tail(draws_matrix),
+    error = function(e) NA_real_
+  )
+
+  # Geweke Z-scores per chain (Geweke 1992)
+  # Z within (-1.96, 1.96) indicates stationarity at the 95% level
+  geweke_result <- tryCatch(
+    sapply(loglikelihood_mcmc, function(ch) coda::geweke.diag(ch)$z),
+    error = function(e) NULL
+  )
+
+  # --- Print diagnostics ----------------------------------------------------
   if (verbose) {
     cat("Convergence Diagnostics for:", site_name, "\n")
-    if (!is.null(gelman_result)) { cat("Gelman-Rubin R-hat:\n"); print(gelman_result) }
-    if (!is.null(ess_result))    { cat("\nEffective Sample Size (ESS):\n"); print(ess_result) }
+    cat(strrep("-", 50), "\n")
+
+    # Classical Gelman-Rubin
+    if (!is.null(gelman_result)) {
+      cat("Classical Gelman-Rubin R-hat (Gelman & Rubin 1992):\n")
+      print(gelman_result)
+    } else {
+      cat("Classical Gelman-Rubin: not available (near-constant chains or single chain)\n")
+    }
+
+    # Rank-normalised R-hat
+    if (!is.na(rhat_rank)) {
+      cat("\nRank-normalised R-hat (Vehtari et al. 2021):", round(rhat_rank, 4),
+          ifelse(rhat_rank < 1.01, "  [PASS < 1.01]", "  [FAIL >= 1.01]"), "\n")
+    }
+
+    # ESS — classical, bulk, and tail
+    if (!is.null(ess_result)) {
+      cat("\nClassical ESS (coda):", round(as.numeric(ess_result), 1), "\n")
+    }
+    if (!is.na(ess_bulk)) {
+      cat("Bulk ESS (Vehtari et al. 2021):", round(ess_bulk, 1),
+          ifelse(ess_bulk > 400, "  [PASS > 400]", "  [FAIL <= 400]"), "\n")
+    }
+    if (!is.na(ess_tail)) {
+      cat("Tail ESS (Vehtari et al. 2021):", round(ess_tail, 1),
+          ifelse(ess_tail > 400, "  [PASS > 400]", "  [FAIL <= 400]"), "\n")
+    }
+
+    # Geweke
+    if (!is.null(geweke_result)) {
+      cat("\nGeweke Z-scores per chain (Geweke 1992) — |Z| < 1.96 indicates stationarity:\n")
+      for (i in seq_along(geweke_result)) {
+        z <- geweke_result[i]
+        cat(sprintf("  Chain %d: Z = %6.4f  %s\n", i, z,
+                    ifelse(abs(z) < 1.96, "[PASS]", "[FAIL]")))
+      }
+    }
+    cat(strrep("-", 50), "\n")
   }
-  
-  # Gelman-Rubin diagnostic plot
-  if (save_plot) grDevices::png(
-    file.path(site_dir, paste0(safe_site_name, "_gelman_rubin.png")),
-    width = 1000, height = 700, res = 120
-  )
+
+  # --- Gelman-Rubin diagnostic plot ----------------------------------------
+  if (save_plot) {
+    grDevices::png(
+      file.path(site_dir, paste0(safe_site_name, "_gelman_rubin.png")),
+      width = 1000, height = 700, res = 120
+    )
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
   old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
+  on.exit(par(old_par), add = TRUE)
   if (length(loglikelihood_mcmc) > 1) {
     tryCatch(
       coda::gelman.plot(
@@ -89,23 +163,27 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
       ),
       error = function(e) {
         plot.new()
-        text(0.5, 0.5, "Gelman plot failed", col = "red")
+        text(0.5, 0.5, "Gelman plot failed\n(near-constant chains)", col = "red")
       }
     )
   } else {
     plot.new()
     text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
   }
-  par(old_par)
-  if (save_plot) grDevices::dev.off()
-  
-  # Traceplot for chain mixing
-  if (save_plot) grDevices::png(
-    file.path(site_dir, paste0(safe_site_name, "_traceplot.png")),
-    width = 1000, height = 600, res = 120
-  )
+  if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
+  par(old_par); on.exit(NULL, add = FALSE)
+
+  # --- Traceplot -----------------------------------------------------------
+  if (save_plot) {
+    grDevices::png(
+      file.path(site_dir, paste0(safe_site_name, "_traceplot.png")),
+      width = 1000, height = 600, res = 120
+    )
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
   old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
-  colors  <- grDevices::rainbow(length(loglikelihood_mcmc))
+  on.exit(par(old_par), add = TRUE)
+  colors <- grDevices::rainbow(length(loglikelihood_mcmc))
   matplot(
     do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
     type = "l", lty = 1, col = colors,
@@ -113,51 +191,55 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     ylab = "Log-Likelihood",
     xlab = "Iterations"
   )
-  legend(
-    "topright",
-    legend = paste("Chain", seq_along(loglikelihood_mcmc)),
-    col    = colors,
-    lty    = 1,
-    bty    = "n",
-    cex    = 0.8
-  )
-  par(old_par)
-  if (save_plot) grDevices::dev.off()
-  
-  # Log-likelihood Distribution
-  if (save_plot) grDevices::png(
-    file.path(site_dir, paste0(safe_site_name, "_log_likelihood_distribution.png")),
-    width = 1000, height = 600, res = 120
-  )
+  legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)),
+         col = colors, lty = 1, bty = "n", cex = 0.8)
+  if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
+  par(old_par); on.exit(NULL, add = FALSE)
+
+  # --- Log-likelihood distribution -----------------------------------------
+  if (save_plot) {
+    grDevices::png(
+      file.path(site_dir, paste0(safe_site_name, "_log_likelihood_distribution.png")),
+      width = 1000, height = 600, res = 120
+    )
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
   old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
-  hist(
-    unlist(clean_chains),
-    breaks = 40,
-    main   = paste(site_name, "- Log-Likelihood Distribution"),
-    xlab   = "Log-Likelihood",
-    col    = "steelblue",
-    border = "white"
-  )
-  par(old_par)
-  if (save_plot) grDevices::dev.off()
-  
-  # Autocorrelation
-  if (save_plot) grDevices::png(
-    file.path(site_dir, paste0(safe_site_name, "_autocorrelation.png")),
-    width = 1200, height = 1000, res = 120
-  )
+  on.exit(par(old_par), add = TRUE)
+  hist(unlist(clean_chains), breaks = 40,
+       main = paste(site_name, "- Log-Likelihood Distribution"),
+       xlab = "Log-Likelihood", col = "steelblue", border = "white")
+  if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
+  par(old_par); on.exit(NULL, add = FALSE)
+
+  # --- Autocorrelation plot ------------------------------------------------
+  if (save_plot) {
+    grDevices::png(
+      file.path(site_dir, paste0(safe_site_name, "_autocorrelation.png")),
+      width = 1200, height = 1000, res = 120
+    )
+    on.exit(grDevices::dev.off(), add = TRUE)
+  }
   plot_dims <- grDevices::n2mfrow(length(clean_chains))
   old_par   <- par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
+  on.exit(par(old_par), add = TRUE)
   for (i in seq_along(clean_chains)) {
     stats::acf(clean_chains[[i]], lag.max = 50, main = "")
     graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
   }
-  par(old_par)  
-  if (save_plot) grDevices::dev.off()
-  
-  invisible(list(gelman = gelman_result, ess = ess_result))
-}
+  if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
+  par(old_par); on.exit(NULL, add = FALSE)
 
+  # --- Return all diagnostic values ----------------------------------------
+  invisible(list(
+    gelman       = gelman_result,     # classical Gelman-Rubin object
+    ess          = ess_result,         # classical ESS from coda
+    rhat_rank    = rhat_rank,          # rank-normalised R-hat (Vehtari et al. 2021)
+    ess_bulk     = ess_bulk,           # bulk ESS (Vehtari et al. 2021)
+    ess_tail     = ess_tail,           # tail ESS (Vehtari et al. 2021)
+    geweke       = geweke_result       # Geweke Z-scores per chain
+  ))
+}
 
 #' Plot Posterior Probability Histogram
 #'

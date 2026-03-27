@@ -2,49 +2,27 @@
 % Please edit documentation in R/mcmc_utils.R
 \name{save_results}
 \alias{save_results}
-\title{Save Classification Results to CSV}
+\title{Save Classification Results and Generate Plots}
 \usage{
-save_results(summary_results, output_folder = "results", verbose = TRUE)
+save_results(
+  summary_results,
+  imported_data,
+  output_folder = NULL,
+  verbose = TRUE
+)
 }
 \arguments{
-\item{summary_results}{A list returned by \code{\link{summarise_results}}.}
+\item{summary_results}{List from \code{summarise_results}.}
 
-\item{output_folder}{A string path to the directory where CSV files will
-be saved. Created recursively if it does not exist. Defaults to
-\code{"results"}.}
+\item{imported_data}{List from \code{import_data}.}
 
-\item{verbose}{Logical. If \code{TRUE}, prints a message confirming where
-files were saved. Defaults to \code{TRUE}.}
-}
-\value{
-Invisibly returns a named character vector of file paths written:
-\describe{
-\item{\code{posterior_probabilities}}{Path to the posterior
-probabilities CSV.}
-\item{\code{comparison}}{Path to the match counting comparison CSV.}
-\item{\code{convergence}}{Path to the convergence summary CSV.
-Only present if convergence data is available.}
-}
+\item{output_folder}{Path to save files. If \code{NULL}, plots are printed
+to the R plot window and CSVs are not saved.}
+
+\item{verbose}{Logical.}
 }
 \description{
-Writes the summarised MCMC classification results to CSV files in the
-specified output folder. This is an internal function called automatically
-by \code{\link{MalReBay}}.
-}
-\details{
-The following files are written:
-\describe{
-\item{\code{posterior_probabilities.csv}}{Per-patient posterior
-probabilities of recrudescence with locus availability summaries.}
-\item{\code{bayesian_match_counting_comparison.csv}}{Combined allele
-match counting and posterior probability results per sample.}
-\item{\code{mcmc_convergence_summary.csv}}{Per-site Gelman-Rubin R-hat
-and effective sample size diagnostics. Only written if convergence
-diagnostics are available.}
-}
-}
-\seealso{
-\code{\link{summarise_results}} for generating the input to this
-function.
+Writes MCMC results to CSV files and generates descriptive and
+result-based plots (Diversity, MOI, and Posterior Histograms).
 }
 \keyword{internal}

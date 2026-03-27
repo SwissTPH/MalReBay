@@ -31,6 +31,8 @@
 #' direction tests — not BD21-002 vs BD21-040.
 #'
 #' Used by: test_2, test_3, test_4, test_5
+#' 
+foreach::registerDoSEQ()
 create_mock_microsat_data <- function() {
   data.frame(
     Sample.ID = c(
@@ -119,12 +121,14 @@ create_mock_xlsx <- function(data, markers = create_mock_markers()) {
 #' convergence thresholds because small mock data won't fully converge.
 #' Used by: test_3, test_4, test_6
 fast_mcmc <- list(
-  n_chains       = 2,
-  chunk_size     = 50,
-  max_iterations = 100,
-  burn_in_frac   = 0.25,
-  rhat_threshold = 1.5,
-  ess_threshold  = 10
+  n_chains              = 2,
+  rhat_threshold        = 1.1,
+  ess_threshold         = 50,
+  chunk_size            = 100,
+  max_iterations        = 200,
+  burn_in_frac          = 0.5,
+  record_hidden_alleles = FALSE,
+  random_seed           = 42      
 )
 
 # ------------------------------------------------------------
