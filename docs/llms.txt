@@ -32,23 +32,17 @@ remotes::install_github("SwissTPH/MalReBay")
 
 ## All functions
 
-- [`calculate_marker_moi()`](https://swisstph.github.io/MalReBay/reference/calculate_marker_moi.md)
-  : Calculate Marker-Specific MOI
-- [`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
-  : Classify Infections Using a Bayesian MCMC Framework
-- [`generate_diversity_plots()`](https://swisstph.github.io/MalReBay/reference/generate_diversity_plots.md)
-  : Generate and Save Diversity Pie Charts
-- [`generate_likelihood_diagnostics()`](https://swisstph.github.io/MalReBay/reference/generate_likelihood_diagnostics.md)
-  : Generate and Plot MCMC Convergence Diagnostics
-- [`generate_marker_moi_plot()`](https://swisstph.github.io/MalReBay/reference/generate_marker_moi_plot.md)
-  : Generate and Save an MOI Plot
-- [`import_data()`](https://swisstph.github.io/MalReBay/reference/import_data.md)
-  : Import Genotyping Data from Excel
-- [`run_pfrecur_analysis_original_prep()`](https://swisstph.github.io/MalReBay/reference/run_pfrecur_analysis_original_prep.md)
-  : Run PfRecur analysis with specific data preparation
+- [`classify_infections()`](classify_infections.md) : Classify
+  Infections Using a Bayesian MCMC Framework
+- [`import_data()`](import_data.md) : Import Genotyping Data from Excel
+- [`plot_likelihood_diagnostics()`](plot_likelihood_diagnostics.md) :
+  Plot MCMC Likelihood Diagnostics
+- [`plot_markers_diversity()`](plot_markers_diversity.md) : Generate and
+  Save Diversity Pie Charts
+- [`plot_moi()`](plot_moi.md) : Plot Multiplicity of Infection (MOI)
 
 # Articles
 
 ### All vignettes
 
-- [MalReBay](https://swisstph.github.io/MalReBay/articles/MalReBay.md):
+- [MalReBay](MalReBay.md):

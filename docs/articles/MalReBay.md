@@ -78,8 +78,7 @@ algorithm. The output is the posterior probability of recrudescence for
 each recurrence, which can then be summarized at both the patient and
 study level.
 
-The main
-[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
+The main [`classify_infections()`](../reference/classify_infections.md)
 function automates this process—from loading the genotyping data and
 parameter settings to generating posterior estimates and final
 recurrence classifications. The following sections describe each input
@@ -187,7 +186,6 @@ library(MalReBay)
 library(future)
 library(dplyr)
 library(ggplot2)
-library(PfRecur)
 library(purrr)
 library(tidyr)
 library(here)
@@ -202,8 +200,24 @@ We then process the sample IDs to extract the patient identifier and day
 of sampling (baseline or day of recurrence).
 
 ``` r
-input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
+marker_file <- system.file("extdata", "maker_details.xlsx", package = "MalReBay")
+input_file_lp <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx", package = "MalReBay")
+
+
+imported_data <- MalReBay::import_data(
+  filepath = input_file_lp, 
+  marker_filepath = marker_file
+)
+#> INFO: Detected 'length_polymorphic' data format.
+#> Warning in MalReBay::import_data(filepath = input_file_lp, marker_filepath =
+#> marker_file): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
 ```
 
 #### Step 2: Define an Output Folder
@@ -215,6 +229,9 @@ If the folder does not already exist, it will be created automatically.
 output_dir_lp <- here::here("vignettes", "malrebay_vignette_outputs", "length_polymorphic_results")
 
 if (!dir.exists(output_dir_lp)) { dir.create(output_dir_lp, recursive = TRUE)}
+
+# creating the data frame for length ploymorphic genotyping data
+genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 ```
 
 #### Step 3: Descriptive statistics
@@ -238,19 +255,15 @@ uncertainty.
 ##### Multiplicity of Infection (MOI)
 
 ``` r
-genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 
 if (nrow(genotypedata_lp) > 0) {
-  moi_per_marker_data <- MalReBay::calculate_marker_moi(
-    genotypedata = genotypedata_lp
+  moi_plot <- MalReBay::plot_moi(
+    genotypedata  = genotypedata_lp,
+    output_folder = output_dir_lp
   )
-  if (!is.null(moi_per_marker_data) && nrow(moi_per_marker_data) > 0) {
-    MalReBay::generate_marker_moi_plot(
-      moi_data = moi_per_marker_data,
-      output_folder = output_dir_lp
-    )
-  } else {
-    message("Skipping MOI plot: MOI data could not be calculated.")
+  
+  if (!is.null(moi_plot)) {
+    print(moi_plot)
   }
 } else {
   message("Skipping MOI analysis: No genotype data available.")
@@ -263,8 +276,8 @@ length-polymorphic dataset.](MalReBay_files/figure-html/MOI-1.png)
 ##### Marker diversity
 
 ``` r
-if (imported_data$data_type == "length_polymorphic" && nrow(genotypedata_lp) > 0) {
-  diversity_plot <- MalReBay:::generate_diversity_plots(
+if (nrow(genotypedata_lp) > 0) {
+  diversity_plot <- MalReBay:::plot_markers_diversity(
     genotypedata    = genotypedata_lp,
     data_type       = "length_polymorphic",
     marker_info     = imported_data$marker_info,
@@ -321,8 +334,8 @@ to ensure robust convergence.
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 5000, 
-  max_iterations = 20000,
+  chunk_size = 500, 
+  max_iterations = 1000,
   rhat_threshold = 1.1,
   ess_threshold = 400
 )
@@ -331,25 +344,28 @@ quick_mcmc_config <- list(
 #### Step 5: Execute the Main Function
 
 Now we can run the analysis.
-[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
-will print progress messages to the console, informing you about the
-data type it detected, the sites it is analyzing, and the status of the
-MCMC convergence. The ‘future’ package is used in the background for
-parallel processing, so you can expect the analysis to run faster on
-multi-core machines.
+[`classify_infections()`](../reference/classify_infections.md) will
+print progress messages to the console, informing you about the data
+type it detected, the sites it is analyzing, and the status of the MCMC
+convergence. The ‘future’ package is used in the background for parallel
+processing, so you can expect the analysis to run faster on multi-core
+machines.
 
 ``` r
 classification_summary <- classify_infections(
-  imported_data = imported_data,
-  mcmc_config = quick_mcmc_config,
-  output_folder = output_dir_lp,
+  imported_data   = imported_data, 
+  mcmc_config     = quick_mcmc_config,
+  output_folder   = output_dir_lp,
   n_workers = 2,
   verbose = FALSE
 )
+#> Warning: package 'future' was built under R version 4.5.2
+#> Warning: package 'future' was built under R version 4.5.2
+#> Successfully saved combined diversity plots to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/length_polymorphic_results/diversity_length_polymorphic_comparison.png
+#> Successfully saved MOI plot to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/length_polymorphic_results/moi_per_marker_by_site.pdf
 ```
 
-The
-[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
+The [`classify_infections()`](../reference/classify_infections.md)
 function returns a list containing two key data frames:
 
 - `summary`: Main results for each patient, including the posterior
@@ -368,8 +384,8 @@ knitr::kable(head(summary_df), caption = "Classification summary.")
 |:---|:---|---:|---:|---:|---:|
 | Benguela | BD21-002 | 0.0000000 | 7 | 7 | 7 |
 | Benguela | BD21-040 | 0.0000000 | 7 | 7 | 7 |
-| Benguela | BD21-041 | 0.9953333 | 7 | 7 | 7 |
-| Benguela | BD21-053 | 0.5163333 | 7 | 5 | 5 |
+| Benguela | BD21-041 | 1.0000000 | 7 | 7 | 7 |
+| Benguela | BD21-053 | 0.5833333 | 7 | 5 | 5 |
 | Benguela | BD21-075 | 0.0000000 | 7 | 7 | 7 |
 | Benguela | BD21-099 | 0.0000000 | 7 | 7 | 7 |
 
@@ -442,8 +458,8 @@ stop once the following criteria are met:
 
 The `classify_infections` function saves the MCMC log-likelihood data
 for each site within its results object. You can use the exported
-`generate_likelihood_diagnostics` function to view the plots for any
-site interactively in your R session.
+`plot_likelihood_diagnostics` function to view the plots for any site
+interactively in your R session.
 
 The key plots for diagnostics are:
 
@@ -463,13 +479,13 @@ Below is an example using the site `Benguela`, demonstrating how to
 generate and visualize the convergence diagnostics:
 
 ``` r
-site_name <- "Benguela"
-LP_loglik_data <- classification_summary$mcmc_loglikelihoods[[site_name]]
+site_to_plot <- names(classification_summary$mcmc_loglikelihoods)[1]
+LP_loglik_data <- classification_summary$mcmc_loglikelihoods[[site_to_plot]]
 
 if (!is.null(LP_loglik_data)) {
-  generate_likelihood_diagnostics(
+  MalReBay::plot_likelihood_diagnostics(
     all_chains_loglikelihood = LP_loglik_data,
-    site_name = site_name,
+    site_name = site_to_plot,
     save_plot = FALSE,
     output_folder = NULL,
     verbose = FALSE
@@ -492,85 +508,71 @@ visual assurance that the MCMC chains have mixed well and stabilized.
 #### Step 8: Comparison with other methods
 
 To evaluate the performance of the Bayesian classification in MalReBay,
-we compare its results against two alternative approaches:
+we compare its results against a simpler **match-counting algorithm**.
+This algorithm counts allele matches between Day 0 and recurrence
+samples to provide a baseline for comparison.
 
-- **PfRecur**: A previously published algorithm for classifying
-  recurrent malaria infections.
-
-- **Match-counting algorithm**: A simpler approach that counts allele
-  matches between Day 0 and recurrence samples.
-
-For length-polymorphic markers, we combine the outputs of `MalReBay`,
-`PfRecur`, and the `match-counting` algorithm into a single table. This
-allows us to examine, for each patient:
+For length-polymorphic markers, we combine the outputs of `MalReBay` and
+the `match-counting` algorithm into a single table. This allows us to
+examine, for each patient:
 
 - The number of loci compared and the number of matches between samples.
-
 - The per-locus results from match-counting (`R` for match, `NI` for
   non-match, `IND` for indeterminate).
-
 - The posterior probability of recrudescence from `MalReBay`
   (MalReBay_Probability).
 
-- The `PfRecur` probability for the same samples (PfRecur_Probability).
-
 ``` r
-pfrecur_raw_data <- readxl::read_excel(input_file)
-pfrecur_results <- MalReBay:::run_pfrecur_analysis_original_prep(
-  raw_data_df = pfrecur_raw_data,
-  output_csv_path = tempfile(fileext = ".csv") 
-)
-pfrecur_clean <- pfrecur_results %>%
-  mutate(Sample.ID = as.character(sub("^(.*)D[0-9]+$", "\\1", recurrence))) %>%
-  rename(PfRecur_Probability = M1) %>%
-  select(Sample.ID, PfRecur_Probability)
-
+# 1. Perform match counting using the imported data and marker info
 match_results_lp <- MalReBay:::perform_match_counting(
   genotypedata_latefailures = imported_data$late_failures, 
   marker_info = imported_data$marker_info
 )
+
 match_summary_clean <- match_results_lp %>%
-  rename(Patient.ID = Sample.ID)
+  dplyr::rename(Patient.ID = Sample.ID)
 
 malrebay_clean <- summary_df %>%
-  select(Site, Sample.ID, MalReBay_Probability = Probability) %>%
-  mutate(Sample.ID = as.character(Sample.ID))
+  dplyr::select(Site, Sample.ID, MalReBay_Probability = Probability) %>%
+  dplyr::mutate(Sample.ID = as.character(Sample.ID))
 
+# 3. Combine results
 combined_comparison <- malrebay_clean %>%
-  left_join(pfrecur_clean, by = "Sample.ID") %>%
-  left_join(match_summary_clean, by = c("Sample.ID" = "Patient.ID"))
+  dplyr::left_join(match_summary_clean, by = c("Sample.ID" = "Patient.ID"))
 
-marker_column_names <- setdiff(colnames(match_summary_clean), c("Patient.ID", "Number_Matches", "Number_Loci_Compared"))
+# Identify marker columns to include in the table
+marker_column_names <- setdiff(colnames(match_summary_clean), 
+                               c("Patient.ID", "Number_Matches", "Number_Loci_Compared"))
+
 final_table <- combined_comparison %>%
-  select(
+  dplyr::select(
     Sample.ID,
     Site,
     Number_Matches,
     Loci_Compared = Number_Loci_Compared,
     all_of(marker_column_names),
-    MalReBay = MalReBay_Probability,
-    PfRecur = PfRecur_Probability
+    MalReBay = MalReBay_Probability
   )
 
 knitr::kable(
   head(final_table), 
-  caption = "Comparison of MalReBay, PfRecur, and match-counting results for length-polymorphic data.",
+  caption = "Comparison of MalReBay and match-counting results for length-polymorphic data.",
   digits = 3
 ) %>%
-  scroll_box(width = "100%") 
+  kableExtra::scroll_box(width = "100%")
 ```
 
-| Sample.ID | Site | Number_Matches | Loci_Compared | 313 | 383 | TA1 | POLYA | PFPK2 | 2490 | TA109 | MalReBay | PfRecur |
-|:---|:---|---:|---:|:---|:---|:---|:---|:---|:---|:---|---:|---:|
-| BD21-002 | Benguela | 0 | 7 | NI | NI | NI | NI | NI | NI | NI | 0.000 | 0.000 |
-| BD21-040 | Benguela | 1 | 7 | NI | NI | NI | R | NI | NI | NI | 0.000 | 0.000 |
-| BD21-041 | Benguela | 6 | 7 | R | NI | R | R | R | R | R | 0.995 | 1.000 |
-| BD21-053 | Benguela | 2 | 5 | NI | R | IND | NI | R | IND | NI | 0.516 | 0.312 |
-| BD21-075 | Benguela | 1 | 7 | NI | NI | NI | NI | NI | R | NI | 0.000 | 0.000 |
-| BD21-099 | Benguela | 2 | 7 | NI | NI | NI | R | NI | R | NI | 0.000 | 0.000 |
+| Sample.ID | Site | Number_Matches | Loci_Compared | 313 | 383 | TA1 | POLYA | PFPK2 | 2490 | TA109 | MalReBay |
+|:---|:---|---:|---:|:---|:---|:---|:---|:---|:---|:---|---:|
+| BD21-002 | Benguela | 3 | 7 | R | NI | R | NI | NI | R | NI | 0.000 |
+| BD21-040 | Benguela | 1 | 7 | NI | NI | NI | R | NI | NI | NI | 0.000 |
+| BD21-041 | Benguela | 7 | 7 | R | R | R | R | R | R | R | 1.000 |
+| BD21-053 | Benguela | 2 | 5 | NI | R | IND | NI | R | IND | NI | 0.583 |
+| BD21-075 | Benguela | 2 | 7 | NI | NI | NI | NI | NI | R | R | 0.000 |
+| BD21-099 | Benguela | 3 | 7 | NI | NI | NI | R | NI | R | R | 0.000 |
 
-Comparison of MalReBay, PfRecur, and match-counting results for
-length-polymorphic data.
+Comparison of MalReBay and match-counting results for length-polymorphic
+data.
 
 ## 7. Example of classification: amplicon sequencing data
 
@@ -584,10 +586,13 @@ We import the example AmpSeq dataset using `MalReBay:::import_data()`.
 The dataset includes both late failure and additional samples.
 
 ``` r
-input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx",
-                                 package = "MalReBay")
-
-imported_data_ampseq <- MalReBay:::import_data(filepath = input_file_ampseq, verbose = FALSE)
+imported_data_ampseq <- MalReBay::import_data(
+  filepath = input_file_ampseq, 
+  marker_filepath = marker_file
+)
+#> INFO: Detected 'ampseq' data format.
+#> Warning in MalReBay::import_data(filepath = input_file_ampseq, marker_filepath
+#> = marker_file): NAs introduced by coercion
 ```
 
 #### Step 2: Define an Output Folder
@@ -601,6 +606,9 @@ output_dir_ampseq <- here::here("vignettes", "malrebay_vignette_outputs", "ampse
 if (!dir.exists(output_dir_ampseq)) {
   dir.create(output_dir_ampseq, recursive = TRUE)
 }
+
+# creating the data frame for length ploymorphic genotyping data
+genotypedata_ampseq <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 ```
 
 #### Step 3: Descriptive statistics
@@ -617,20 +625,14 @@ We explore the genetic characteristics of the data:
 ##### Multiplicity of Infection (MOI)
 
 ``` r
-genotypedata_ampseq <- dplyr::bind_rows(imported_data_ampseq$late_failures, imported_data_ampseq$additional)
-
 if (nrow(genotypedata_ampseq) > 0) {
-  moi_per_marker_data <- MalReBay:::calculate_marker_moi(
-    genotypedata = genotypedata_ampseq
+  moi_plot <- MalReBay::plot_moi(
+    genotypedata  = genotypedata_ampseq,
+    output_folder = output_dir_ampseq
   )
   
-  if (!is.null(moi_per_marker_data) && nrow(moi_per_marker_data) > 0) {
-    MalReBay::generate_marker_moi_plot(
-      moi_data = moi_per_marker_data,
-      output_folder = output_dir_ampseq
-    )
-  } else {
-    message("Skipping MOI plot: MOI data could not be calculated.")
+  if (!is.null(moi_plot)) {
+    print(moi_plot)
   }
 } else {
   message("Skipping MOI analysis: No genotype data available.")
@@ -645,7 +647,7 @@ dataset.](MalReBay_files/figure-html/MOI_ampseq-1.png)
 
 ``` r
 if (imported_data_ampseq$data_type == "ampseq" && nrow(genotypedata_ampseq) > 0) {
-  diversity_plot_ampseq <- MalReBay:::generate_diversity_plots(
+  diversity_plot_ampseq <- MalReBay:::plot_markers_diversity(
     genotypedata    = genotypedata_ampseq,
     data_type       = "ampseq",
     output_folder   = output_dir_ampseq,
@@ -679,8 +681,8 @@ We define the MCMC sampler parameters for this tutorial run:
 
 quick_mcmc_config <- list(
   n_chains = 4,
-  chunk_size = 5000,
-  max_iterations = 20000,
+  chunk_size = 500,
+  max_iterations = 1000,
   rhat_threshold = 1.1,
   ess_threshold = 400     
 )
@@ -689,20 +691,23 @@ quick_mcmc_config <- list(
 #### Step 5: Execute the Main Function
 
 Now we can run the analysis by calling the
-[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md).
+[`classify_infections()`](../reference/classify_infections.md).
 
 ``` r
 classification_summary_ampseq <- classify_infections(
-  imported_data = imported_data_ampseq,
+  imported_data   = imported_data_ampseq, 
   mcmc_config = quick_mcmc_config,
   output_folder = output_dir_ampseq,
   n_workers = 2,
   verbose = FALSE
 )
+#> Warning: package 'future' was built under R version 4.5.2
+#> Warning: package 'future' was built under R version 4.5.2
+#> Successfully saved combined diversity plots to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/ampseq_results/diversity_ampseq_comparison.png
+#> Successfully saved MOI plot to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/ampseq_results/moi_per_marker_by_site.pdf
 ```
 
-The
-[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
+The [`classify_infections()`](../reference/classify_infections.md)
 function returns a list containing two key data frames: `summary` and
 `marker_details`.
 
@@ -720,9 +725,9 @@ knitr::kable(head(summary_df), caption = "Classification summary.")
 | 1    | 1         |   1.0000000 |              3 |              3 |                 3 |
 | 1    | 10        |   1.0000000 |              3 |              3 |                 3 |
 | 1    | 11        |   1.0000000 |              3 |              3 |                 3 |
-| 1    | 12        |   0.2136667 |              3 |              3 |                 3 |
+| 1    | 12        |   0.1566667 |              3 |              3 |                 3 |
 | 1    | 13        |   1.0000000 |              3 |              3 |                 3 |
-| 1    | 14        |   0.6876667 |              3 |              3 |                 3 |
+| 1    | 14        |   0.7266667 |              3 |              3 |                 3 |
 
 Classification summary.
 
@@ -773,19 +778,19 @@ trace, Gelman–Rubin, histogram, and autocorrelation plots for a single
 site.
 
 ``` r
-site_name <- "1"
-ampseq_loglik_data <- classification_summary_ampseq$mcmc_loglikelihoods[[site_name]]
+site_to_plot <- names(classification_summary_ampseq$mcmc_loglikelihoods)[1]
+ampseq_loglik_data <- classification_summary_ampseq$mcmc_loglikelihoods[[site_to_plot]]
 
 if (!is.null(ampseq_loglik_data)) {
-  generate_likelihood_diagnostics(
+  MalReBay::plot_likelihood_diagnostics(
     all_chains_loglikelihood = ampseq_loglik_data,
-    site_name = site_name,
+    site_name = site_to_plot,
     save_plot = FALSE,
     output_folder = NULL,
     verbose = FALSE
   )
 } else {
-  cat("Log-likelihood data for site '", site_name, "' not available.\n")
+  cat("Log-likelihood data for site '", site_to_plot, "' not available.\n")
 }
 ```
 
@@ -812,57 +817,59 @@ table includes:
 - The posterior probability of recrudescence from \`MalReBay.
 
 ``` r
-input_file_ampseq <- system.file("extdata", "Amplicon_Sequencing.xlsx",
-                                 package = "MalReBay")
-imported_data_ampseq <- MalReBay::import_data(filepath = input_file_ampseq, verbose = FALSE)
 
-mcmc_summary_ampseq <- classification_summary_ampseq$summary
-
+# Perform match counting using the AmpSeq imported data
 match_results_ampseq <- MalReBay:::perform_match_counting(
   genotypedata_latefailures = imported_data_ampseq$late_failures, 
-  marker_info = imported_data_ampseq$marker_info)
+  marker_info = imported_data_ampseq$marker_info
+)
 
-mcmc_summary_clean <- mcmc_summary_ampseq %>%
-  dplyr::rename(Patient.ID = Sample.ID) %>%
-  dplyr::select(Patient.ID, Site, Prob_Recrud_MalReBay = Probability)
-
-match_summary_clean <- match_results_ampseq %>%
+# Standardize column names for joining  
+match_summary_clean_ampseq <- match_results_ampseq %>%
   dplyr::rename(Patient.ID = Sample.ID)
 
-final_table <- mcmc_summary_clean %>%
-  dplyr::left_join(match_summary_clean, by = "Patient.ID")
+# Clean MalReBay summary results
+malrebay_clean_ampseq <- classification_summary_ampseq$summary %>%
+  dplyr::select(Site, Sample.ID, MalReBay_Probability = Probability) %>%
+  dplyr::mutate(Sample.ID = as.character(Sample.ID))
 
-marker_column_names <- setdiff(colnames(match_summary_clean), c("Patient.ID", "Number_Matches", "Number_Loci_Compared"))
+# Combine results (matching your LP join logic)
+combined_comparison_ampseq <- malrebay_clean_ampseq %>%
+  dplyr::left_join(match_summary_clean_ampseq, by = c("Sample.ID" = "Patient.ID"))
 
-final_comparison_table_ampseq <- final_table %>%
+# Identify marker columns to include
+marker_column_names_ampseq <- setdiff(colnames(match_summary_clean_ampseq), 
+                                     c("Patient.ID", "Number_Matches", "Number_Loci_Compared"))
+
+# Final Table Selection (Matches LP format)
+final_table_ampseq <- combined_comparison_ampseq %>%
   dplyr::select(
-    Sample.ID = Patient.ID,
+    Sample.ID,
     Site,
     Number_Matches,
-    Number_Loci_Compared,
-    all_of(marker_column_names), 
-    MalReBay = Prob_Recrud_MalReBay
+    Loci_Compared = Number_Loci_Compared,
+    all_of(marker_column_names_ampseq),
+    MalReBay = MalReBay_Probability
   )
 
 knitr::kable(
-  head(final_comparison_table_ampseq), 
-  caption = "Comparison of match-counting results and MalReBay probability for amplicon data.",
+  head(final_table_ampseq), 
+  caption = "Comparison of MalReBay and match-counting results for AmpSeq data.",
   digits = 3
 ) %>%
-  scroll_box(width = "100%")
+  kableExtra::scroll_box(width = "100%")
 ```
 
-| Sample.ID | Site | Number_Matches | Number_Loci_Compared | cpmp | cpp | amaD3 | MalReBay |
-|:----------|:-----|---------------:|---------------------:|:-----|:----|:------|---------:|
-| 1         | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 10        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 11        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 12        | 1    |              1 |                    3 | NI   | R   | NI    |    0.214 |
-| 13        | 1    |              3 |                    3 | R    | R   | R     |    1.000 |
-| 14        | 1    |              3 |                    3 | R    | R   | R     |    0.688 |
+| Sample.ID | Site | Number_Matches | Loci_Compared | cpmp | cpp | amaD3 | MalReBay |
+|:----------|:-----|---------------:|--------------:|:-----|:----|:------|---------:|
+| 1         | 1    |              3 |             3 | R    | R   | R     |    1.000 |
+| 10        | 1    |              3 |             3 | R    | R   | R     |    1.000 |
+| 11        | 1    |              3 |             3 | R    | R   | R     |    1.000 |
+| 12        | 1    |              3 |             3 | R    | R   | R     |    0.157 |
+| 13        | 1    |              3 |             3 | R    | R   | R     |    1.000 |
+| 14        | 1    |              3 |             3 | R    | R   | R     |    0.727 |
 
-Comparison of match-counting results and MalReBay probability for
-amplicon data.
+Comparison of MalReBay and match-counting results for AmpSeq data.
 
 The final table contains the following columns:
 
@@ -900,13 +907,24 @@ increasing iterations, adjusting priors, or running more chains).
 #### output non-convergence
 
 ``` r
-input_file <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-imported_data <- MalReBay:::import_data(filepath = input_file, verbose = FALSE)
+imported_data <- MalReBay:::import_data(
+  filepath = input_file_lp, 
+  marker_filepath = marker_file,
+  verbose = FALSE
+)
+#> Warning in MalReBay:::import_data(filepath = input_file_lp, marker_filepath =
+#> marker_file, : NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
+#> Warning in FUN(X[[i]], ...): NAs introduced by coercion
 
 quick_mcmc_config <- list(
   n_chains = 4, 
-  chunk_size = 3000, 
-  max_iterations = 6000, 
+  chunk_size = 500, 
+  max_iterations = 1000, 
   rhat_threshold = 1.1,
   ess_threshold = 100
 )
@@ -917,22 +935,27 @@ if (!dir.exists(output_dir_nonconverge)) {
 }
 
 classification_summary_nonconverge <- classify_infections(
-  imported_data = imported_data,
+  imported_data   = imported_data, 
   mcmc_config = quick_mcmc_config,
   output_folder = output_dir_nonconverge,
   n_workers = 2,
   verbose = FALSE
 )
+#> Warning: package 'future' was built under R version 4.5.2
+#> Warning: package 'future' was built under R version 4.5.2
+#> Successfully saved combined diversity plots to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/non_convergence_test/diversity_length_polymorphic_comparison.png
+#> Successfully saved MOI plot to: D:/OneDrive/Masters Class notes/AIMS Rwanda/Thesis Phase/SwissTPH_Git_Repo/MalReBay/vignettes/malrebay_vignette_outputs/non_convergence_test/moi_per_marker_by_site.pdf
 
-site_name <- "Benguela"
-loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_name]]
+site_to_plot  <- names(classification_summary_nonconverge$mcmc_loglikelihoods)[1]
+loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_to_plot]]
+
 if (!is.null(loglik_data)) {
-generate_likelihood_diagnostics(
-all_chains_loglikelihood = loglik_data,
-site_name = site_name,
-save_plot = FALSE,
-output_folder = NULL,
-verbose = FALSE
+  plot_likelihood_diagnostics(
+  all_chains_loglikelihood = loglik_data,
+  site_name = site_to_plot ,
+  save_plot = FALSE,
+  output_folder = NULL,
+  verbose = FALSE
 )
 } else {
 cat("No log-likelihood data found for site: ", site_name, "\n")
@@ -992,9 +1015,9 @@ MalReBay framework.
 
 ### 10.1 Data preparation
 
-- [`import_data()`](https://swisstph.github.io/MalReBay/reference/import_data.md)
-  function reads the input Excel file, automatically detects the data
-  type (length-polymorphic vs. amplicon sequencing), and applies basic
+- [`import_data()`](../reference/import_data.md) function reads the
+  input Excel file, automatically detects the data type
+  (length-polymorphic vs. amplicon sequencing), and applies basic
   cleaning.
 
 - For length-polymorphic markers, `define_alleles()` groups raw fragment
@@ -1039,7 +1062,7 @@ interpretable outputs.
   the posterior probability of recrudescence.
 
 - Diagnostic Reports: Functions such as
-  [`generate_likelihood_diagnostics()`](https://swisstph.github.io/MalReBay/reference/generate_likelihood_diagnostics.md)
+  [`plot_likelihood_diagnostics()`](../reference/plot_likelihood_diagnostics.md)
   produce trace plots and Gelman–Rubin plots for convergence checks.
 
 - Allele Frequency Plots: `generate_allele_frequency_plot()` visualizes

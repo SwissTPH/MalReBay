@@ -2,7 +2,6 @@
 % Please edit documentation in R/MalReBay-package.R
 \docType{package}
 \name{MalReBay-package}
-\alias{MalReBay}
 \alias{MalReBay-package}
 \title{MalReBay: Bayesian classification for malaria recurrences}
 \description{

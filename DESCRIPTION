@@ -23,7 +23,7 @@ License: GPL (>= 3) + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Suggests: 
+Suggests:
     here,
     kableExtra,
     knitr,
@@ -31,24 +31,26 @@ Suggests:
     patchwork,
     rmarkdown,
     rJava,
-    readxl,
     stringr,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    writexl
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-Imports: 
+Imports:
     abind,
-    future,
     coda,
+    doParallel,
     dplyr,
-    future.apply,
+    foreach,
     ggplot2,
+    ggpubr,
     gtools,
+    forcats,
     magrittr,
-    PfRecur,
+    posterior,
     purrr,
     RColorBrewer,
-    tidyr,
-    ggpubr,
-    forcats,
-    scales
+    readxl,
+    rlang,
+    scales,
+    tidyr

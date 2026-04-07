@@ -17,8 +17,8 @@
 #'   \item **`microsatellite`**: A match occurs if for every Day 0 allele, there
 #'     is a Day of Failure allele within the specified `repeatlength` tolerance,
 #'     OR vice-versa.
-#'   \item **`cluster`**: Alleles from both time points are first grouped into
-#'     clusters based on the `cluster_gap_threshold`. A match occurs if the set
+#'   \item **`msp_glurp`**: Alleles from both time points are first grouped into
+#'     clusters based on the `repeatlength`. A match occurs if the set
 #'     of Day 0 clusters is a subset of the Day of Failure clusters, OR vice-versa.
 #'   \item **`exact`** (e.g., for ampseq data): A match occurs if the set of
 #'     Day 0 alleles is a subset of the Day of Failure alleles, OR vice-versa.
@@ -69,12 +69,12 @@ assign_clusters <- function(alleles, threshold) {
 perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   
   # 1. Universal ID parsing (Kept from your current version)
-  id_pattern <- "(_?D[0-9]+| Day 0| Day Failure)$"
+  id_pattern <- "(_?D[0-9]+| Day 0| recurrence)$"
   
   paired_data <- genotypedata_latefailures %>%
     dplyr::mutate(
       Patient.ID = trimws(gsub(id_pattern, "", .data$Sample.ID)),
-      Day = ifelse(grepl("D0|Day 0", .data$Sample.ID), "Day 0", "Day X")
+      Day = ifelse(grepl("Day 0", .data$Sample.ID), "Day 0", "recurrence")
     )
   
   patient_ids <- unique(paired_data$Patient.ID)
@@ -91,7 +91,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
   # 2. Lookups (Restored from your original version)
   bin_method_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
   bin_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
-  cluster_thresh_lookup <- stats::setNames(marker_info$cluster_gap_threshold, marker_info$marker_id)
+  cluster_thresh_lookup <- stats::setNames(marker_info$repeatlength, marker_info$marker_id)
   
   # Initialize output
   number_matches <- rep(NA, nids)
@@ -103,7 +103,7 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
     current_patient_id <- patient_ids[i]
     
     day0_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day 0")
-    dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "Day X")
+    dayf_row <- paired_data %>% dplyr::filter(.data$Patient.ID == current_patient_id, .data$Day == "recurrence")
     
     # Check for valid pair
     if (nrow(day0_row) != 1 || nrow(dayf_row) != 1) {
@@ -141,10 +141,10 @@ perform_match_counting <- function(genotypedata_latefailures, marker_info) {
           df_num <- as.numeric(dayf_alleles)
           bin_size <- bin_lookup[current_locus]
           
-          # Check if any allele in Day Failure has a match in Day 0 within the bin size
+          # Check if any allele in recurrence has a match in Day 0 within the bin size
           is_match <- any(sapply(df_num, function(df) any(abs(df - d0_num) <= bin_size)))
           
-        } else if (method == "cluster") {
+        } else if (method == "msp_glurp") {
           # Clustering logic
           d0_num <- as.numeric(day0_alleles)
           df_num <- as.numeric(dayf_alleles)
