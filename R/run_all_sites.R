@@ -23,7 +23,7 @@ run_all_sites <- function(
     output_folder = NULL,
     verbose = TRUE) {
 
-  # --- Extract and coerce config parameters ----------------------------------
+  # Extract mcmc configuration parameters
   n_chains              <- as.integer(mcmc_config$n_chains)
   rhat_threshold        <- as.numeric(mcmc_config$rhat_threshold)
   ess_threshold         <- as.numeric(mcmc_config$ess_threshold)
@@ -32,7 +32,6 @@ run_all_sites <- function(
   burn_in_frac          <- as.numeric(mcmc_config$burn_in_frac)
   record_hidden_alleles <- as.logical(mcmc_config$record_hidden_alleles)
   base_seed             <- as.integer(mcmc_config$random_seed)
-  # New parameters from Vehtari et al. 2021 and Geweke 1992
   ess_tail_threshold  <- as.numeric(
     if (!is.null(mcmc_config$ess_tail_threshold)) mcmc_config$ess_tail_threshold else 400
   )
@@ -40,7 +39,7 @@ run_all_sites <- function(
     if (!is.null(mcmc_config$geweke_threshold)) mcmc_config$geweke_threshold else 1.96
   )
 
-  # --- Validate config -------------------------------------------------------
+  # Validate config 
   if (is.na(n_chains)       || n_chains < 1)       stop("mcmc_config$n_chains must be a positive integer.",        call. = FALSE)
   if (is.na(rhat_threshold) || rhat_threshold <= 1) stop("mcmc_config$rhat_threshold must be a number above 1.",   call. = FALSE)
   if (is.na(ess_threshold)  || ess_threshold < 1)   stop("mcmc_config$ess_threshold must be a positive number.",   call. = FALSE)
@@ -52,7 +51,7 @@ run_all_sites <- function(
   if (is.na(ess_tail_threshold) || ess_tail_threshold < 1) stop("mcmc_config$ess_tail_threshold must be a positive number.", call. = FALSE)
   if (is.na(geweke_threshold)   || geweke_threshold <= 0)  stop("mcmc_config$geweke_threshold must be a positive number.",  call. = FALSE)
 
-  # --- Source files for worker processes ------------------------------------
+  # Source files for worker processes
   r_files <- file.path(getwd(), c(
     "R/allele_utils.R",
     "R/mcmc_length_polymorphic.R",
@@ -62,7 +61,7 @@ run_all_sites <- function(
     "R/mcmc_utils.R"
   ))
 
-  # --- Initialise site-level output lists ------------------------------------
+  # Initialise site-level output lists
   site_names                 <- as.character(unique(late_failures$Site))
   local_sites_classification <- list()
   local_sites_alleles0       <- list()
@@ -156,7 +155,7 @@ run_all_sites <- function(
     local_sites_locus_summary[[site]] <- locus_summary
     engine_args$is_locus_comparable   <- is_locus_comparable
 
-    # --- Automated MCMC loop with convergence stop rule ----------------------
+    # MCMC loop with convergence stop rule and post-burn-in sample collection
     full_loglik_history <- list()
     full_chain_results  <- list()
     total_iterations    <- 0L
@@ -215,11 +214,9 @@ run_all_sites <- function(
 
       if (is.null(post_burn_draws) || nrow(post_burn_draws) < 50) next
 
-      # --- Tier 1: Variance guard -------------------------------------------
       # When chains stabilise completely (near-constant trace), classical
-      # Gelman-Rubin is undefined (W -> 0). Detect this first and declare
-      # convergence directly. Based on Vehtari et al. (2021) recommendation
-      # to check chain stability before applying variance-based diagnostics.
+      # Gelman-Rubin is undefined (W (within chain) -> 0). We check the chain stability 
+      # before applying variance-based diagnostics.
       chain_sds <- apply(post_burn_draws, 2, sd, na.rm = TRUE)
       if (all(!is.na(chain_sds) & chain_sds < 0.1)) {
         converged <- TRUE
@@ -229,10 +226,7 @@ run_all_sites <- function(
         next
       }
 
-      # --- Tier 2: Rank-normalised R-hat + bulk and tail ESS ----------------
-      # Vehtari et al. (2021): rank-normalised R-hat is robust to heavy tails
-      # and near-zero within-chain variance. Threshold 1.01 as recommended.
-      # Requires the posterior package.
+      # Rank-normalised R-hat + bulk and tail ESS
       rhat_rank <- tryCatch(
         posterior::rhat(post_burn_draws),
         error = function(e) NA_real_
@@ -260,11 +254,7 @@ run_all_sites <- function(
         next
       }
 
-      # --- Tier 3: Classical Gelman-Rubin + ESS fallback --------------------
-      # Kept as fallback when posterior package unavailable or rank R-hat fails.
-      # Uses classical coda implementation (Gelman & Rubin 1992, Brooks &
-      # Gelman 1998). Will fail silently on near-constant chains — handled
-      # above by the variance guard.
+      # Classical Gelman-Rubin + ESS fallback 
       mcmc_list_loglik <- tryCatch(
         coda::mcmc.list(lapply(full_loglik_history, function(x) {
           start_idx <- floor(burn_in_frac * length(x)) + 1
@@ -295,11 +285,7 @@ run_all_sites <- function(
         }
       }
 
-      # --- Tier 4: Geweke diagnostic fallback -------------------------------
-      # Geweke (1992): compares mean of first 10% to last 50% of each chain
-      # via a spectral-density Z-score. Works even when between-chain variance
-      # is near zero. Threshold 1.96 = 95% CI as per Geweke (1992).
-      # Declare convergence only when ALL chains pass.
+      # Geweke diagnostic
       if (!is.null(mcmc_list_loglik)) {
         geweke_vals <- tryCatch(
           sapply(mcmc_list_loglik, function(ch) coda::geweke.diag(ch)$z),
@@ -322,7 +308,7 @@ run_all_sites <- function(
               max_iterations, " iterations. Results may be unreliable.")
     }
 
-    # --- Collect post-burn-in samples ----------------------------------------
+    # Collect post-burn-in samples
     if (length(full_chain_results) > 0) {
       num_total_samples_per_chain <- ncol(full_chain_results[[1]]$state_parameters)
       burn_in_samples_per_chain   <- floor(burn_in_frac * num_total_samples_per_chain)

@@ -24,41 +24,39 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
                                         save_plot     = TRUE,
                                         output_folder = NULL,
                                         verbose       = TRUE) {
-
+  
   if (save_plot && is.null(output_folder)) {
     stop("`output_folder` must be provided when `save_plot = TRUE`.", call. = FALSE)
   }
-
+  
   safe_site_name <- gsub(" ", "_", site_name)
-
+  
   site_dir <- NULL
   if (save_plot) {
     site_dir <- file.path(output_folder, "convergence_diagnosis", safe_site_name)
     if (dir.exists(site_dir)) unlink(site_dir, recursive = TRUE)
     dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   }
-
+  
   # --- Data cleaning --------------------------------------------------------
   clean_chains <- lapply(all_chains_loglikelihood, function(x) x[is.finite(x)])
   clean_chains <- Filter(function(x) length(x) >= 2, clean_chains)
-
+  
   if (length(clean_chains) == 0) {
     warning("No valid chains for site '", site_name, "'. Skipping.", call. = FALSE)
     return(invisible(NULL))
   }
-
+  
   loglikelihood_mcmc <- tryCatch({
     mlist  <- lapply(clean_chains, coda::mcmc)
     mclist <- coda::as.mcmc.list(mlist)
     coda::varnames(mclist) <- " "
     mclist
   }, error = function(e) NULL)
-
+  
   if (is.null(loglikelihood_mcmc)) return(invisible(NULL))
-
-  # --- Convergence diagnostics ----------------------------------------------
-
-  # Classical Gelman-Rubin (Gelman & Rubin 1992, Brooks & Gelman 1998)
+  
+  # Gelman-Rubin
   gelman_result <- NULL
   if (length(loglikelihood_mcmc) > 1) {
     gelman_result <- tryCatch(
@@ -66,19 +64,19 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
       error = function(e) NULL
     )
   }
-
-  # Classical ESS (coda)
+  
+  # ESS 
   ess_result <- tryCatch(
     coda::effectiveSize(loglikelihood_mcmc),
     error = function(e) NULL
   )
-
-  # Rank-normalised R-hat + bulk and tail ESS (Vehtari et al. 2021)
+  
+  # Rank-normalised R-hat + bulk and tail ESS 
   draws_matrix <- tryCatch(
     do.call(cbind, lapply(clean_chains, as.numeric)),
     error = function(e) NULL
   )
-
+  
   rhat_rank <- tryCatch(
     posterior::rhat(draws_matrix),
     error = function(e) NA_real_
@@ -91,19 +89,17 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     posterior::ess_tail(draws_matrix),
     error = function(e) NA_real_
   )
-
-  # Geweke Z-scores per chain (Geweke 1992)
-  # Z within (-1.96, 1.96) indicates stationarity at the 95% level
+  
+  # Geweke Z-scores per chain
   geweke_result <- tryCatch(
     sapply(loglikelihood_mcmc, function(ch) coda::geweke.diag(ch)$z),
     error = function(e) NULL
   )
-
-  # --- Print diagnostics ----------------------------------------------------
+  
   if (verbose) {
     cat("Convergence Diagnostics for:", site_name, "\n")
     cat(strrep("-", 50), "\n")
-
+    
     # Classical Gelman-Rubin
     if (!is.null(gelman_result)) {
       cat("Classical Gelman-Rubin R-hat (Gelman & Rubin 1992):\n")
@@ -111,13 +107,13 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     } else {
       cat("Classical Gelman-Rubin: not available (near-constant chains or single chain)\n")
     }
-
+    
     # Rank-normalised R-hat
     if (!is.na(rhat_rank)) {
       cat("\nRank-normalised R-hat (Vehtari et al. 2021):", round(rhat_rank, 4),
           ifelse(rhat_rank < 1.01, "  [PASS < 1.01]", "  [FAIL >= 1.01]"), "\n")
     }
-
+    
     # ESS — classical, bulk, and tail
     if (!is.null(ess_result)) {
       cat("\nClassical ESS (coda):", round(as.numeric(ess_result), 1), "\n")
@@ -130,7 +126,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
       cat("Tail ESS (Vehtari et al. 2021):", round(ess_tail, 1),
           ifelse(ess_tail > 400, "  [PASS > 400]", "  [FAIL <= 400]"), "\n")
     }
-
+    
     # Geweke
     if (!is.null(geweke_result)) {
       cat("\nGeweke Z-scores per chain (Geweke 1992) — |Z| < 1.96 indicates stationarity:\n")
@@ -142,8 +138,8 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     }
     cat(strrep("-", 50), "\n")
   }
-
-  # --- Gelman-Rubin diagnostic plot ----------------------------------------
+  
+  # Gelman-Rubin diagnostic plot
   if (save_plot) {
     grDevices::png(
       file.path(site_dir, paste0(safe_site_name, "_gelman_rubin.png")),
@@ -172,8 +168,8 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
   }
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
   par(old_par); on.exit(NULL, add = FALSE)
-
-  # --- Traceplot -----------------------------------------------------------
+  
+  # Traceplot
   if (save_plot) {
     grDevices::png(
       file.path(site_dir, paste0(safe_site_name, "_traceplot.png")),
@@ -195,8 +191,8 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
          col = colors, lty = 1, bty = "n", cex = 0.8)
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
   par(old_par); on.exit(NULL, add = FALSE)
-
-  # --- Log-likelihood distribution -----------------------------------------
+  
+  # Log-likelihood distribution
   if (save_plot) {
     grDevices::png(
       file.path(site_dir, paste0(safe_site_name, "_log_likelihood_distribution.png")),
@@ -211,8 +207,8 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
        xlab = "Log-Likelihood", col = "steelblue", border = "white")
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
   par(old_par); on.exit(NULL, add = FALSE)
-
-  # --- Autocorrelation plot ------------------------------------------------
+  
+  # Autocorrelation plot 
   if (save_plot) {
     grDevices::png(
       file.path(site_dir, paste0(safe_site_name, "_autocorrelation.png")),
@@ -229,15 +225,15 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
   }
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
   par(old_par); on.exit(NULL, add = FALSE)
-
-  # --- Return all diagnostic values ----------------------------------------
+  
+  
   invisible(list(
-    gelman       = gelman_result,     # classical Gelman-Rubin object
-    ess          = ess_result,         # classical ESS from coda
-    rhat_rank    = rhat_rank,          # rank-normalised R-hat (Vehtari et al. 2021)
-    ess_bulk     = ess_bulk,           # bulk ESS (Vehtari et al. 2021)
-    ess_tail     = ess_tail,           # tail ESS (Vehtari et al. 2021)
-    geweke       = geweke_result       # Geweke Z-scores per chain
+    gelman       = gelman_result,     
+    ess          = ess_result,         
+    rhat_rank    = rhat_rank,          
+    ess_bulk     = ess_bulk,           
+    ess_tail     = ess_tail,           
+    geweke       = geweke_result       
   ))
 }
 
@@ -286,122 +282,156 @@ plot_probability_histogram <- function(summary_results, output_folder = "results
   invisible(path)
 }
 
-
-
 #' Plot Multiplicity of Infection (MOI)
 #'
-#' This function calculates the MOI (number of distinct alleles per marker per sample) 
-#' and generates a faceted violin plot across different sites.
+#' This function calculates the MOI (number of distinct alleles per marker per
+#' sample) and generates one violin plot per site for improved readability.
 #'
 #' @param genotypedata A data frame containing `Sample.ID`, `Site`, and marker columns.
-#' @param marker_pattern A regex pattern to identify marker columns. 
+#' @param marker_pattern A regex pattern to identify marker columns.
 #'   Defaults to standard allele suffix patterns.
-#' @param output_folder Path to the directory where the plot will be saved. 
-#'   If NULL, the plot is not saved to disk.
-#' @param filename The name for the output PDF file.
-#' 
-#' @return A ggplot object. The underlying MOI data is attached as an 
-#'   attribute "moi_data".
+#' @param output_folder Path to the directory where plots will be saved.
+#'   If NULL, plots are not saved to disk.
+#' @param filename_prefix Prefix for output PNG filenames. Each file will be
+#'   named `<prefix>_<site>.png`.
+#'
+#' @return A named list of ggplot objects, one per site. The underlying MOI
+#'   data is attached to each plot as the attribute `"moi_data"`.
 #' @export
 plot_moi <- function(genotypedata,
-                     marker_pattern = "(_allele_\\d+|_\\d+)$",
-                     output_folder = NULL,
-                     filename = "moi_per_marker_by_site.png") {
+                     marker_pattern  = "(_allele_\\d+|_\\d+)$",
+                     output_folder   = NULL,
+                     filename_prefix = "moi_per_marker") {
   
-  # Validating if the site column is available
+  # Input validation
   if (!"Site" %in% colnames(genotypedata)) {
     stop("Input 'genotypedata' must contain a column named 'Site'.")
   }
   
-  # Calculating the MOI for each day of observation per sample
   genotypedata$Sample.ID <- as.character(genotypedata$Sample.ID)
   
-  # Identify marker columns
   marker_cols <- grep(marker_pattern, colnames(genotypedata), value = TRUE)
   if (length(marker_cols) == 0) {
     warning("No marker columns found matching the pattern.")
     return(NULL)
   }
   
+  # Compute MOI 
   moi_data <- genotypedata %>%
     tidyr::pivot_longer(
-      cols = dplyr::all_of(marker_cols),
-      names_to = "marker_replicate",
-      values_to = "allele",
+      cols          = dplyr::all_of(marker_cols),
+      names_to      = "marker_replicate",
+      values_to     = "allele",
       values_drop_na = TRUE
     ) %>%
-    dplyr::mutate(marker_id = gsub(marker_pattern, "", .data$marker_replicate)) %>%
+    dplyr::mutate(
+      marker_id = gsub(marker_pattern, "", .data$marker_replicate)
+    ) %>%
     dplyr::group_by(.data$Sample.ID, .data$Site, .data$marker_id) %>%
     dplyr::summarise(MOI = dplyr::n_distinct(.data$allele), .groups = "drop")
   
-  # Fill in zeroes for samples/markers with no data
-  all_sample_sites <- dplyr::distinct(genotypedata, .data$Sample.ID, .data$Site)
-  all_markers <- unique(gsub(marker_pattern, "", marker_cols))
-  complete_grid <- tidyr::crossing(all_sample_sites, marker_id = all_markers)
+  # Fill zeroes for samples / markers with no data
+  all_markers   <- unique(gsub(marker_pattern, "", marker_cols))
+  complete_grid <- tidyr::crossing(
+    dplyr::distinct(genotypedata, .data$Sample.ID, .data$Site),
+    marker_id = all_markers
+  )
   
-  moi_data <- dplyr::left_join(complete_grid, moi_data, by = c("Sample.ID", "Site", "marker_id")) %>%
+  moi_data <- dplyr::left_join(
+    complete_grid, moi_data,
+    by = c("Sample.ID", "Site", "marker_id")
+  ) %>%
     dplyr::mutate(MOI = tidyr::replace_na(.data$MOI, 0))
-
+  
   if (nrow(moi_data) == 0) {
     message("MOI data is empty. Skipping plot generation.")
     return(NULL)
   }
-
-  # Prepare plotting labels
+  
+  # Define label data
   label_data <- moi_data %>%
     dplyr::group_by(.data$Site, .data$marker_id) %>%
-    dplyr::summarise(mean_moi = mean(.data$MOI), .groups = "drop")
-  
-  site_max_moi <- moi_data %>%
-    dplyr::group_by(.data$Site) %>%
-    dplyr::summarise(label_y_pos = max(.data$MOI) + 0.5, .groups = "drop")
-  
-  label_data <- dplyr::left_join(label_data, site_max_moi, by = "Site")
-  moi_data$marker_id <- factor(moi_data$marker_id, levels = unique(label_data$marker_id))
-  
-  # Generating the MOI plots
-  moi_plot <- ggplot2::ggplot(moi_data, ggplot2::aes(x = .data$marker_id, y = .data$MOI, fill = .data$marker_id, color = .data$marker_id)) + 
-    ggplot2::geom_jitter(width = 0.15, height = 0.1, alpha = 0.3) + 
-    ggplot2::geom_violin(alpha = 0.4, trim = FALSE) + 
-    ggplot2::geom_text(
-      data = label_data,
-      ggplot2::aes(x = .data$marker_id, y = .data$label_y_pos, label = sprintf("%.2f", .data$mean_moi)),
-      size = 3.5, vjust = 0, color = "black"
-    ) +
-    ggplot2::scale_fill_brewer(palette = "Set2") +
-    ggplot2::scale_color_brewer(palette = "Set2") +
-    ggplot2::facet_grid(.data$Site ~ ., scales = "free_y") +
-    ggplot2::scale_y_continuous(breaks = scales::pretty_breaks()) +
-    ggplot2::coord_cartesian(ylim = c(-0.5, NA)) +
-    ggplot2::labs(
-      title = "Multiplicity of Infection (MOI) by Marker and Site",
-      x = "Marker", y = "MOI (Number of Alleles)"
-    ) +
-    ggplot2::theme_classic(base_size = 14) +
-    ggplot2::theme(
-      legend.position = "none", 
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-      strip.background = ggplot2::element_rect(fill = "grey90", color = "black"),
-      strip.text.y = ggplot2::element_text(angle = 0, face = "bold")
+    dplyr::summarise(mean_moi = mean(.data$MOI), .groups = "drop") %>%
+    dplyr::left_join(
+      moi_data %>%
+        dplyr::group_by(.data$Site) %>%
+        dplyr::summarise(label_y_pos = max(.data$MOI) + 0.5, .groups = "drop"),
+      by = "Site"
     )
   
-  # Save and return
-  if (!is.null(output_folder)) {
-    if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-    output_path <- file.path(output_folder, filename)
-    n_sites <- length(unique(moi_data$Site))
-    ggplot2::ggsave(output_path, plot = moi_plot, width = 12, height = 3 + (1.5 * n_sites))
-    message(paste("Successfully saved MOI plot to:", output_path))
+  marker_levels <- unique(label_data$marker_id)
+  
+  # Output folder
+  if (!is.null(output_folder) && !dir.exists(output_folder)) {
+    dir.create(output_folder, recursive = TRUE)
   }
   
-  # Attach data as attribute so it's not "lost"
-  attr(moi_plot, "moi_data") <- moi_data
+  # Build a plot per site 
+  sites <- unique(moi_data$Site)
   
-  return(moi_plot)
+  plots <- lapply(stats::setNames(sites, sites), function(site) {
+    
+    site_moi    <- dplyr::filter(moi_data,   .data$Site == site)
+    site_labels <- dplyr::filter(label_data, .data$Site == site)
+    
+    site_moi$marker_id <- factor(site_moi$marker_id, levels = marker_levels)
+    
+    p <- ggplot2::ggplot(
+      site_moi,
+      ggplot2::aes(
+        x     = .data$marker_id,
+        y     = .data$MOI,
+        fill  = .data$marker_id,
+        color = .data$marker_id
+      )
+    ) +
+      ggplot2::geom_jitter(width = 0.15, height = 0.1, alpha = 0.3) +
+      ggplot2::geom_violin(alpha = 0.4, trim = FALSE) +
+      ggplot2::geom_text(
+        data    = site_labels,
+        mapping = ggplot2::aes(
+          x     = .data$marker_id,
+          y     = .data$label_y_pos,
+          label = sprintf("%.2f", .data$mean_moi)
+        ),
+        size    = 3.5,
+        vjust   = 0,
+        color   = "black"
+      ) +
+      ggplot2::scale_fill_brewer(palette  = "Set2") +
+      ggplot2::scale_color_brewer(palette = "Set2") +
+      ggplot2::scale_y_continuous(breaks = scales::pretty_breaks()) +
+      ggplot2::coord_cartesian(ylim = c(-0.5, NA)) +
+      ggplot2::labs(
+        title = paste("MOI by Marker \u2013", site),
+        x     = "Marker",
+        y     = "MOI (Number of Alleles)"
+      ) +
+      ggplot2::theme_classic(base_size = 14) +
+      ggplot2::theme(
+        legend.position  = "none",
+        plot.title       = ggplot2::element_text(hjust = 0.5, face = "bold"),
+        axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1),
+        strip.background = ggplot2::element_rect(fill = "grey90", color = "black"),
+        strip.text.y     = ggplot2::element_text(angle = 0, face = "bold")
+      )
+    
+    # Save individual plot
+    if (!is.null(output_folder)) {
+      safe_site  <- gsub("[^A-Za-z0-9_-]", "_", site)
+      output_path <- file.path(
+        output_folder,
+        paste0(filename_prefix, "_", safe_site, ".png")
+      )
+      ggplot2::ggsave(output_path, plot = p, width = 12, height = 6)
+    }
+    
+    attr(p, "moi_data") <- site_moi
+    p
+  })
+  
+  plots
 }
-
-
 
 #' Define Allele Bins for Plotting
 #'
@@ -412,48 +442,39 @@ plot_moi <- function(genotypedata,
 #' @param marker_info A data frame with marker definitions.
 #' @return A list of data frames, each defining allele bins for a marker.
 #' @noRd
-
 define_alleles_for_plotting <- function(genotypedata, marker_info) {
-  alleles_definitions_bin <- list()
-  data_marker_columns <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata), value = TRUE)
-  available_base_markers <- unique(gsub("(_allele_\\d+|_\\d+)$", "", data_marker_columns))
+  alleles_definitions_bin  <- list()
+  data_marker_columns      <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata), value = TRUE)
+  available_base_markers   <- unique(gsub("(_allele_\\d+|_\\d+)$", "", data_marker_columns))
   
   for (locus_name in available_base_markers) {
     locus_marker_info <- marker_info[marker_info$marker_id == locus_name, ]
     if (nrow(locus_marker_info) == 0) next
     
-    binning_method <- locus_marker_info$binning_method[1]
+    binning_method    <- locus_marker_info$binning_method[1]
+    locus_cols        <- grepl(paste0("^", locus_name, "(_allele_|_)\\d+"), colnames(genotypedata))
+    raw_alleles       <- unlist(genotypedata[, locus_cols])
+    unique_alleles    <- sort(unique(raw_alleles[!is.na(raw_alleles)]))
+    if (length(unique_alleles) == 0) next
     
-    if (binning_method == "microsatellite") {
-      locus_cols_pattern <- paste0("^", locus_name, "(_allele_|_)\\d+")
-      locus_cols_logical <- grepl(locus_cols_pattern, colnames(genotypedata))
-      raw_alleles_vector <- unlist(genotypedata[, locus_cols_logical])
-      unique_alleles <- sort(unique(raw_alleles_vector[!is.na(raw_alleles_vector)]))
-      
-      if (length(unique_alleles) > 0) {
-        repeat_length <- locus_marker_info$repeatlength[1]
-        bins <- ceiling((unique_alleles - unique_alleles[1] + 1) / repeat_length)
-        alleles_definitions_bin[[locus_name]] <- data.frame(min = tapply(unique_alleles, bins, min),
-                                                            max = tapply(unique_alleles, bins, max))
-      }
+    bins <- if (binning_method == "microsatellite") {
+      repeat_length <- locus_marker_info$repeatlength[1]
+      ceiling((unique_alleles - unique_alleles[1] + 1) / repeat_length)
     } else if (binning_method == "msp_glurp") {
-      locus_cols_pattern <- paste0("^", locus_name, "(_allele_|_)\\d+")
-      locus_cols_logical <- grepl(locus_cols_pattern, colnames(genotypedata))
-      raw_alleles_vector <- unlist(genotypedata[, locus_cols_logical])
-      unique_alleles <- sort(unique(raw_alleles_vector[!is.na(raw_alleles_vector)]))
-      
-      if (length(unique_alleles) > 0) {
-        gap_threshold <- locus_marker_info$repeatlength[1]
-        breaks <- c(0, which(diff(unique_alleles) > gap_threshold), length(unique_alleles))
-        bins <- findInterval(seq_along(unique_alleles), breaks)
-        alleles_definitions_bin[[locus_name]] <- data.frame(min = tapply(unique_alleles, bins, min),
-                                                            max = tapply(unique_alleles, bins, max))
-      }
+      gap_threshold <- locus_marker_info$repeatlength[1]
+      breaks        <- c(0, which(diff(unique_alleles) > gap_threshold), length(unique_alleles))
+      findInterval(seq_along(unique_alleles), breaks)
+    } else {
+      next
     }
+    
+    alleles_definitions_bin[[locus_name]] <- data.frame(
+      min = tapply(unique_alleles, bins, min),
+      max = tapply(unique_alleles, bins, max)
+    )
   }
-  return(alleles_definitions_bin)
+  alleles_definitions_bin
 }
-
 
 #' Process Data for Pie Chart
 #'
@@ -461,31 +482,24 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
 #'   columns, creates labels, and orders the data.
 #'
 #' @param plot_data_df A data frame with Haplotype, Amount, and Frequency.
-#' @param data_type The type of data ("lp" or "ampseq").
+#' @param data_type The type of data (`"length_polymorphic"` or `"ampseq"`).
 #' @return A processed data frame ready for plotting.
 #' @noRd
-
-# Merged data processing function for plotting
 process_pie_data <- function(plot_data_df, data_type) {
   colnames(plot_data_df) <- c("Haplotype", "Amount", "Frequency")
   plot_data_df <- plot_data_df[!is.na(plot_data_df$Haplotype), ]
   
-  if (data_type == "lp") {
-    plot_data_df$Haplotype <- factor(plot_data_df$Haplotype, levels = sort(as.numeric(as.character(plot_data_df$Haplotype))))
+  plot_data_df$Haplotype <- if (data_type == "length_polymorphic") {
+    factor(plot_data_df$Haplotype, levels = sort(as.numeric(as.character(plot_data_df$Haplotype))))
   } else {
-    plot_data_df$Haplotype <- as.factor(plot_data_df$Haplotype)
+    as.factor(plot_data_df$Haplotype)
   }
   
   plot_data_df$Label <- paste0(round(plot_data_df$Frequency * 100), "%")
-  plot_data_df <- plot_data_df[order(plot_data_df$Amount, decreasing = TRUE), ]
-  
-  if (nrow(plot_data_df) > 4) {
-    plot_data_df[5:nrow(plot_data_df), "Label"] <- ""
-  }
-  return(plot_data_df)
+  plot_data_df       <- plot_data_df[order(plot_data_df$Amount, decreasing = TRUE), ]
+  if (nrow(plot_data_df) > 4) plot_data_df[5:nrow(plot_data_df), "Label"] <- ""
+  plot_data_df
 }
-
-
 
 #' Plot a Pie Chart for Haplotype/Allele Diversity
 #'
@@ -495,31 +509,33 @@ process_pie_data <- function(plot_data_df, data_type) {
 #' @param color_marker The base color for the chart palette.
 #' @param marker_name The name of the genetic marker.
 #' @param total_n The total number of infections for this marker.
-#' @param data_type The type of data ("length_polymorphic" or "ampseq").
+#' @param data_type The type of data (`"length_polymorphic"` or `"ampseq"`).
 #' @return A ggplot object representing the pie chart.
 #'
 #' @importFrom dplyr mutate lead if_else
-#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text theme_void theme element_text ggtitle
+#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text
+#'   theme_void theme element_text ggtitle
 #' @importFrom forcats fct_inorder
 #' @importFrom grDevices colorRampPalette
 #' @noRd
 plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_type) {
   if (nrow(data_df) == 0) return(NULL)
   
-  # Process data for plotting
-  plot_data_df <- process_pie_data(data_df, data_type)
-  title_marker <- paste0(marker_name, "\n(n=", total_n, ")")
+  plot_data_df  <- process_pie_data(data_df, data_type)
+  title_marker  <- paste0(marker_name, "\n(n=", total_n, ")")
+  colfunc       <- grDevices::colorRampPalette(c(color_marker, "white"))
   
   plot_data_df <- plot_data_df %>%
     dplyr::mutate(
       csum = rev(cumsum(rev(.data$Amount))),
-      pos = .data$Amount/2 + dplyr::lead(.data$csum, 1),
-      pos = dplyr::if_else(is.na(.data$pos), .data$Amount/2, .data$pos)
+      pos  = .data$Amount / 2 + dplyr::lead(.data$csum, 1),
+      pos  = dplyr::if_else(is.na(.data$pos), .data$Amount / 2, .data$pos)
     )
   
-  colfunc <- grDevices::colorRampPalette(c(color_marker, "white"))
-  
-  pie_chart <- ggplot2::ggplot(plot_data_df, ggplot2::aes(x = "", y = .data$Amount, fill = forcats::fct_inorder(.data$Haplotype))) +
+  ggplot2::ggplot(
+    plot_data_df,
+    ggplot2::aes(x = "", y = .data$Amount, fill = forcats::fct_inorder(.data$Haplotype))
+  ) +
     ggplot2::geom_col(width = 1, color = "white") +
     ggplot2::coord_polar(theta = "y") +
     ggplot2::scale_fill_manual(values = colfunc(nrow(plot_data_df))) +
@@ -527,260 +543,163 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
     ggplot2::theme_void() +
     ggplot2::theme(
       legend.position = "none",
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 12)
+      plot.title      = ggplot2::element_text(hjust = 0.5, size = 12)
     ) +
     ggplot2::ggtitle(title_marker)
-  
-  return(pie_chart)
 }
 
+# Internal helpers 
+
+#' Pivot and tidy genotype data into long form
+#' @noRd
+.pivot_long_genotypes <- function(data, value_col) {
+  data %>%
+    tidyr::pivot_longer(
+      cols        = dplyr::matches("_allele_\\d+$|_\\d+$"),
+      names_to    = "marker_replicate",
+      values_to   = value_col
+    ) %>%
+    dplyr::filter(!is.na(.data[[value_col]]) & .data[[value_col]] != "") %>%
+    dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
+    dplyr::select("Sample.ID", "marker_id", dplyr::all_of(value_col)) %>%
+    dplyr::distinct()
+}
+
+#' Compute per-marker allele frequencies from a long-format table
+#' @noRd
+.compute_frequencies <- function(long_data, allele_col) {
+  long_data %>%
+    dplyr::group_by(.data$marker_id, .data[[allele_col]]) %>%
+    dplyr::summarise(Amount = dplyr::n(), .groups = "drop") %>%
+    dplyr::left_join(
+      long_data %>%
+        dplyr::group_by(.data$marker_id) %>%
+        dplyr::summarise(TotalInfections = dplyr::n(), .groups = "drop"),
+      by = "marker_id"
+    ) %>%
+    dplyr::mutate(Frequency = .data$Amount / .data$TotalInfections)
+}
+
+#' Bin length-polymorphic alleles using pre-computed bin definitions
+#' @noRd
+.bin_lp_alleles <- function(long_data, alleles_definitions_bin) {
+  markers_with_bins <- intersect(unique(long_data$marker_id), names(alleles_definitions_bin))
+  
+  purrr::map_dfr(markers_with_bins, function(marker) {
+    bin_centers <- rowMeans(alleles_definitions_bin[[marker]], na.rm = TRUE)
+    long_data %>%
+      dplyr::filter(.data$marker_id == marker) %>%
+      dplyr::mutate(
+        true_alleles = bin_centers[
+          sapply(.data$allele_length, function(x) which.min(abs(x - bin_centers)))
+        ]
+      )
+  }) %>%
+    dplyr::select("Sample.ID", "marker_id", "true_alleles") %>%
+    dplyr::distinct()
+}
 
 #' Generate and Save Diversity Pie Charts
 #'
-#' @description This function creates pie charts to visualize allele or haplotype
-#' diversity at Day 0 and at the day of recurrence. It saves the combined plot
-#' as an image.
+#' @description Creates pie charts visualising allele or haplotype diversity
+#'   across all samples combined (Day 0 and recurrences pooled). Pies are
+#'   arranged with at most `max_cols` per row.
 #'
 #' @param genotypedata A dataframe containing the genotyping data.
-#' @param data_type A string, either "length_polymorphic" or "ampseq".
-#' @param marker_info A dataframe with information about the markers, required
-#'   if `data_type` is "length_polymorphic".
-#' @param output_folder The path to the directory where the output PDF will be saved.
-#' @param filename_prefix A string prefix for the output PDF filename.
-#' @return Invisibly returns the final combined ggplot object.
+#' @param data_type A string: `"length_polymorphic"` or `"ampseq"`.
+#' @param marker_info A dataframe with marker definitions; required when
+#'   `data_type = "length_polymorphic"`.
+#' @param output_folder Path to the directory where the output PNG will be saved.
+#' @param filename_prefix A string prefix for the output filename.
+#' @param max_cols Maximum number of pie charts per row. Defaults to 4.
+#' @return Invisibly returns the combined ggplot object, or `NULL` if no data.
 #'
-#' @importFrom dplyr %>% filter mutate select distinct group_by summarize summarise matches left_join bind_rows n
+#' @importFrom dplyr %>% filter mutate select distinct group_by summarise
+#'   left_join all_of n
 #' @importFrom tidyr pivot_longer
 #' @importFrom ggplot2 ggsave
-#' @importFrom ggpubr ggarrange annotate_figure text_grob
+#' @importFrom ggpubr ggarrange
 #' @importFrom RColorBrewer brewer.pal
+#' @importFrom purrr map_dfr
 #' @export
-
 plot_markers_diversity <- function(genotypedata,
-                                     data_type,
-                                     marker_info = NULL,
-                                     output_folder,
-                                     filename_prefix = "diversity") {
+                                   data_type,
+                                   marker_info     = NULL,
+                                   output_folder,
+                                   filename_prefix = "diversity",
+                                   max_cols        = 4) {
   
+  # Validation
   if (!data_type %in% c("length_polymorphic", "ampseq")) {
-    stop("Invalid data_type specified. Please use 'length_polymorphic' or 'ampseq'.")
+    stop("'data_type' must be \"length_polymorphic\" or \"ampseq\".")
   }
-  
   if (data_type == "length_polymorphic" && is.null(marker_info)) {
-    stop("marker_info must be provided for data_type = 'length_polymorphic'.")
+    stop("'marker_info' must be provided when data_type = \"length_polymorphic\".")
   }
   
-  if (!"Sample.ID" %in% colnames(genotypedata)) {
-    # Check for case-insensitive match
-    sid_col <- grep("^sample.?id$", colnames(genotypedata), ignore.case = TRUE, value = TRUE)
-    if(length(sid_col) > 0) {
-      genotypedata$Sample.ID <- genotypedata[[sid_col[1]]]
-    } else {
-      stop("Input data must contain a 'Sample.ID' column.")
-    }
-  }
+  sid_col <- grep("^sample.?id$", colnames(genotypedata), ignore.case = TRUE, value = TRUE)
+  if (length(sid_col) == 0) stop("Input data must contain a 'Sample.ID' column.")
+  genotypedata$Sample.ID <- as.character(genotypedata[[sid_col[1]]])
   
-  if (data_type == "ampseq") {
+  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
+  
+  # Build combined frequency data
+  if (data_type == "length_polymorphic") {
+    alleles_definitions_bin <- define_alleles_for_plotting(genotypedata, marker_info)
+    
+    long_data      <- .pivot_long_genotypes(genotypedata, "allele_length")
+    binned_data    <- .bin_lp_alleles(long_data, alleles_definitions_bin)
+    frequency_data <- .compute_frequencies(binned_data, "true_alleles")
+    allele_col     <- "true_alleles"
+    
+  } else {
+    # Normalise Sample.ID tags for ampseq if needed
     if (!any(grepl(" Day ", genotypedata$Sample.ID))) {
-      genotypedata$Sample.ID <- gsub("D0$", " Day 0", genotypedata$Sample.ID)
+      genotypedata$Sample.ID <- gsub("D0$",          " Day 0",       genotypedata$Sample.ID)
       genotypedata$Sample.ID <- gsub("D[1-9][0-9]*$", " Day Failure", genotypedata$Sample.ID)
     }
+    
+    long_data      <- .pivot_long_genotypes(genotypedata, "haplotype")
+    frequency_data <- .compute_frequencies(long_data, "haplotype")
+    allele_col     <- "haplotype"
   }
   
-  day0_data <- genotypedata[grepl(" Day 0", genotypedata$Sample.ID), ]
-  recurrence_data <- genotypedata[!grepl(" Day 0", genotypedata$Sample.ID), ]
-  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  figure_day0 <- NULL
-  figure_recurrence <- NULL
-  
-  # Variables to track how many rows of pie charts are in each section
-  rows_d0 <- 0
-  rows_rec <- 0
-  
-  # day 0
-  if (nrow(day0_data) > 0) {
-    if (data_type == "length_polymorphic") {
-      alleles_definitions_bin <- define_alleles_for_plotting(genotypedata = genotypedata, marker_info = marker_info)
-      long_data_d0 <- day0_data %>%
-        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
-        dplyr::filter(!is.na(.data$allele_length)) %>%
-        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
-        dplyr::select("Sample.ID", "marker_id", "allele_length") %>%
-        dplyr::distinct()
-      
-      if(nrow(long_data_d0) > 0) {
-        binned_alleles_list_d0 <- list()
-        for (marker in unique(long_data_d0$marker_id)) {
-          if (!marker %in% names(alleles_definitions_bin)) { next }
-          marker_data <- long_data_d0 %>% filter(.data$marker_id == marker)
-          current_definitions <- alleles_definitions_bin[[marker]]
-          bin_centers <- rowMeans(current_definitions, na.rm = TRUE)
-          marker_data$true_alleles <- sapply(marker_data$allele_length, function(x) bin_centers[which.min(abs(x - bin_centers))])
-          binned_alleles_list_d0[[marker]] <- marker_data
-        }
-        final_alleles_d0 <- bind_rows(binned_alleles_list_d0) %>% select("Sample.ID", "marker_id", "true_alleles") %>% distinct()
-        frequency_data_d0 <- final_alleles_d0 %>% group_by(.data$marker_id, .data$true_alleles) %>% summarize(Amount = n(), .groups = 'drop')
-        total_infections_d0 <- frequency_data_d0 %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
-        frequency_data_d0 <- left_join(frequency_data_d0, total_infections_d0, by = "marker_id") %>% mutate(Frequency = .data$Amount / .data$TotalInfections)
-        
-        list_markers_d0 <- unique(frequency_data_d0$marker_id)
-        p_array_d0 <- vector('list', length(list_markers_d0))
-        colors <- RColorBrewer::brewer.pal(max(3, length(list_markers_d0)), "Set2")
-        if (length(list_markers_d0) > length(colors)) colors <- rep(colors, length.out = length(list_markers_d0))
-        
-        for (i in seq_along(list_markers_d0)) {
-          marker_name <- list_markers_d0[i]
-          plot_data <- frequency_data_d0 %>% filter(.data$marker_id == marker_name)
-          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select("true_alleles", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
-        }
-        
-        p_array_d0 <- p_array_d0[!sapply(p_array_d0, is.null)]
-        if(length(p_array_d0) > 0) {
-          num_cols_d0 <- min(length(p_array_d0), 7)
-          rows_d0 <- ceiling(length(p_array_d0) / num_cols_d0) 
-          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = rows_d0)
-          figure_day0 <- ggpubr::annotate_figure(figure_day0, left = ggpubr::text_grob("Day 0", rot = 90, size = 18))
-        }
-      }
-    } else if (data_type == "ampseq") {
-      long_data_d0 <- day0_data %>%
-        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
-        dplyr::filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
-        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
-        dplyr::select("Sample.ID", "marker_id", "haplotype") %>%
-        dplyr::distinct()
-      
-      if(nrow(long_data_d0) > 0) {
-        frequency_data_d0 <- long_data_d0 %>% group_by(.data$marker_id, .data$haplotype) %>% summarize(Amount = n(), .groups = 'drop')
-        total_infections_d0 <- frequency_data_d0 %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
-        frequency_data_d0 <- left_join(frequency_data_d0, total_infections_d0, by = "marker_id") %>% mutate(Frequency = .data$Amount / .data$TotalInfections)
-        
-        list_markers_d0 <- unique(frequency_data_d0$marker_id)
-        p_array_d0 <- vector('list', length(list_markers_d0))
-        colors <- RColorBrewer::brewer.pal(max(3, length(list_markers_d0)), "Set2")
-        if (length(list_markers_d0) > length(colors)) colors <- rep(colors, length.out = length(list_markers_d0))
-        
-        for (i in seq_along(list_markers_d0)) {
-          marker_name <- list_markers_d0[i]
-          plot_data <- frequency_data_d0 %>% filter(.data$marker_id == marker_name)
-          p_array_d0[[i]] <- plot_pie_chart(plot_data %>% select("haplotype", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
-        }
-        
-        p_array_d0 <- p_array_d0[!sapply(p_array_d0, is.null)]
-        if(length(p_array_d0) > 0) {
-          num_cols_d0 <- min(length(p_array_d0), 7)
-          rows_d0 <- ceiling(length(p_array_d0) / num_cols_d0) 
-          figure_day0 <- ggpubr::ggarrange(plotlist = p_array_d0, ncol = num_cols_d0, nrow = rows_d0)
-          figure_day0 <- ggpubr::annotate_figure(figure_day0, left = ggpubr::text_grob("Day 0", rot = 90, size = 18))
-        }
-      }
-    }
-  } else { message("No Day 0 data found. Skipping.") }
-  
-  # Day of recurrence
-  if (nrow(recurrence_data) > 0) {
-    if (data_type == "length_polymorphic") {
-      if (!exists("alleles_definitions_bin")) {
-        alleles_definitions_bin <- define_alleles_for_plotting(genotypedata = genotypedata, marker_info = marker_info)
-      }
-      long_data_rec <- recurrence_data %>%
-        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "allele_length") %>%
-        dplyr::filter(!is.na(.data$allele_length)) %>%
-        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
-        dplyr::select("Sample.ID", "marker_id", "allele_length") %>%
-        dplyr::distinct()
-      
-      if(nrow(long_data_rec) > 0) {
-        binned_alleles_list_rec <- list()
-        for (marker in unique(long_data_rec$marker_id)) {
-          if (!marker %in% names(alleles_definitions_bin)) { next }
-          marker_data <- long_data_rec %>% filter(.data$marker_id == marker)
-          current_definitions <- alleles_definitions_bin[[marker]]
-          bin_centers <- rowMeans(current_definitions, na.rm = TRUE)
-          marker_data$true_alleles <- sapply(marker_data$allele_length, function(x) bin_centers[which.min(abs(x - bin_centers))])
-          binned_alleles_list_rec[[marker]] <- marker_data
-        }
-        final_alleles_rec <- bind_rows(binned_alleles_list_rec) %>% select("Sample.ID", "marker_id", "true_alleles") %>% distinct()
-        
-        frequency_data_rec <- final_alleles_rec %>% group_by(.data$marker_id, .data$true_alleles) %>% summarize(Amount = n(), .groups = 'drop')
-        total_infections_rec <- frequency_data_rec %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
-        frequency_data_rec <- left_join(frequency_data_rec, total_infections_rec, by = "marker_id") %>% mutate(Frequency = .data$Amount / .data$TotalInfections)
-        
-        list_markers_rec <- unique(frequency_data_rec$marker_id)
-        p_array_rec <- vector('list', length(list_markers_rec))
-        colors <- RColorBrewer::brewer.pal(max(3, length(list_markers_rec)), "Set2")
-        if (length(list_markers_rec) > length(colors)) colors <- rep(colors, length.out = length(list_markers_rec))
-        
-        for (i in seq_along(list_markers_rec)) {
-          marker_name <- list_markers_rec[i]
-          plot_data <- frequency_data_rec %>% filter(.data$marker_id == marker_name)
-          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select("true_alleles", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "length_polymorphic")
-        }
-        
-        p_array_rec <- p_array_rec[!sapply(p_array_rec, is.null)]
-        if(length(p_array_rec) > 0) {
-          num_cols_rec <- min(length(p_array_rec), 7)
-          rows_rec <- ceiling(length(p_array_rec) / num_cols_rec)
-          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = rows_rec)
-          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, left = ggpubr::text_grob("Day of Recurrence", rot = 90, size = 18))
-        }
-      }
-    } else if (data_type == "ampseq") {
-      long_data_rec <- recurrence_data %>%
-        tidyr::pivot_longer(cols = matches("_allele_\\d+$|_\\d+$"), names_to = "marker_replicate", values_to = "haplotype") %>%
-        dplyr::filter(!is.na(.data$haplotype) & .data$haplotype != "") %>%
-        dplyr::mutate(marker_id = gsub("_allele_\\d+$|_\\d+$", "", .data$marker_replicate)) %>%
-        dplyr::select("Sample.ID", "marker_id", "haplotype") %>%
-        dplyr::distinct()
-      
-      if(nrow(long_data_rec) > 0) {
-        frequency_data_rec <- long_data_rec %>% group_by(.data$marker_id, .data$haplotype) %>% summarize(Amount = n(), .groups = 'drop')
-        total_infections_rec <- frequency_data_rec %>% group_by(.data$marker_id) %>% summarise(TotalInfections = sum(.data$Amount), .groups = 'drop')
-        frequency_data_rec <- left_join(frequency_data_rec, total_infections_rec, by = "marker_id") %>% mutate(Frequency = .data$Amount / .data$TotalInfections)
-        
-        list_markers_rec <- unique(frequency_data_rec$marker_id)
-        p_array_rec <- vector('list', length(list_markers_rec))
-        colors <- RColorBrewer::brewer.pal(max(3, length(list_markers_rec)), "Set2")
-        if (length(list_markers_rec) > length(colors)) colors <- rep(colors, length.out = length(list_markers_rec))
-        
-        for (i in seq_along(list_markers_rec)) {
-          marker_name <- list_markers_rec[i]
-          plot_data <- frequency_data_rec %>% filter(.data$marker_id == marker_name)
-          p_array_rec[[i]] <- plot_pie_chart(plot_data %>% select("haplotype", "Amount", "Frequency"), colors[i], marker_name, plot_data$TotalInfections[1], "ampseq")
-        }
-        
-        p_array_rec <- p_array_rec[!sapply(p_array_rec, is.null)]
-        if(length(p_array_rec) > 0) {
-          num_cols_rec <- min(length(p_array_rec), 7)
-          rows_rec <- ceiling(length(p_array_rec) / num_cols_rec)
-          figure_recurrence <- ggpubr::ggarrange(plotlist = p_array_rec, ncol = num_cols_rec, nrow = rows_rec)
-          figure_recurrence <- ggpubr::annotate_figure(figure_recurrence, left = ggpubr::text_grob("Day of Recurrence", rot = 90, size = 18))
-        }
-      }
-    }
-  } else { message("No recurrence data found. Skipping.") }
-  
-  final_plot_list <- list(figure_day0, figure_recurrence)
-  final_plot_list <- final_plot_list[!sapply(final_plot_list, is.null)]
-  plot_heights <- c()
-  if (!is.null(figure_day0)) plot_heights <- c(plot_heights, rows_d0)
-  if (!is.null(figure_recurrence)) plot_heights <- c(plot_heights, rows_rec)
-  
-  if (length(final_plot_list) > 0) {
-    final_figure <- ggpubr::ggarrange(plotlist = final_plot_list, 
-                                      ncol = 1, 
-                                      nrow = length(final_plot_list),
-                                      heights = plot_heights)
-    
-    # output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.pdf"))
-    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
-    calc_height <- max(4, sum(plot_heights) * 3.5)
-    
-    ggsave(output_path, plot = final_figure, width = 24, height = calc_height, limitsize = FALSE)
-    message(paste("Successfully saved combined diversity plots to:", output_path))
-    invisible(final_figure)
-  } else {
-    message("No plots were generated.")
-    invisible(NULL)
+  if (nrow(frequency_data) == 0) {
+    message("No frequency data could be computed. Skipping plot generation.")
+    return(invisible(NULL))
   }
+  
+  # Build pie charts 
+  list_markers <- unique(frequency_data$marker_id)
+  n_markers    <- length(list_markers)
+  
+  base_colors <- RColorBrewer::brewer.pal(max(3, min(n_markers, 8)), "Set2")
+  colors      <- rep_len(base_colors, n_markers)
+  
+  p_array <- Map(function(marker_name, color) {
+    plot_data <- dplyr::filter(frequency_data, .data$marker_id == marker_name)
+    plot_pie_chart(
+      dplyr::select(plot_data, dplyr::all_of(c(allele_col, "Amount", "Frequency"))),
+      color, marker_name, plot_data$TotalInfections[1], data_type
+    )
+  }, list_markers, colors)
+  
+  p_array <- Filter(Negate(is.null), p_array)
+  if (length(p_array) == 0) {
+    message("No pie charts were generated.")
+    return(invisible(NULL))
+  }
+  
+  # Arrange and save 
+  num_cols     <- min(length(p_array), max_cols)
+  num_rows     <- ceiling(length(p_array) / num_cols)
+  final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
+  
+  output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_diversity.png"))
+  ggplot2::ggsave(output_path, plot = final_figure,
+                  width  = num_cols * 4,
+                  height = num_rows * 4,
+                  limitsize = FALSE)
+  
+  invisible(final_figure)
 }
