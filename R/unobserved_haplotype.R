@@ -1,139 +1,136 @@
 #' Update a Single Hidden Allele for Amplicon Data via Metropolis-Hastings
 #'
 #' @description
-#' A core MCMC sampler step that updates the imputed identity of a single, randomly
-#' chosen hidden allele for one patient. This function is specifically for
-#' amplicon sequencing (ampseq) data and uses a Metropolis-Hastings algorithm
-#' to sample from the complex posterior distribution of the hidden allele's state.
+#' Proposes and accepts/rejects a new identity for one randomly chosen hidden
+#' (imputed) allele for a single patient, using a Metropolis-Hastings step.
 #'
 #' @details
-#' This function executes one update for a single patient (`x`) within a Gibbs
-#' sampling iteration. Its workflow is as follows:
+#' Executes one hidden allele update for patient \code{x} within a Gibbs
+#' sampling iteration:
 #' \enumerate{
-#'   \item **Selection:** Randomly selects one "hidden" (unobserved) allele
-#'     slot from either the Day 0 or Day of Failure sample of the specified patient.
-#'   \item **Proposal:** Proposes a new allele identity (a new character sequence)
-#'     for this slot by sampling from the population-level allele frequency distribution.
-#'   \item **Likelihood Calculation:** It calculates the log-likelihood of the
-#'     patient's entire genetic profile under both the current state and the
-#'     proposed new state. The likelihood logic depends on the patient's current
-#'     `classification`:
+#'   \item \strong{Selection:} Randomly picks one hidden allele slot from either
+#'     the Day 0 or recurrence sample of patient \code{x}.
+#'   \item \strong{Proposal:} Samples a new allele identity from the
+#'     population-level allele frequency distribution.
+#'   \item \strong{Likelihood Calculation:} Computes the log-likelihood of the
+#'     patient's full genetic profile under the current and proposed states:
 #'     \itemize{
-#'       \item **If Recrudescence:** The likelihood is based on whether alleles
-#'         at Day of Failure are present at Day 0, modulated by the genotyping
-#'         error/mutation probability (`qq`).
-#'       \item **If Reinfection:** The likelihood is the product of the
-#'         population frequencies of the observed Day of Failure alleles.
+#'       \item \strong{Recrudescence:} Likelihood based on allele sharing between
+#'         Day 0 and recurrence, modulated by \code{q_mismatch} and \code{q_loss}.
+#'       \item \strong{Reinfection:} Likelihood based on the product of
+#'         population frequencies of recurrence alleles.
 #'     }
-#'   \item **Decision & Update:** The Metropolis-Hastings acceptance ratio is
-#'     computed using the change in log-likelihood and the proposal probabilities
-#'     (the frequencies of the old vs. new alleles). The proposed change is accepted
-#'     stochastically based on this ratio. If accepted, the relevant `recoded0`
-#'     or `recodedf` matrix is updated with the new allele.
+#'   \item \strong{Accept/Reject:} Computes the Metropolis-Hastings acceptance
+#'     ratio (including a proposal correction for the frequency-proportional
+#'     proposal) and stochastically accepts or rejects the proposed change.
 #' }
 #'
-#' @param x The integer index of the patient to be updated.
-#' @param hidden0,hiddenf The current state matrices of boolean flags indicating
-#'   which allele slots are imputed (hidden).
-#' @param recoded0,recodedf The current state matrices of character allele IDs for
-#'   all samples (both observed and imputed).
-#' @param classification A vector of the current classification state for all patients.
-#' @param qq The current estimate of the genotyping error/mutation probability.
-#' @param allele_frequencies The list object containing population genetic statistics,
-#'   including allele codes (`allele_codes`) and their frequencies (`freq_matrix`).
-#' @param nloci,maxMOI Core dimensions of the analysis (number of loci and max MOI).
+#' @param x Integer index of the patient to update.
+#' @param hidden0,hiddenf Integer matrices flagging which allele slots are
+#'   imputed (1) or observed (0) for Day 0 and recurrence samples.
+#' @param recoded0,recodedf Character matrices of allele IDs (observed and
+#'   imputed) for Day 0 and recurrence samples.
+#' @param classification Integer vector of current classifications for all
+#'   patients (1 = recrudescence, 0 = reinfection).
+#' @param q_mismatch Current estimate of the sequencing error/mismatch probability
+#'   (\code{q_mismatch} in the calling chain).
+#' @param q_loss Current estimate of the allele loss probability between
+#'   Day 0 and recurrence.
+#' @param allele_frequencies List containing allele codes (\code{allele_codes})
+#'   and their population frequencies (\code{freq_matrix}).
+#' @param nloci,maxMOI Number of loci and maximum MOI.
 #'
-#' @return A list containing the updated `recoded0` and `recodedf` state matrices.
-#'   If the proposed switch was accepted for patient `x`, the returned matrices
-#'   will reflect this update; otherwise, they are returned unchanged.
+#' @return A list with updated \code{recoded0} and \code{recodedf} matrices.
+#'   Only the allele slot of patient \code{x} may differ from the input if the
+#'   proposed change was accepted; otherwise returned unchanged.
 #'
-#' @keywords internal
 #' @noRd
-#'
 switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
-                                 classification, qq, q_loss, allele_frequencies, nloci, maxMOI) { 
+                                 classification, q_mismatch, q_loss, allele_frequencies,
+                                 nloci, maxMOI) {
   
-  # Identify all positions currently marked as 'hidden' (imputed) for this patient
-  hidden_positions <- which(c(hidden0[x,], hiddenf[x,]) == 1)
+  # Identify hidden (imputed) allele positions for this patient
+  hidden_positions <- which(c(hidden0[x, ], hiddenf[x, ]) == 1)
+  if (length(hidden_positions) == 0)
+    return(list(recoded0 = recoded0, recodedf = recodedf))
   
-  # If no alleles are hidden (complete observation), exit early
-  if (length(hidden_positions) == 0) {
-    return(list(recoded0=recoded0, recodedf=recodedf))
-  }
-  
-  # Randomly select one hidden allele position to propose a new value for
-  chosen <- sample(hidden_positions, 1)
+  # Randomly select one hidden position to propose a new value for
+  chosen         <- sample(hidden_positions, 1)
   is_day0_allele <- chosen <= ncol(hidden0)
   
-  # Determine which locus the chosen position belongs to
   if (is_day0_allele) {
     chosenlocus <- floor((chosen - 1) / maxMOI) + 1
-    old_id <- recoded0[x, chosen]
+    old_id      <- recoded0[x, chosen]
   } else {
     chosenlocus <- floor((chosen - 1 - ncol(hidden0)) / maxMOI) + 1
-    old_id <- recodedf[x, chosen - ncol(hidden0)]
+    old_id      <- recodedf[x, chosen - ncol(hidden0)]
   }
   
-  # Retrieve valid allele codes for the selected locus from the frequency matrix
   possible_alleles <- allele_frequencies$allele_codes[[chosenlocus]]
-  if (length(possible_alleles) == 0) {
-    return(list(recoded0=recoded0, recodedf=recodedf))
-  }
+  if (length(possible_alleles) == 0)
+    return(list(recoded0 = recoded0, recodedf = recodedf))
   
-  # Propose a new allele value sampled proportional to population frequencies
-  # new_id <- sample(possible_alleles, 1)
+  # Proposal distribution: population frequencies, normalised
   allele_freqs <- allele_frequencies$freq_matrix[chosenlocus, 1:length(possible_alleles)]
-  if(any(is.na(allele_freqs)) || sum(allele_freqs) == 0) {
-    new_id <- sample(possible_alleles, 1)
-  } else {
-    new_id <- sample(possible_alleles, 1, prob = allele_freqs)
-  }
+  if (any(is.na(allele_freqs)) || sum(allele_freqs) == 0)
+    allele_freqs <- rep(1 / length(possible_alleles), length(possible_alleles))
   
-  # log-likelihood for a given state
+  new_id <- sample(possible_alleles, 1, prob = allele_freqs)
+  
   calculate_log_lik <- function(patient_recoded0, patient_recodedf) {
     log_lik_total <- 0
+    
     for (locus_idx in 1:nloci) {
-      # Extract unique alleles for current locus at Day 0 and recurrence
-      d0_alleles <- unique(patient_recoded0[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)])
+      d0_alleles <- patient_recoded0[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)]
       d0_alleles <- d0_alleles[!is.na(d0_alleles)]
-      
-      df_alleles <- unique(patient_recodedf[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)])
+      df_alleles <- patient_recodedf[(maxMOI*(locus_idx-1)+1):(maxMOI*locus_idx)]
       df_alleles <- df_alleles[!is.na(df_alleles)]
       
       if (length(d0_alleles) == 0 || length(df_alleles) == 0) next
       
-      # Probability model depends on current MCMC classification state
-      if (classification[x] == 1) { # RECRUDESCENCE
-        # 'qq' for false-allele/mismatch and 'q_loss' for allelic dropout
-        log_probs_per_allele <- sapply(df_alleles, function(allele) {
-          log(ifelse(allele %in% d0_alleles, 1 - qq, qq) + 1e-10)
-        })
-        log_lik_total <- log_lik_total + sum(log_probs_per_allele)
+      allele_codes <- allele_frequencies$allele_codes[[locus_idx]]
+      freq_row     <- allele_frequencies$freq_matrix[locus_idx, ]
+      
+      if (classification[x] == 1) {
+        # RECRUDESCENCE: pair-averaged likelihood accounting for mismatch (q_mismatch) and allele loss (q_loss)
+        n_pairs  <- length(d0_alleles) * length(df_alleles)
+        n_lost   <- sum(!d0_alleles %in% df_alleles)
         
-        lost_alleles <- d0_alleles[!d0_alleles %in% df_alleles]
-        if (length(lost_alleles) > 0) {
-          log_lik_total <- log_lik_total + (length(lost_alleles) * log(q_loss + 1e-10))
-        }  
-      } else { # REINFECTION
-        # Use population allele frequencies to calculate the probability of the recurrence genotype
-        freqs <- allele_frequencies$freq_matrix[locus_idx, ]
-        allele_codes <- allele_frequencies$allele_codes[[locus_idx]]
-        matched_indices <- match(df_alleles, allele_codes)
+        pair_sum <- 0
+        for (r0 in seq_along(d0_alleles)) {
+          for (rf in seq_along(df_alleles)) {
+            w   <- ifelse(d0_alleles[r0] == df_alleles[rf], 1 - q_mismatch, q_mismatch)
+            idx <- match(df_alleles[rf], allele_codes)
+            # Protect against zero frequencies
+            lam <- if (!is.na(idx)) max(freq_row[idx], 1e-6) else 1e-6
+            pair_sum <- pair_sum + w / lam
+          }
+        }
         
-        if (any(is.na(matched_indices))) {
-          log_lik_total <- log_lik_total - 1e6 
+        log_lik_total <- log_lik_total +
+          n_lost * log(q_loss + 1e-10) +
+          log(pair_sum / n_pairs + 1e-10)
+        
+      } else {
+        # REINFECTION: log product of recurrence allele frequencies
+        df_matched <- match(df_alleles, allele_codes)
+        df_valid   <- !is.na(df_matched)
+        if (!any(df_valid)) {
+          log_lik_total <- log_lik_total - 1e6
         } else {
-          log_lik_total <- log_lik_total + sum(log(freqs[matched_indices] + 1e-10))
+          log_lik_total <- log_lik_total +
+            sum(log(pmax(freq_row[df_matched[df_valid]], 1e-6)))
         }
       }
     }
     return(log_lik_total)
   }
   
-  # Calculate likelihood of current state vs. state with proposed allele change
-  log_lik_old <- calculate_log_lik(recoded0[x,], recodedf[x,])
-  recoded0_new <- recoded0[x,]
-  recodedf_new <- recodedf[x,]
+  # Evaluate likelihood of current and proposed states
+  log_lik_old  <- calculate_log_lik(recoded0[x, ], recodedf[x, ])
+  
+  recoded0_new <- recoded0[x, ]
+  recodedf_new <- recodedf[x, ]
   if (is_day0_allele) {
     recoded0_new[chosen] <- new_id
   } else {
@@ -141,19 +138,21 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
   }
   
   log_lik_new <- calculate_log_lik(recoded0_new, recodedf_new)
-  old_freq <- allele_frequencies$freq_matrix[chosenlocus, which(possible_alleles == old_id)]
-  if(length(old_freq)==0) old_freq <- 0
-  new_freq <- allele_frequencies$freq_matrix[chosenlocus, which(possible_alleles == new_id)]
-  if(length(new_freq)==0) new_freq <- 0
   
-  # Calculate the log acceptance ratio
-  log_acceptance_ratio <- log_lik_new - log_lik_old
+  # MH acceptance ratio with proposal correction.
+  # Since proposals are drawn proportional to allele frequency (independent of current state):
+  #   log q(old|new) - log q(new|old) = log(freq_old) - log(freq_new)
+  # Note: proposing the same allele as current (new_id == old_id) is possible,
+  # in which case the acceptance ratio is 1 and the step is a no-op.
+  old_idx  <- match(old_id, possible_alleles)
+  new_idx  <- match(new_id, possible_alleles)
+  old_freq <- if (!is.na(old_idx)) allele_freqs[old_idx] else 1e-10
+  new_freq <- if (!is.na(new_idx)) allele_freqs[new_idx] else 1e-10
   
-  z <- stats::runif(1)
-  alpha <- min(1, exp(log_acceptance_ratio))
+  log_proposal_ratio   <- log(old_freq + 1e-10) - log(new_freq + 1e-10)
+  log_acceptance_ratio <- log_lik_new - log_lik_old + log_proposal_ratio
   
-  # Accept the new state with probability alpha
-  if (z < alpha) {
+  if (stats::runif(1) < min(1, exp(log_acceptance_ratio))) {
     if (is_day0_allele) {
       recoded0[x, chosen] <- new_id
     } else {
@@ -161,5 +160,5 @@ switch_hidden_ampseq <- function(x, hidden0, hiddenf, recoded0, recodedf,
     }
   }
   
-  return(list(recoded0=recoded0, recodedf=recodedf))
+  return(list(recoded0 = recoded0, recodedf = recodedf))
 }

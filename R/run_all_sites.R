@@ -1,7 +1,7 @@
 #' Run the Full MCMC Analysis Pipeline Across All Sites
 #'
 #' @description
-#' manages MCMC runs
+#' Manages MCMC runs across all geographical sites and returns combined results.
 #' @param late_failures Data frame of late treatment failure samples.
 #' @param additional Additional neutral marker data.
 #' @param marker_info Marker definitions used for allele matching.
@@ -29,9 +29,15 @@ run_all_sites <- function(
   ess_threshold         <- as.numeric(mcmc_config$ess_threshold)
   chunk_size            <- as.integer(mcmc_config$chunk_size)
   max_iterations        <- as.integer(mcmc_config$max_iterations)
-  burn_in_frac          <- as.numeric(mcmc_config$burn_in_frac)
-  record_hidden_alleles <- as.logical(mcmc_config$record_hidden_alleles)
-  base_seed             <- as.integer(mcmc_config$random_seed)
+  burn_in_frac          <- as.numeric(
+    if (!is.null(mcmc_config$burn_in_frac)) mcmc_config$burn_in_frac else 0.5
+  )
+  record_hidden_alleles <- as.logical(
+    if (!is.null(mcmc_config$record_hidden_alleles)) mcmc_config$record_hidden_alleles else FALSE
+  )
+  base_seed             <- as.integer(
+    if (!is.null(mcmc_config$random_seed)) mcmc_config$random_seed else 42
+  )
   ess_tail_threshold  <- as.numeric(
     if (!is.null(mcmc_config$ess_tail_threshold)) mcmc_config$ess_tail_threshold else 400
   )
@@ -50,16 +56,6 @@ run_all_sites <- function(
   if (is.na(base_seed)      || base_seed < 0) stop("mcmc_config$random_seed must be a non-negative integer.", call. = FALSE)
   if (is.na(ess_tail_threshold) || ess_tail_threshold < 1) stop("mcmc_config$ess_tail_threshold must be a positive number.", call. = FALSE)
   if (is.na(geweke_threshold)   || geweke_threshold <= 0)  stop("mcmc_config$geweke_threshold must be a positive number.",  call. = FALSE)
-
-  # Source files for worker processes
-  r_files <- file.path(getwd(), c(
-    "R/allele_utils.R",
-    "R/mcmc_length_polymorphic.R",
-    "R/mcmc_ampseq.R",
-    "R/unobserved_alleles.R",
-    "R/unobserved_haplotype.R",
-    "R/mcmc_utils.R"
-  ))
 
   # Initialise site-level output lists
   site_names                 <- as.character(unique(late_failures$Site))
@@ -166,12 +162,11 @@ run_all_sites <- function(
 
       chunk_results <- foreach::foreach(
         id             = 1:n_chains,
-        .packages      = c("abind", "coda"),
+        .packages      = c("abind", "coda", "MalReBay"),
         .export        = c("engine_args", "chunk_size",
-                           "mcmc_engine_function", "base_seed", "r_files"),
+                           "mcmc_engine_function", "base_seed"),
         .errorhandling = "stop"
       ) %dopar% {
-        invisible(lapply(r_files, source))
         set.seed(base_seed + id)
         full_args_for_chunk <- c(
           list(chain_id = id, nruns = chunk_size,
@@ -221,7 +216,7 @@ run_all_sites <- function(
       if (all(!is.na(chain_sds) & chain_sds < 0.1)) {
         converged <- TRUE
         if (verbose) message("INFO: Convergence reached for site '", site,
-                             "' — chains are stable (SD < 0.1) at iteration ",
+                             "' -- chains are stable (SD < 0.1) at iteration ",
                              total_iterations, ".")
         next
       }

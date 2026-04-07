@@ -9,26 +9,29 @@ plot_markers_diversity(
   data_type,
   marker_info = NULL,
   output_folder,
-  filename_prefix = "diversity"
+  filename_prefix = "diversity",
+  max_cols = 4
 )
 }
 \arguments{
 \item{genotypedata}{A dataframe containing the genotyping data.}
 
-\item{data_type}{A string, either "length_polymorphic" or "ampseq".}
+\item{data_type}{A string: \code{"length_polymorphic"} or \code{"ampseq"}.}
 
-\item{marker_info}{A dataframe with information about the markers, required
-if \code{data_type} is "length_polymorphic".}
+\item{marker_info}{A dataframe with marker definitions; required when
+\code{data_type = "length_polymorphic"}.}
 
-\item{output_folder}{The path to the directory where the output PDF will be saved.}
+\item{output_folder}{Path to the directory where the output PNG will be saved.}
 
-\item{filename_prefix}{A string prefix for the output PDF filename.}
+\item{filename_prefix}{A string prefix for the output filename.}
+
+\item{max_cols}{Maximum number of pie charts per row. Defaults to 4.}
 }
 \value{
-Invisibly returns the final combined ggplot object.
+Invisibly returns the combined ggplot object, or \code{NULL} if no data.
 }
 \description{
-This function creates pie charts to visualize allele or haplotype
-diversity at Day 0 and at the day of recurrence. It saves the combined plot
-as an image.
+Creates pie charts visualising allele or haplotype diversity
+across all samples combined (Day 0 and recurrences pooled). Pies are
+arranged with at most \code{max_cols} per row.
 }

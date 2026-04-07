@@ -114,7 +114,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
           ifelse(rhat_rank < 1.01, "  [PASS < 1.01]", "  [FAIL >= 1.01]"), "\n")
     }
     
-    # ESS — classical, bulk, and tail
+    # ESS -- classical, bulk, and tail
     if (!is.null(ess_result)) {
       cat("\nClassical ESS (coda):", round(as.numeric(ess_result), 1), "\n")
     }
@@ -129,7 +129,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     
     # Geweke
     if (!is.null(geweke_result)) {
-      cat("\nGeweke Z-scores per chain (Geweke 1992) — |Z| < 1.96 indicates stationarity:\n")
+      cat("\nGeweke Z-scores per chain (Geweke 1992) -- |Z| < 1.96 indicates stationarity:\n")
       for (i in seq_along(geweke_result)) {
         z <- geweke_result[i]
         cat(sprintf("  Chain %d: Z = %6.4f  %s\n", i, z,
@@ -240,10 +240,9 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
 #' Plot Posterior Probability Histogram
 #'
 #' Creates and saves a histogram of posterior probabilities of recrudescence
-#' for all patients. This is an internal function called automatically by
-#' \code{\link{MalReBay}}.
+#' for all patients. Also called automatically by \code{\link{MalReBay}}.
 #'
-#' @param summary_results A list returned by \code{\link{summarise_results}},
+#' @param summary_results A list returned by \code{\link{MalReBay}},
 #'   containing a \code{posterior_probabilities} data frame with a
 #'   \code{Probability} column.
 #' @param output_folder A string specifying the directory where the histogram
@@ -254,7 +253,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
 #' @return Invisibly returns the file path of the saved PNG. Returns
 #'   \code{invisible(NULL)} if no probabilities are available to plot.
 #'
-#' @keywords internal
+#' @export
 plot_probability_histogram <- function(summary_results, output_folder = "results", verbose = TRUE) {
   
   posterior_probabilities <- summary_results$posterior_probabilities
@@ -695,7 +694,7 @@ plot_markers_diversity <- function(genotypedata,
   num_rows     <- ceiling(length(p_array) / num_cols)
   final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
   
-  output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_diversity.png"))
+  output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
   ggplot2::ggsave(output_path, plot = final_figure,
                   width  = num_cols * 4,
                   height = num_rows * 4,

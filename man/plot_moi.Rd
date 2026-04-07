@@ -8,7 +8,7 @@ plot_moi(
   genotypedata,
   marker_pattern = "(_allele_\\\\d+|_\\\\d+)$",
   output_folder = NULL,
-  filename = "moi_per_marker_by_site.png"
+  filename_prefix = "moi_per_marker"
 )
 }
 \arguments{
@@ -17,16 +17,17 @@ plot_moi(
 \item{marker_pattern}{A regex pattern to identify marker columns.
 Defaults to standard allele suffix patterns.}
 
-\item{output_folder}{Path to the directory where the plot will be saved.
-If NULL, the plot is not saved to disk.}
+\item{output_folder}{Path to the directory where plots will be saved.
+If NULL, plots are not saved to disk.}
 
-\item{filename}{The name for the output PDF file.}
+\item{filename_prefix}{Prefix for output PNG filenames. Each file will be
+named \verb{<prefix>_<site>.png}.}
 }
 \value{
-A ggplot object. The underlying MOI data is attached as an
-attribute "moi_data".
+A named list of ggplot objects, one per site. The underlying MOI
+data is attached to each plot as the attribute \code{"moi_data"}.
 }
 \description{
-This function calculates the MOI (number of distinct alleles per marker per sample)
-and generates a faceted violin plot across different sites.
+This function calculates the MOI (number of distinct alleles per marker per
+sample) and generates one violin plot per site for improved readability.
 }

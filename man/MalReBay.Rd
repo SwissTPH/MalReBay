@@ -35,7 +35,6 @@ Invisibly returns a named list containing:
 \item{\code{comparison}}{Data frame combining match counting and Bayesian results.}
 \item{\code{convergence}}{Diagnostics (R-hat and ESS).}
 \item{\code{mcmc_loglikelihoods}}{Raw MCMC chains.}
-\item{\code{chain_results}}{Full posterior samples.}
 }
 }
 \description{

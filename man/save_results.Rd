@@ -6,7 +6,7 @@
 \usage{
 save_results(
   summary_results,
-  imported_data,
+  imported_data = NULL,
   output_folder = NULL,
   verbose = TRUE
 )

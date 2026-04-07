@@ -11,7 +11,7 @@ plot_probability_histogram(
 )
 }
 \arguments{
-\item{summary_results}{A list returned by \code{\link{summarise_results}},
+\item{summary_results}{A list returned by \code{\link{MalReBay}},
 containing a \code{posterior_probabilities} data frame with a
 \code{Probability} column.}
 
@@ -27,7 +27,5 @@ Invisibly returns the file path of the saved PNG. Returns
 }
 \description{
 Creates and saves a histogram of posterior probabilities of recrudescence
-for all patients. This is an internal function called automatically by
-\code{\link{MalReBay}}.
+for all patients. Also called automatically by \code{\link{MalReBay}}.
 }
-\keyword{internal}

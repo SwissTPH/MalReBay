@@ -61,7 +61,7 @@ In practice, these probabilities cannot be solved analytically because the poste
 The workflow begins with paired genotyping data from `day 0` and `day of recurrence` infections. These data are combined with model parameters (e.g., genotyping error rates, within-host diversity, allele frequencies) and analyzed using a Markov chain **Monte Carlo (MCMC)** algorithm. The output is the posterior probability of recrudescence for each recurrence, which can then be summarized at both the patient and study level.
 
 
-The main `classify_infections()` function automates this process—from loading the genotyping data and parameter settings to generating posterior estimates and final recurrence classifications. The following sections describe each input type and how to prepare your data for analysis.
+The main `MalReBay()` function automates this process—from loading the genotyping data and parameter settings to generating posterior estimates and final recurrence classifications. The following sections describe each input type and how to prepare your data for analysis.
 
 
 ## 4. Input Data
@@ -94,13 +94,13 @@ Here is an example of the expected input format for length-polymorphic data:
 
 ### 4.2 Amplicon sequencing data
 
-For amplicon sequencing,but the marker columns store haplotype labels instead of allele lengths. The input Excel file have similar structure as length-polymorphic data:
+For amplicon sequencing, the marker columns store haplotype labels instead of allele lengths. The input Excel file has a similar structure to length-polymorphic data:
 
 Here is an example of the expected input format for amplicon sequencing data:
 ![Amplicon sequencingt](figure/ampseq_1.png){width="100%"}
 
 
-## 5. Descritptive analysis
+## 5. Descriptive analysis
 
 Before running the main classification analysis, it is often helpful to explore your genotyping data. `MalReBay` provides specialized functions to visualize **allele and haplotype diversity**, tailored to the type of data you are analyzing. These exploratory analyses can reveal which markers are **most informative or frequent in the population**, assess the **quality and completeness of the genotyping data**, and evaluate the **overall polymorphism and richness of the markers**, all of which are important for robust downstream analyses.
 
@@ -137,7 +137,6 @@ First, we need to load the `MalReBay` package, along with a couple of other usef
 
 ```{r required packages, message=FALSE, warning=FALSE}
 library(MalReBay)
-library(future)
 library(dplyr)
 library(ggplot2)
 library(purrr)
@@ -151,7 +150,7 @@ library(kableExtra)
 We import the example dataset using `MalReBay:::import_data()`. The dataset includes both late failure samples and any additional samples. We then process the sample IDs to extract the patient identifier and day of sampling (baseline or day of recurrence).
 
 ```{r get-data-path-length}
-marker_file <- system.file("extdata", "maker_details.xlsx", package = "MalReBay")
+marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 input_file_lp <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
 
 # Import and validate data
@@ -249,7 +248,7 @@ results <- MalReBay::MalReBay(
 
 
 
-The `classify_infections()` function returns a list containing two key data frames:
+The `MalReBay()` function returns a list containing two key data frames:
 
 + `summary`: Main results for each patient, including the posterior probability of recrudescence and the number of comparable loci.
 
@@ -305,7 +304,7 @@ Convergence is monitored automatically during sampling using both the log-likeli
 
 ##### How to Generate Plots Interactively
 
-The `classify_infections` function saves the MCMC log-likelihood data for each site within its results object. You can use the exported `plot_likelihood_diagnostics` function to view the plots for any site interactively in your R session.
+The `MalReBay()` function saves the MCMC log-likelihood data for each site within its results object. You can use the exported `plot_likelihood_diagnostics` function to view the plots for any site interactively in your R session.
 
 The key plots for diagnostics are:
 
@@ -331,7 +330,8 @@ if (!is.null(loglik_data)) {
   MalReBay::plot_likelihood_diagnostics(
     all_chains_loglikelihood = loglik_data,
     site_name                = site_to_plot,
-    output_folder            = NULL, # Set to NULL to just plot in R session
+    save_plot                = FALSE,
+    output_folder            = NULL,
     verbose                  = FALSE
   )
 }
@@ -365,46 +365,41 @@ knitr::kable(
 
 #### output non-convergence
 ```{r output-non-convergence, dev = "png", fig.width = 10, fig.height = 8, fig.alt = "Example of non-converged MCMC chains for the Benguela site."}
-imported_data <- MalReBay:::import_data(
-  filepath = input_file_lp, 
-  marker_filepath = marker_file,
-  verbose = FALSE
-)
-
 quick_mcmc_config <- list(
-  n_chains = 4, 
-  chunk_size = 500, 
-  max_iterations = 1000, 
+  n_chains = 4,
+  chunk_size = 500,
+  max_iterations = 1000,
   rhat_threshold = 1.1,
   ess_threshold = 100
 )
 
-output_dir_nonconverge <- here::here("vignettes", "malrebay_vignette_outputs", "non_convergence_test")
+output_dir_nonconverge <- file.path(tempdir(), "malrebay_results", "non_convergence_test")
 if (!dir.exists(output_dir_nonconverge)) {
   dir.create(output_dir_nonconverge, recursive = TRUE)
 }
 
-classification_summary_nonconverge <- classify_infections(
-  imported_data   = imported_data, 
-  mcmc_config = quick_mcmc_config,
-  output_folder = output_dir_nonconverge,
-  n_workers = 2,
-  verbose = FALSE
+results_nonconverge <- MalReBay::MalReBay(
+  filepath        = input_file_lp,
+  marker_filepath = marker_file,
+  mcmc_config     = quick_mcmc_config,
+  output_folder   = output_dir_nonconverge,
+  n_workers       = 2,
+  verbose         = FALSE
 )
 
-site_to_plot  <- names(classification_summary_nonconverge$mcmc_loglikelihoods)[1]
-loglik_data <- classification_summary_nonconverge$mcmc_loglikelihoods[[site_to_plot]]
+site_to_plot  <- names(results_nonconverge$mcmc_loglikelihoods)[1]
+loglik_data <- results_nonconverge$mcmc_loglikelihoods[[site_to_plot]]
 
 if (!is.null(loglik_data)) {
-  plot_likelihood_diagnostics(
-  all_chains_loglikelihood = loglik_data,
-  site_name = site_to_plot ,
-  save_plot = FALSE,
-  output_folder = NULL,
-  verbose = FALSE
-)
+  MalReBay::plot_likelihood_diagnostics(
+    all_chains_loglikelihood = loglik_data,
+    site_name                = site_to_plot,
+    save_plot                = FALSE,
+    output_folder            = NULL,
+    verbose                  = FALSE
+  )
 } else {
-cat("No log-likelihood data found for site: ", site_name, "\n")
+  cat("No log-likelihood data found for site: ", site_to_plot, "\n")
 }
 ```
 
@@ -419,7 +414,7 @@ When diagnosing MCMC output, the following visual patterns indicate that chains 
 + **Autocorrelation:** A good autocorrelation plot shows a rapid decline toward zero within a few lags. If autocorrelation remains high or decays slowly across iterations, it means the chains are exploring the parameter space inefficiently and convergence has not been reached.
 
 
-####S# How to improve convergence.
+#### How to improve convergence
 If chains fail to converge, several adjustments can help improve stability and mixing:
 
 + Increase the number of iterations: Allow more sampling time so chains have a better chance to explore the parameter space thoroughly.
