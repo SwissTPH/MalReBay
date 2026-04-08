@@ -1,5 +1,5 @@
 #' @importFrom rlang .data
-#' @importFrom stats rbinom sd
+#' @importFrom stats dist rbinom sd setNames
 NULL
 
 utils::globalVariables(c(

@@ -150,8 +150,8 @@ library(kableExtra)
 We import the example dataset using `MalReBay:::import_data()`. The dataset includes both late failure samples and any additional samples. We then process the sample IDs to extract the patient identifier and day of sampling (baseline or day of recurrence).
 
 ```{r get-data-path-length}
-marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 input_file_lp <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+marker_file   <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
 # Import and validate data
 imported_data <- MalReBay::import_data(
@@ -192,10 +192,14 @@ These descriptive outputs give context for interpreting molecular correction res
 
 ```{r MOI,fig.width=7, fig.height=5, message=FALSE, out.width='100%', fig.alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset."}
 if (nrow(genotypedata_lp) > 0) {
-  MalReBay::plot_moi(
-    genotypedata  = genotypedata_lp,
+  first_site      <- unique(genotypedata_lp$Site)[1]
+  genotypedata_s1 <- dplyr::filter(genotypedata_lp, Site == first_site)
+
+  moi_plots <- MalReBay::plot_moi(
+    genotypedata  = genotypedata_s1,
     output_folder = output_dir_lp
   )
+  print(moi_plots[[first_site]])
 }
 ```
 
@@ -218,22 +222,27 @@ The MCMC sampler has several parameters that control its runtime and convergence
 
 ##### Parameter Definitions
 
-+ **max_iterations** is the maximum total number of MCMC iterations and serves as an upper limit to ensure the model stops even if convergence hasn’t been reached earlier. The appropriate number of iterations varies with data quality and marker type. In this example we are using the Microsatellite markers and for the dataset we will use 20,000 runs.
++ **iter:** The total number of iterations per chain (including warmup).
 
-+ **ess_threshold** is the Effective Sample Size (ESS), a standard MCMC diagnostic that measures how many independent samples the chain effectively represents after accounting for autocorrelation. A higher ESS indicates better mixing and more reliable estimates. Common thresholds range from 200 to 1,000+, depending on precision needs. In our setup, 400 provides a balance between computational cost and reliability.
++ **burn_in_frac:** The fraction of iterations used for warmup (typically 0.5).
 
-+ **rhat_threshold** is the Gelman–Rubin statistic, corresponding to the potential scale reduction factor (R̂ or R-hat). It compares within- and between-chain variance, with values close to 1.0 indicating convergence (typically acceptable if R̂ < 1.1).
++ **chains:** The number of independent Markov chains to run..
 
-+ **chunk_size** – The number of iterations run before intermediate convergence checks are performed. This parameter controls the automatic stopping mechanism by dividing the total iterations into smaller chunks (e.g., four). Smaller chunk_size values allow for more frequent convergence checks but increase computational time.
++ **adapt_delta:** (Stan-specific) Controls the step size during sampling. Increasing this (e.g., to 0.95) helps with "divergent transitions."
 
 
 #### Step 5: Execute the Main Function
 
-Now we can run the analysis. `classify_infections()` will print progress messages to the console, informing you about the data type it detected, the sites it is analyzing, and the status of the MCMC convergence.  The 'future' package is used in the background for parallel processing, so you can expect the analysis to run faster on multi-core machines.
+Now we can run the analysis. `MalReBay()` will print progress messages to the console, informing you about the data type it detected, the sites it is analyzing, and the status of the MCMC convergence.  The 'future' package is used in the background for parallel processing, so you can expect the analysis to run faster on multi-core machines.
 
 ```{r run-analysis-length, cache=TRUE}
-# Define a quick config for the vignette
-quick_config <- system.file("extdata", "default_mcmc_config.xlsx", package = "MalReBay")
+# Define a config list
+quick_config <- list(
+  n_chains     = 2,
+  iter         = 1000,   # Increased from 300 to ensure Stan finishes
+  burn_in_frac = 0.5,
+  random_seed  = 42
+)
 
 # Run the full pipeline
 results <- MalReBay::MalReBay(
@@ -241,9 +250,12 @@ results <- MalReBay::MalReBay(
   marker_filepath = marker_file,
   mcmc_config     = quick_config,
   output_folder   = output_dir_lp,
-  n_workers       = 2,
   verbose         = FALSE
 )
+
+if (is.null(results)) {
+  knitr::knit_exit("MCMC failed to produce results; skipping remaining chunks.")
+}
 ```
 
 
@@ -330,6 +342,7 @@ if (!is.null(loglik_data)) {
   MalReBay::plot_likelihood_diagnostics(
     all_chains_loglikelihood = loglik_data,
     site_name                = site_to_plot,
+    stan_fit                 = results$stan_fits[[site_to_plot]],
     save_plot                = FALSE,
     output_folder            = NULL,
     verbose                  = FALSE
@@ -365,41 +378,32 @@ knitr::kable(
 
 #### output non-convergence
 ```{r output-non-convergence, dev = "png", fig.width = 10, fig.height = 8, fig.alt = "Example of non-converged MCMC chains for the Benguela site."}
-quick_mcmc_config <- list(
-  n_chains = 4,
-  chunk_size = 500,
-  max_iterations = 1000,
-  rhat_threshold = 1.1,
-  ess_threshold = 100
+bad_mcmc_config <- list(
+  n_chains     = 2,
+  iter         = 200, 
+  burn_in_frac = 0.5,
+  random_seed  = 1
 )
 
-output_dir_nonconverge <- file.path(tempdir(), "malrebay_results", "non_convergence_test")
-if (!dir.exists(output_dir_nonconverge)) {
-  dir.create(output_dir_nonconverge, recursive = TRUE)
-}
-
+# Run MalReBay but SET output_folder to NULL 
+# and ensure your R functions handle NULL as fixed above.
 results_nonconverge <- MalReBay::MalReBay(
   filepath        = input_file_lp,
   marker_filepath = marker_file,
-  mcmc_config     = quick_mcmc_config,
-  output_folder   = output_dir_nonconverge,
-  n_workers       = 2,
+  mcmc_config     = bad_mcmc_config,
+  output_folder   = NULL,   
   verbose         = FALSE
 )
 
-site_to_plot  <- names(results_nonconverge$mcmc_loglikelihoods)[1]
-loglik_data <- results_nonconverge$mcmc_loglikelihoods[[site_to_plot]]
-
-if (!is.null(loglik_data)) {
+if (!is.null(results_nonconverge)) {
+  site_to_plot <- names(results_nonconverge$mcmc_loglikelihoods)[1]
+  
   MalReBay::plot_likelihood_diagnostics(
-    all_chains_loglikelihood = loglik_data,
+    all_chains_loglikelihood = results_nonconverge$mcmc_loglikelihoods[[site_to_plot]],
     site_name                = site_to_plot,
-    save_plot                = FALSE,
-    output_folder            = NULL,
-    verbose                  = FALSE
+    stan_fit                 = results_nonconverge$stan_fits[[site_to_plot]],
+    save_plot                = FALSE
   )
-} else {
-  cat("No log-likelihood data found for site: ", site_to_plot, "\n")
 }
 ```
 

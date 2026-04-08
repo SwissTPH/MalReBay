@@ -16,36 +16,19 @@ summarise_results(
 
 \item{imported_data}{A list returned by \code{\link{import_data}}.}
 
-\item{output_folder}{A string path to the directory where convergence
-diagnostic plots will be saved. If \code{NULL}, plots are not saved.
-Defaults to \code{NULL}.}
+\item{output_folder}{Path for saving convergence diagnostic plots.
+\code{NULL} skips saving.}
 
-\item{verbose}{Logical. If \code{TRUE}, prints progress messages.
-Defaults to \code{TRUE}.}
+\item{verbose}{Logical. Print progress messages.}
 }
 \value{
-A named list containing:
-\describe{
-\item{\code{posterior_probabilities}}{A data frame with per-patient
-posterior probabilities of recrudescence, and per-site locus
-availability summaries.}
-\item{\code{comparison}}{A data frame combining allele match counting
-results with posterior probabilities for each sample.}
-\item{\code{convergence}}{A data frame with per-site Gelman-Rubin
-R-hat and effective sample size diagnostics. \code{NULL} if
-diagnostics are unavailable.}
-\item{\code{mcmc_loglikelihoods}}{A named list of per-site MCMC
-log-likelihood chains.}
-}
+A named list with \code{posterior_probabilities}, \code{comparison},
+\code{convergence}, and \code{mcmc_loglikelihoods}.
 }
 \description{
 Post-processes raw MCMC output from \code{\link{classify_infections}} into
 interpretable summaries including posterior probabilities, convergence
-diagnostics, and a match counting comparison table. This is an internal
-function called automatically by \code{\link{MalReBay}}.
-}
-\seealso{
-\code{\link{classify_infections}} for the MCMC engine,
-\code{\link{save_results}} for saving the output to CSV.
+diagnostics, and a match counting comparison table. Called automatically
+by \code{\link{MalReBay}}.
 }
 \keyword{internal}

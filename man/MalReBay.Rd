@@ -2,7 +2,7 @@
 % Please edit documentation in R/MalReBay.R
 \name{MalReBay}
 \alias{MalReBay}
-\title{Run the Full MalReBay Pipeline}
+\title{Run the MalReBay malaria recrudescence classification pipeline}
 \usage{
 MalReBay(
   filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
@@ -14,40 +14,47 @@ MalReBay(
 )
 }
 \arguments{
-\item{filepath}{A string path to the input Excel file containing genotype
-data. Defaults to the built-in example dataset.}
+\item{filepath}{Path to the genotype data Excel file.
+Defaults to the package example dataset.}
 
-\item{marker_filepath}{A string path to the marker information Excel file.}
+\item{marker_filepath}{Path to the marker metadata Excel file.
+Defaults to the package example marker file.}
 
-\item{mcmc_config}{A path to a configuration Excel file or a named list of parameters.}
+\item{mcmc_config}{Path to the MCMC configuration Excel file.
+Defaults to the package default configuration.}
 
-\item{output_folder}{A string path to the directory where all output files
-(CSVs and Plots) will be saved. If \code{NULL}, results are not saved.}
+\item{output_folder}{Path to a folder for saving results and plots.
+Set to \code{NULL} to skip saving (results are
+still returned invisibly).}
 
-\item{n_workers}{An integer specifying the number of parallel workers.}
+\item{n_workers}{Number of parallel workers. For
+length-polymorphic data this is handled
+automatically by the sampler; the argument is
+retained for compatibility with amplicon-sequencing
+data.}
 
-\item{verbose}{Logical. If \code{TRUE}, prints progress messages.}
+\item{verbose}{If \code{TRUE}, print progress messages to the
+console.}
 }
 \value{
-Invisibly returns a named list containing:
-\describe{
-\item{\code{posterior_probabilities}}{Data frame with results and locus summaries.}
-\item{\code{comparison}}{Data frame combining match counting and Bayesian results.}
-\item{\code{convergence}}{Diagnostics (R-hat and ESS).}
-\item{\code{mcmc_loglikelihoods}}{Raw MCMC chains.}
-}
+A list of per-site summary results (invisibly). See
+\code{summarise_results()} for details of the list structure.
 }
 \description{
-A wrapper function that runs the complete Bayesian malaria recrudescence
-classification pipeline. It handles data import, MCMC processing,
-results summarization, and output generation (plots and CSVs).
+Imports genotype data, runs Bayesian MCMC classification to distinguish
+recrudescent from reinfection malaria treatment failures, summarises
+results, and saves output plots and tables.
 }
-\details{
-The pipeline executes the following steps in order:
-\enumerate{
-\item Import and validate genotype data via \code{\link{import_data}}
-\item Run the Bayesian MCMC classification via \code{\link{classify_infections}}
-\item Summarise MCMC results via \code{\link{summarise_results}}
-\item Save outputs and generate plots via \code{\link{save_results}}
+\examples{
+\dontrun{
+# Run on the bundled example data with default settings
+results <- MalReBay()
+
+# Run on your own data and save output to a folder
+results <- MalReBay(
+  filepath      = "path/to/your_data.xlsx",
+  output_folder = "path/to/output"
+)
 }
+
 }

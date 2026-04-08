@@ -5,8 +5,9 @@
 \title{Plot MCMC Likelihood Diagnostics}
 \usage{
 plot_likelihood_diagnostics(
-  all_chains_loglikelihood,
+  all_chains_loglikelihood = NULL,
   site_name,
+  stan_fit = NULL,
   save_plot = TRUE,
   output_folder = NULL,
   verbose = TRUE
@@ -17,6 +18,8 @@ plot_likelihood_diagnostics(
 representing the log-likelihood history of one MCMC chain.}
 
 \item{site_name}{A character string for labeling plots.}
+
+\item{stan_fit}{An optional \code{stanfit} object (from rstan) for additional diagnostics.}
 
 \item{save_plot}{A logical. If \code{TRUE}, plots are saved as PNG files.}
 

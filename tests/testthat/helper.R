@@ -32,7 +32,6 @@
 #'
 #' Used by: test_2, test_3, test_4, test_5
 #' 
-foreach::registerDoSEQ()
 create_mock_microsat_data <- function() {
   data.frame(
     Sample.ID = c(
@@ -121,14 +120,13 @@ create_mock_xlsx <- function(data, markers = create_mock_markers()) {
 #' convergence thresholds because small mock data won't fully converge.
 #' Used by: test_3, test_4, test_6
 fast_mcmc <- list(
-  n_chains              = 2,
-  rhat_threshold        = 1.1,
-  ess_threshold         = 50,
-  chunk_size            = 100,
-  max_iterations        = 200,
-  burn_in_frac          = 0.5,
-  record_hidden_alleles = FALSE,
-  random_seed           = 42      
+  n_chains     = 2,
+  iter         = 200,      
+  burn_in_frac = 0.5,      
+  random_seed  = 42,
+  adapt_delta  = 0.8,
+  rhat_threshold = 1.1,
+  ess_threshold  = 50
 )
 
 # ------------------------------------------------------------
@@ -175,9 +173,8 @@ make_test_mcmc_results <- function() {
 #'                       Pass an explicit path to also test file outputs.
 #' Used by: test_4
 make_test_summary_results <- function(output_folder = NULL) {
-  # Always provide a real folder — summarise_results calls
-  # plot_likelihood_diagnostics() which requires output_folder != NULL
-  use_folder <- if (!is.null(output_folder)) output_folder else tempfile()
+  use_folder <- if (!is.null(output_folder)) output_folder else tempdir()
+  
   suppressMessages(suppressWarnings(
     summarise_results(
       mcmc_results  = make_test_mcmc_results(),

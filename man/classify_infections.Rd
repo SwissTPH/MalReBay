@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcmc_utils.R
 \name{classify_infections}
 \alias{classify_infections}
-\title{Run Bayesian MCMC Classification}
+\title{Classify malaria infections using Bayesian MCMC}
 \usage{
 classify_infections(
   imported_data,
@@ -12,29 +12,19 @@ classify_infections(
 )
 }
 \arguments{
-\item{imported_data}{A list returned by \code{\link{import_data}}.}
+\item{imported_data}{List returned by \code{import_data()}.}
 
-\item{mcmc_config}{A named list of MCMC parameters. See
-\code{\link{MalReBay}} for valid entries and defaults.}
+\item{mcmc_config}{Path to MCMC configuration Excel file.}
 
-\item{n_workers}{An integer specifying the number of parallel workers.
-Defaults to \code{1} (sequential).}
+\item{n_workers}{Parallel workers. Ignored for length-polymorphic data
+(Stan handles parallelism internally). Used for ampseq.}
 
-\item{verbose}{Logical. If \code{TRUE}, prints progress messages.
-Defaults to \code{TRUE}.}
+\item{verbose}{Print progress messages.}
 }
 \value{
-A named list of raw MCMC results per site, containing
-classifications, log-likelihoods, locus likelihood ratios, locus
-distances, locus summaries, patient IDs, and loci names. Returns
-\code{NULL} if no valid results are produced.
+List of MCMC results passed to \code{summarise_results()}.
 }
 \description{
-Runs the Bayesian MCMC engine across all sites in the imported data to
-classify patient samples as recrudescence or reinfection. This is an
-internal function called automatically by \code{\link{MalReBay}}.
-}
-\seealso{
-\code{\link{summarise_results}} for post-processing the output.
+Classify malaria infections using Bayesian MCMC
 }
 \keyword{internal}

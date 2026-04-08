@@ -27,7 +27,7 @@ test_that("classify_infections: returns correct top-level list keys", {
   results <- run_classify()
   expect_named(results, c("classifications", "all_chains_loglikelihood",
                           "ids", "locus_summary", "locus_lrs",
-                          "locus_dists", "locinames"))
+                          "locus_dists", "locinames", "stan_fits"))
 })
 
 test_that("classify_infections: ids match patients in mock data", {
@@ -58,7 +58,7 @@ test_that("classify_infections: BD21-041 (4/4 match) classified towards recrudes
   skip_on_cran()
   results     <- run_classify()
   id_idx      <- which(results$ids$Benguela == "BD21-041")
-  prob_recrud <- mean(results$classifications$Benguela[id_idx, ])
+  prob_recrud <- mean(results$classifications$Benguela[, id_idx])
   expect_gt(prob_recrud, 0.5)
 })
 
@@ -66,17 +66,15 @@ test_that("classify_infections: BD21-040 (1/4 match) classified towards reinfect
   skip_on_cran()
   results     <- run_classify()
   id_idx      <- which(results$ids$Benguela == "BD21-040")
-  prob_recrud <- mean(results$classifications$Benguela[id_idx, ])
+  prob_recrud <- mean(results$classifications$Benguela[, id_idx])
   expect_lt(prob_recrud, 0.5)
 })
-
 # ============================================================
 # Real data smoke test — uses pre-imported .rds, no file paths needed
 # ============================================================
 
 test_that("classify_infections: runs on real Angola data without error", {
   skip_on_cran()
-  
   results <- suppressMessages(suppressWarnings(
     classify_infections(
       imported_data = angola_imported_data,
@@ -85,8 +83,7 @@ test_that("classify_infections: runs on real Angola data without error", {
       verbose       = FALSE
     )
   ))
-  
   expect_type(results, "list")
   expect_true(length(unlist(results$ids)) > 0)
-  expect_true(all(is.finite(unlist(results$all_chains_loglikelihood))))
+  expect_s4_class(results$stan_fits[[1]], "stanfit")
 })

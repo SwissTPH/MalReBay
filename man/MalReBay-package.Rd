@@ -5,7 +5,7 @@
 \alias{MalReBay-package}
 \title{MalReBay: Bayesian classification for malaria recurrences}
 \description{
-Classification of malaria infection recurrence using a Bayesian algorithm.
+Classification of malaria infection recurrence using a Bayesian algorithm implemented in Stan for efficient sampling.
 }
 \seealso{
 Useful links:

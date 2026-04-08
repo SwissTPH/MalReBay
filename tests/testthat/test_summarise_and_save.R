@@ -98,7 +98,7 @@ test_that("save_results: creates output folder if it does not exist", {
   result <- make_test_summary_results()
   on.exit(unlink(tmp, recursive = TRUE))
   
-  save_results(result, output_folder = tmp, verbose = FALSE)
+  save_results(result, imported_data = create_mock_imported_data(), output_folder = tmp, verbose = FALSE)
   expect_true(dir.exists(tmp))
 })
 

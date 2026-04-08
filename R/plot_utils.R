@@ -10,6 +10,7 @@
 #' @param save_plot A logical. If `TRUE`, plots are saved as PNG files.
 #' @param output_folder A character string specifying the path to save plots.
 #' @param verbose A logical. If `TRUE`, prints diagnostic summaries.
+#' @param stan_fit An optional \code{stanfit} object (from rstan) for additional diagnostics.
 #'
 #' @return An invisible list containing the calculated diagnostic results.
 #'
@@ -19,44 +20,54 @@
 #' @importFrom stats acf
 #'
 #' @export
-plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
-                                        site_name,
-                                        save_plot     = TRUE,
-                                        output_folder = NULL,
-                                        verbose       = TRUE) {
-  
-  if (save_plot && is.null(output_folder)) {
-    stop("`output_folder` must be provided when `save_plot = TRUE`.", call. = FALSE)
+plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
+                                         site_name,
+                                         stan_fit      = NULL,   # NEW optional
+                                         save_plot     = TRUE,
+                                         output_folder = NULL,
+                                         verbose       = TRUE) {
+
+  if (save_plot && is.null(output_folder))
+    stop("`output_folder` must be provided when `save_plot = TRUE`.",
+         call. = FALSE)
+
+  if (!is.null(stan_fit) && inherits(stan_fit, "stanfit") &&
+      is.null(all_chains_loglikelihood)) {
+    lp_mat <- rstan::extract(stan_fit, pars = "lp__",
+                              permuted = FALSE)[, , "lp__"]
+    all_chains_loglikelihood <- lapply(
+      seq_len(ncol(lp_mat)), function(ch) lp_mat[, ch]
+    )
   }
-  
+
+  if (is.null(all_chains_loglikelihood))
+    stop("Provide either all_chains_loglikelihood or stan_fit.", call. = FALSE)
   safe_site_name <- gsub(" ", "_", site_name)
-  
   site_dir <- NULL
   if (save_plot) {
     site_dir <- file.path(output_folder, "convergence_diagnosis", safe_site_name)
     if (dir.exists(site_dir)) unlink(site_dir, recursive = TRUE)
     dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  
-  # --- Data cleaning --------------------------------------------------------
+
+  # Data cleaning
   clean_chains <- lapply(all_chains_loglikelihood, function(x) x[is.finite(x)])
   clean_chains <- Filter(function(x) length(x) >= 2, clean_chains)
-  
   if (length(clean_chains) == 0) {
     warning("No valid chains for site '", site_name, "'. Skipping.", call. = FALSE)
     return(invisible(NULL))
   }
-  
+
   loglikelihood_mcmc <- tryCatch({
     mlist  <- lapply(clean_chains, coda::mcmc)
     mclist <- coda::as.mcmc.list(mlist)
     coda::varnames(mclist) <- " "
     mclist
   }, error = function(e) NULL)
-  
+
   if (is.null(loglikelihood_mcmc)) return(invisible(NULL))
-  
-  # Gelman-Rubin
+
+  # Convergence diagnostics
   gelman_result <- NULL
   if (length(loglikelihood_mcmc) > 1) {
     gelman_result <- tryCatch(
@@ -64,72 +75,43 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
       error = function(e) NULL
     )
   }
-  
-  # ESS 
   ess_result <- tryCatch(
     coda::effectiveSize(loglikelihood_mcmc),
     error = function(e) NULL
   )
-  
-  # Rank-normalised R-hat + bulk and tail ESS 
   draws_matrix <- tryCatch(
     do.call(cbind, lapply(clean_chains, as.numeric)),
     error = function(e) NULL
   )
-  
-  rhat_rank <- tryCatch(
-    posterior::rhat(draws_matrix),
-    error = function(e) NA_real_
-  )
-  ess_bulk <- tryCatch(
-    posterior::ess_bulk(draws_matrix),
-    error = function(e) NA_real_
-  )
-  ess_tail <- tryCatch(
-    posterior::ess_tail(draws_matrix),
-    error = function(e) NA_real_
-  )
-  
-  # Geweke Z-scores per chain
+  rhat_rank <- tryCatch(posterior::rhat(draws_matrix),      error = function(e) NA_real_)
+  ess_bulk  <- tryCatch(posterior::ess_bulk(draws_matrix),  error = function(e) NA_real_)
+  ess_tail  <- tryCatch(posterior::ess_tail(draws_matrix),  error = function(e) NA_real_)
   geweke_result <- tryCatch(
     sapply(loglikelihood_mcmc, function(ch) coda::geweke.diag(ch)$z),
     error = function(e) NULL
   )
-  
+
   if (verbose) {
     cat("Convergence Diagnostics for:", site_name, "\n")
     cat(strrep("-", 50), "\n")
-    
-    # Classical Gelman-Rubin
     if (!is.null(gelman_result)) {
-      cat("Classical Gelman-Rubin R-hat (Gelman & Rubin 1992):\n")
-      print(gelman_result)
+      cat("Classical Gelman-Rubin R-hat:\n"); print(gelman_result)
     } else {
-      cat("Classical Gelman-Rubin: not available (near-constant chains or single chain)\n")
+      cat("Classical Gelman-Rubin: not available (near-constant or single chain)\n")
     }
-    
-    # Rank-normalised R-hat
-    if (!is.na(rhat_rank)) {
-      cat("\nRank-normalised R-hat (Vehtari et al. 2021):", round(rhat_rank, 4),
-          ifelse(rhat_rank < 1.01, "  [PASS < 1.01]", "  [FAIL >= 1.01]"), "\n")
-    }
-    
-    # ESS -- classical, bulk, and tail
-    if (!is.null(ess_result)) {
+    if (!is.na(rhat_rank))
+      cat("\nRank-normalised R-hat (Vehtari 2021):", round(rhat_rank, 4),
+          ifelse(rhat_rank < 1.01, "  [PASS]", "  [FAIL]"), "\n")
+    if (!is.null(ess_result))
       cat("\nClassical ESS (coda):", round(as.numeric(ess_result), 1), "\n")
-    }
-    if (!is.na(ess_bulk)) {
-      cat("Bulk ESS (Vehtari et al. 2021):", round(ess_bulk, 1),
-          ifelse(ess_bulk > 400, "  [PASS > 400]", "  [FAIL <= 400]"), "\n")
-    }
-    if (!is.na(ess_tail)) {
-      cat("Tail ESS (Vehtari et al. 2021):", round(ess_tail, 1),
-          ifelse(ess_tail > 400, "  [PASS > 400]", "  [FAIL <= 400]"), "\n")
-    }
-    
-    # Geweke
+    if (!is.na(ess_bulk))
+      cat("Bulk ESS:", round(ess_bulk, 1),
+          ifelse(ess_bulk > 400, "  [PASS]", "  [FAIL]"), "\n")
+    if (!is.na(ess_tail))
+      cat("Tail ESS:", round(ess_tail, 1),
+          ifelse(ess_tail > 400, "  [PASS]", "  [FAIL]"), "\n")
     if (!is.null(geweke_result)) {
-      cat("\nGeweke Z-scores per chain (Geweke 1992) -- |Z| < 1.96 indicates stationarity:\n")
+      cat("\nGeweke Z-scores per chain |Z| < 1.96 = stationary:\n")
       for (i in seq_along(geweke_result)) {
         z <- geweke_result[i]
         cat(sprintf("  Chain %d: Z = %6.4f  %s\n", i, z,
@@ -138,111 +120,105 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     }
     cat(strrep("-", 50), "\n")
   }
-  
-  # Gelman-Rubin diagnostic plot
+
+  # Gelman-Rubin plot
   if (save_plot) {
-    grDevices::png(
-      file.path(site_dir, paste0(safe_site_name, "_gelman_rubin.png")),
-      width = 1000, height = 700, res = 120
-    )
+    grDevices::png(file.path(site_dir,
+                              paste0(safe_site_name, "_gelman_rubin.png")),
+                   width = 1000, height = 700, res = 120)
     on.exit(grDevices::dev.off(), add = TRUE)
   }
-  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
-  on.exit(par(old_par), add = TRUE)
+  old_par <- graphics::par(mar = c(4.1, 4.1, 3.5, 1.1))
+  on.exit(graphics::par(old_par), add = TRUE)
   if (length(loglikelihood_mcmc) > 1) {
     tryCatch(
-      coda::gelman.plot(
-        loglikelihood_mcmc,
-        autoburnin = FALSE,
-        main       = paste(site_name, "- Gelman-Rubin Diagnostic"),
-        col        = c("black", "indianred")
-      ),
+      coda::gelman.plot(loglikelihood_mcmc, autoburnin = FALSE,
+                        main = paste(site_name, "- Gelman-Rubin Diagnostic"),
+                        col  = c("black", "indianred")),
       error = function(e) {
-        plot.new()
-        text(0.5, 0.5, "Gelman plot failed\n(near-constant chains)", col = "red")
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, "Gelman plot failed\n(near-constant chains)",
+                       col = "red")
       }
     )
   } else {
-    plot.new()
-    text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
+    graphics::plot.new()
+    graphics::text(0.5, 0.5, "Gelman plot not applicable\n(requires > 1 chain)")
   }
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
-  par(old_par); on.exit(NULL, add = FALSE)
-  
+  graphics::par(old_par); on.exit(NULL, add = FALSE)
+
   # Traceplot
   if (save_plot) {
-    grDevices::png(
-      file.path(site_dir, paste0(safe_site_name, "_traceplot.png")),
-      width = 1000, height = 600, res = 120
-    )
+    grDevices::png(file.path(site_dir,
+                              paste0(safe_site_name, "_traceplot.png")),
+                   width = 1000, height = 600, res = 120)
     on.exit(grDevices::dev.off(), add = TRUE)
   }
-  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
-  on.exit(par(old_par), add = TRUE)
+  old_par <- graphics::par(mar = c(4.1, 4.1, 3.5, 1.1))
+  on.exit(graphics::par(old_par), add = TRUE)
   colors <- grDevices::rainbow(length(loglikelihood_mcmc))
-  matplot(
+  graphics::matplot(
     do.call(cbind, lapply(loglikelihood_mcmc, as.numeric)),
     type = "l", lty = 1, col = colors,
     main = paste(site_name, "- Traceplot"),
-    ylab = "Log-Likelihood",
-    xlab = "Iterations"
+    ylab = "Log-Posterior", xlab = "Iterations"
   )
-  legend("topright", legend = paste("Chain", seq_along(loglikelihood_mcmc)),
-         col = colors, lty = 1, bty = "n", cex = 0.8)
+  graphics::legend("topright",
+                   legend = paste("Chain", seq_along(loglikelihood_mcmc)),
+                   col = colors, lty = 1, bty = "n", cex = 0.8)
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
-  par(old_par); on.exit(NULL, add = FALSE)
-  
-  # Log-likelihood distribution
+  graphics::par(old_par); on.exit(NULL, add = FALSE)
+
+  # Log-posterior distribution
   if (save_plot) {
-    grDevices::png(
-      file.path(site_dir, paste0(safe_site_name, "_log_likelihood_distribution.png")),
-      width = 1000, height = 600, res = 120
-    )
+    grDevices::png(file.path(site_dir,
+                              paste0(safe_site_name, "_log_likelihood_distribution.png")),
+                   width = 1000, height = 600, res = 120)
     on.exit(grDevices::dev.off(), add = TRUE)
   }
-  old_par <- par(mar = c(4.1, 4.1, 3.5, 1.1))
-  on.exit(par(old_par), add = TRUE)
-  hist(unlist(clean_chains), breaks = 40,
-       main = paste(site_name, "- Log-Likelihood Distribution"),
-       xlab = "Log-Likelihood", col = "steelblue", border = "white")
+  old_par <- graphics::par(mar = c(4.1, 4.1, 3.5, 1.1))
+  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::hist(unlist(clean_chains), breaks = 40,
+                 main = paste(site_name, "- Log-Posterior Distribution"),
+                 xlab = "Log-Posterior", col = "steelblue", border = "white")
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
-  par(old_par); on.exit(NULL, add = FALSE)
-  
-  # Autocorrelation plot 
+  graphics::par(old_par); on.exit(NULL, add = FALSE)
+
+  # Autocorrelation
   if (save_plot) {
-    grDevices::png(
-      file.path(site_dir, paste0(safe_site_name, "_autocorrelation.png")),
-      width = 1200, height = 1000, res = 120
-    )
+    grDevices::png(file.path(site_dir,
+                              paste0(safe_site_name, "_autocorrelation.png")),
+                   width = 1200, height = 1000, res = 120)
     on.exit(grDevices::dev.off(), add = TRUE)
   }
   plot_dims <- grDevices::n2mfrow(length(clean_chains))
-  old_par   <- par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
-  on.exit(par(old_par), add = TRUE)
+  old_par   <- graphics::par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
+  on.exit(graphics::par(old_par), add = TRUE)
   for (i in seq_along(clean_chains)) {
     stats::acf(clean_chains[[i]], lag.max = 50, main = "")
     graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
   }
   if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
-  par(old_par); on.exit(NULL, add = FALSE)
-  
-  
+  graphics::par(old_par); on.exit(NULL, add = FALSE)
+
   invisible(list(
-    gelman       = gelman_result,     
-    ess          = ess_result,         
-    rhat_rank    = rhat_rank,          
-    ess_bulk     = ess_bulk,           
-    ess_tail     = ess_tail,           
-    geweke       = geweke_result       
+    gelman    = gelman_result,
+    ess       = ess_result,
+    rhat_rank = rhat_rank,
+    ess_bulk  = ess_bulk,
+    ess_tail  = ess_tail,
+    geweke    = geweke_result
   ))
 }
 
 #' Plot Posterior Probability Histogram
 #'
 #' Creates and saves a histogram of posterior probabilities of recrudescence
-#' for all patients. Also called automatically by \code{\link{MalReBay}}.
+#' for all patients. This is an internal function called automatically by
+#' \code{\link{MalReBay}}.
 #'
-#' @param summary_results A list returned by \code{\link{MalReBay}},
+#' @param summary_results A list returned by \code{\link{summarise_results}},
 #'   containing a \code{posterior_probabilities} data frame with a
 #'   \code{Probability} column.
 #' @param output_folder A string specifying the directory where the histogram
@@ -250,35 +226,50 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
 #' @param verbose Logical. If \code{TRUE}, prints a message when the file is
 #'   saved. Defaults to \code{TRUE}.
 #'
-#' @return Invisibly returns the file path of the saved PNG. Returns
-#'   \code{invisible(NULL)} if no probabilities are available to plot.
+#' @return When \code{output_folder} is \code{NULL}, displays the histogram
+#'   on the current graphics device and returns \code{invisible(NULL)}.
+#'   When \code{output_folder} is provided, saves a PNG and returns the file
+#'   path invisibly. Returns \code{invisible(NULL)} if no probabilities are
+#'   available.
 #'
 #' @export
-plot_probability_histogram <- function(summary_results, output_folder = "results", verbose = TRUE) {
-  
+plot_probability_histogram <- function(summary_results, output_folder = NULL, verbose = TRUE) {
+
   posterior_probabilities <- summary_results$posterior_probabilities
-  
+
   if (is.null(posterior_probabilities) || nrow(posterior_probabilities) == 0) {
     warning("No posterior probabilities to plot.")
     return(invisible(NULL))
   }
-  
-  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  
-  path <- file.path(output_folder, "recrudescence_probability_histogram.png")
-  grDevices::png(path, width = 8, height = 6, units = "in", res = 300)
+
+  probs <- as.numeric(as.character(posterior_probabilities$Probability))
+
+  if (!is.null(output_folder)) {
+    if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
+    path <- file.path(output_folder, "recrudescence_probability_histogram.png")
+    grDevices::png(path, width = 8, height = 6, units = "in", res = 300)
+    graphics::hist(
+      probs,
+      breaks = seq(0, 1, by = 0.05),
+      col    = "skyblue",
+      main   = "Posterior Probability Distribution",
+      xlab   = "Probability of Recrudescence",
+      ylab   = "Number of Patients"
+    )
+    grDevices::dev.off()
+    if (verbose) message("INFO: Probability histogram saved to: ", output_folder)
+    return(invisible(path))
+  }
+
   graphics::hist(
-    as.numeric(as.character(posterior_probabilities$Probability)),
+    probs,
     breaks = seq(0, 1, by = 0.05),
     col    = "skyblue",
     main   = "Posterior Probability Distribution",
     xlab   = "Probability of Recrudescence",
     ylab   = "Number of Patients"
   )
-  grDevices::dev.off()
-  
-  if (verbose) message("INFO: Probability histogram saved to: ", output_folder)
-  invisible(path)
+  invisible(NULL)
 }
 
 #' Plot Multiplicity of Infection (MOI)
@@ -301,20 +292,20 @@ plot_moi <- function(genotypedata,
                      marker_pattern  = "(_allele_\\d+|_\\d+)$",
                      output_folder   = NULL,
                      filename_prefix = "moi_per_marker") {
-  
+
   # Input validation
   if (!"Site" %in% colnames(genotypedata)) {
     stop("Input 'genotypedata' must contain a column named 'Site'.")
   }
-  
+
   genotypedata$Sample.ID <- as.character(genotypedata$Sample.ID)
-  
+
   marker_cols <- grep(marker_pattern, colnames(genotypedata), value = TRUE)
   if (length(marker_cols) == 0) {
     warning("No marker columns found matching the pattern.")
     return(NULL)
   }
-  
+
   # Compute MOI 
   moi_data <- genotypedata %>%
     tidyr::pivot_longer(
@@ -328,25 +319,25 @@ plot_moi <- function(genotypedata,
     ) %>%
     dplyr::group_by(.data$Sample.ID, .data$Site, .data$marker_id) %>%
     dplyr::summarise(MOI = dplyr::n_distinct(.data$allele), .groups = "drop")
-  
+
   # Fill zeroes for samples / markers with no data
   all_markers   <- unique(gsub(marker_pattern, "", marker_cols))
   complete_grid <- tidyr::crossing(
     dplyr::distinct(genotypedata, .data$Sample.ID, .data$Site),
     marker_id = all_markers
   )
-  
+
   moi_data <- dplyr::left_join(
     complete_grid, moi_data,
     by = c("Sample.ID", "Site", "marker_id")
   ) %>%
     dplyr::mutate(MOI = tidyr::replace_na(.data$MOI, 0))
-  
+
   if (nrow(moi_data) == 0) {
     message("MOI data is empty. Skipping plot generation.")
     return(NULL)
   }
-  
+
   # Define label data
   label_data <- moi_data %>%
     dplyr::group_by(.data$Site, .data$marker_id) %>%
@@ -357,24 +348,24 @@ plot_moi <- function(genotypedata,
         dplyr::summarise(label_y_pos = max(.data$MOI) + 0.5, .groups = "drop"),
       by = "Site"
     )
-  
+
   marker_levels <- unique(label_data$marker_id)
-  
+
   # Output folder
   if (!is.null(output_folder) && !dir.exists(output_folder)) {
     dir.create(output_folder, recursive = TRUE)
   }
-  
+
   # Build a plot per site 
   sites <- unique(moi_data$Site)
-  
+
   plots <- lapply(stats::setNames(sites, sites), function(site) {
-    
+
     site_moi    <- dplyr::filter(moi_data,   .data$Site == site)
     site_labels <- dplyr::filter(label_data, .data$Site == site)
-    
+
     site_moi$marker_id <- factor(site_moi$marker_id, levels = marker_levels)
-    
+
     p <- ggplot2::ggplot(
       site_moi,
       ggplot2::aes(
@@ -414,7 +405,7 @@ plot_moi <- function(genotypedata,
         strip.background = ggplot2::element_rect(fill = "grey90", color = "black"),
         strip.text.y     = ggplot2::element_text(angle = 0, face = "bold")
       )
-    
+
     # Save individual plot
     if (!is.null(output_folder)) {
       safe_site  <- gsub("[^A-Za-z0-9_-]", "_", site)
@@ -424,13 +415,14 @@ plot_moi <- function(genotypedata,
       )
       ggplot2::ggsave(output_path, plot = p, width = 12, height = 6)
     }
-    
+
     attr(p, "moi_data") <- site_moi
     p
   })
-  
+
   plots
 }
+
 
 #' Define Allele Bins for Plotting
 #'
@@ -445,17 +437,17 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
   alleles_definitions_bin  <- list()
   data_marker_columns      <- grep("(_allele_\\d+|_\\d+)$", colnames(genotypedata), value = TRUE)
   available_base_markers   <- unique(gsub("(_allele_\\d+|_\\d+)$", "", data_marker_columns))
-  
+
   for (locus_name in available_base_markers) {
     locus_marker_info <- marker_info[marker_info$marker_id == locus_name, ]
     if (nrow(locus_marker_info) == 0) next
-    
+
     binning_method    <- locus_marker_info$binning_method[1]
     locus_cols        <- grepl(paste0("^", locus_name, "(_allele_|_)\\d+"), colnames(genotypedata))
     raw_alleles       <- unlist(genotypedata[, locus_cols])
     unique_alleles    <- sort(unique(raw_alleles[!is.na(raw_alleles)]))
     if (length(unique_alleles) == 0) next
-    
+
     bins <- if (binning_method == "microsatellite") {
       repeat_length <- locus_marker_info$repeatlength[1]
       ceiling((unique_alleles - unique_alleles[1] + 1) / repeat_length)
@@ -466,7 +458,7 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
     } else {
       next
     }
-    
+
     alleles_definitions_bin[[locus_name]] <- data.frame(
       min = tapply(unique_alleles, bins, min),
       max = tapply(unique_alleles, bins, max)
@@ -487,13 +479,13 @@ define_alleles_for_plotting <- function(genotypedata, marker_info) {
 process_pie_data <- function(plot_data_df, data_type) {
   colnames(plot_data_df) <- c("Haplotype", "Amount", "Frequency")
   plot_data_df <- plot_data_df[!is.na(plot_data_df$Haplotype), ]
-  
+
   plot_data_df$Haplotype <- if (data_type == "length_polymorphic") {
     factor(plot_data_df$Haplotype, levels = sort(as.numeric(as.character(plot_data_df$Haplotype))))
   } else {
     as.factor(plot_data_df$Haplotype)
   }
-  
+
   plot_data_df$Label <- paste0(round(plot_data_df$Frequency * 100), "%")
   plot_data_df       <- plot_data_df[order(plot_data_df$Amount, decreasing = TRUE), ]
   if (nrow(plot_data_df) > 4) plot_data_df[5:nrow(plot_data_df), "Label"] <- ""
@@ -519,18 +511,18 @@ process_pie_data <- function(plot_data_df, data_type) {
 #' @noRd
 plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_type) {
   if (nrow(data_df) == 0) return(NULL)
-  
+
   plot_data_df  <- process_pie_data(data_df, data_type)
   title_marker  <- paste0(marker_name, "\n(n=", total_n, ")")
   colfunc       <- grDevices::colorRampPalette(c(color_marker, "white"))
-  
+
   plot_data_df <- plot_data_df %>%
     dplyr::mutate(
       csum = rev(cumsum(rev(.data$Amount))),
       pos  = .data$Amount / 2 + dplyr::lead(.data$csum, 1),
       pos  = dplyr::if_else(is.na(.data$pos), .data$Amount / 2, .data$pos)
     )
-  
+
   ggplot2::ggplot(
     plot_data_df,
     ggplot2::aes(x = "", y = .data$Amount, fill = forcats::fct_inorder(.data$Haplotype))
@@ -583,7 +575,7 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #' @noRd
 .bin_lp_alleles <- function(long_data, alleles_definitions_bin) {
   markers_with_bins <- intersect(unique(long_data$marker_id), names(alleles_definitions_bin))
-  
+
   purrr::map_dfr(markers_with_bins, function(marker) {
     bin_centers <- rowMeans(alleles_definitions_bin[[marker]], na.rm = TRUE)
     long_data %>%
@@ -623,11 +615,11 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #' @export
 plot_markers_diversity <- function(genotypedata,
                                    data_type,
-                                   marker_info     = NULL,
-                                   output_folder,
+                                   marker_info = NULL,
+                                   output_folder = NULL,
                                    filename_prefix = "diversity",
                                    max_cols        = 4) {
-  
+
   # Validation
   if (!data_type %in% c("length_polymorphic", "ampseq")) {
     stop("'data_type' must be \"length_polymorphic\" or \"ampseq\".")
@@ -635,46 +627,51 @@ plot_markers_diversity <- function(genotypedata,
   if (data_type == "length_polymorphic" && is.null(marker_info)) {
     stop("'marker_info' must be provided when data_type = \"length_polymorphic\".")
   }
-  
+
   sid_col <- grep("^sample.?id$", colnames(genotypedata), ignore.case = TRUE, value = TRUE)
   if (length(sid_col) == 0) stop("Input data must contain a 'Sample.ID' column.")
   genotypedata$Sample.ID <- as.character(genotypedata[[sid_col[1]]])
+
+  if (!is.null(output_folder)) {
+    if (!dir.exists(output_folder)) {
+      dir.create(output_folder, recursive = TRUE)
+    }
+  }
   
-  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  
+
   # Build combined frequency data
   if (data_type == "length_polymorphic") {
     alleles_definitions_bin <- define_alleles_for_plotting(genotypedata, marker_info)
-    
+
     long_data      <- .pivot_long_genotypes(genotypedata, "allele_length")
     binned_data    <- .bin_lp_alleles(long_data, alleles_definitions_bin)
     frequency_data <- .compute_frequencies(binned_data, "true_alleles")
     allele_col     <- "true_alleles"
-    
+
   } else {
     # Normalise Sample.ID tags for ampseq if needed
     if (!any(grepl(" Day ", genotypedata$Sample.ID))) {
       genotypedata$Sample.ID <- gsub("D0$",          " Day 0",       genotypedata$Sample.ID)
       genotypedata$Sample.ID <- gsub("D[1-9][0-9]*$", " Day Failure", genotypedata$Sample.ID)
     }
-    
+
     long_data      <- .pivot_long_genotypes(genotypedata, "haplotype")
     frequency_data <- .compute_frequencies(long_data, "haplotype")
     allele_col     <- "haplotype"
   }
-  
+
   if (nrow(frequency_data) == 0) {
     message("No frequency data could be computed. Skipping plot generation.")
     return(invisible(NULL))
   }
-  
+
   # Build pie charts 
   list_markers <- unique(frequency_data$marker_id)
   n_markers    <- length(list_markers)
-  
+
   base_colors <- RColorBrewer::brewer.pal(max(3, min(n_markers, 8)), "Set2")
   colors      <- rep_len(base_colors, n_markers)
-  
+
   p_array <- Map(function(marker_name, color) {
     plot_data <- dplyr::filter(frequency_data, .data$marker_id == marker_name)
     plot_pie_chart(
@@ -682,23 +679,25 @@ plot_markers_diversity <- function(genotypedata,
       color, marker_name, plot_data$TotalInfections[1], data_type
     )
   }, list_markers, colors)
-  
+
   p_array <- Filter(Negate(is.null), p_array)
   if (length(p_array) == 0) {
     message("No pie charts were generated.")
     return(invisible(NULL))
   }
-  
+
   # Arrange and save 
   num_cols     <- min(length(p_array), max_cols)
   num_rows     <- ceiling(length(p_array) / num_cols)
   final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
-  
-  output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
-  ggplot2::ggsave(output_path, plot = final_figure,
-                  width  = num_cols * 4,
-                  height = num_rows * 4,
-                  limitsize = FALSE)
-  
+
+  if (!is.null(output_folder)) {
+    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
+    ggplot2::ggsave(output_path, plot = final_figure,
+                    width  = num_cols * 4,
+                    height = num_rows * 4,
+                    limitsize = FALSE)
+  }
+
   invisible(final_figure)
 }

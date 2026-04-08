@@ -78,7 +78,7 @@ test_that("MalReBay: saves all expected output files", {
   expect_true(file.exists(file.path(tmp, "posterior_probabilities.csv")))
   expect_true(file.exists(file.path(tmp, "bayesian_match_counting_comparison.csv")))
   expect_true(file.exists(file.path(tmp, "diversity_length_polymorphic_comparison.png")))
-  expect_true(file.exists(file.path(tmp, "moi_per_marker_by_site.png")))
+  expect_gt(length(list.files(tmp, pattern = "^moi_per_marker_.*\\.png$")), 0)
   expect_true(file.exists(file.path(tmp, "recrudescence_probability_histogram.png")))
   expect_true(dir.exists( file.path(tmp, "convergence_diagnosis")))
 })

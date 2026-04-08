@@ -6,12 +6,12 @@
 \usage{
 plot_probability_histogram(
   summary_results,
-  output_folder = "results",
+  output_folder = NULL,
   verbose = TRUE
 )
 }
 \arguments{
-\item{summary_results}{A list returned by \code{\link{MalReBay}},
+\item{summary_results}{A list returned by \code{\link{summarise_results}},
 containing a \code{posterior_probabilities} data frame with a
 \code{Probability} column.}
 
@@ -22,10 +22,14 @@ PNG will be saved. Defaults to \code{"results"}.}
 saved. Defaults to \code{TRUE}.}
 }
 \value{
-Invisibly returns the file path of the saved PNG. Returns
-\code{invisible(NULL)} if no probabilities are available to plot.
+When \code{output_folder} is \code{NULL}, displays the histogram
+on the current graphics device and returns \code{invisible(NULL)}.
+When \code{output_folder} is provided, saves a PNG and returns the file
+path invisibly. Returns \code{invisible(NULL)} if no probabilities are
+available.
 }
 \description{
 Creates and saves a histogram of posterior probabilities of recrudescence
-for all patients. Also called automatically by \code{\link{MalReBay}}.
+for all patients. This is an internal function called automatically by
+\code{\link{MalReBay}}.
 }

@@ -8,7 +8,7 @@ plot_markers_diversity(
   genotypedata,
   data_type,
   marker_info = NULL,
-  output_folder,
+  output_folder = NULL,
   filename_prefix = "diversity",
   max_cols = 4
 )

@@ -1,13 +1,15 @@
 #' @keywords internal
 "_PACKAGE"
 
-utils::globalVariables(c("ESS_threshold", "R_hat_threshold", "full_loglik_history", "site"))
+# Add stanmodels and p_recrud here
+utils::globalVariables(c("ESS_threshold", "R_hat_threshold", "full_loglik_history", 
+                         "site", "stanmodels", "p_recrud"))
 
-## usethis namespace: start
-#' @importFrom stats rbeta setNames
-#' @importFrom utils str
-## usethis namespace: end
-# Imports: start ---- 
-# Imports: end ----
-
+#' @import Rcpp
+#' @import methods
+#' @importFrom rstan sampling
+#' @importFrom rstantools rstan_config
+#' @importFrom RcppParallel RcppParallelLibs
+#' @useDynLib MalReBay, .registration = TRUE
 NULL
+

@@ -14,12 +14,17 @@ save_results(
 \arguments{
 \item{summary_results}{List from \code{summarise_results}.}
 
-\item{imported_data}{List from \code{import_data}.}
+\item{imported_data}{List from \code{import_data}. When \code{NULL},
+data-dependent plots (diversity, MOI) are skipped.}
 
-\item{output_folder}{Path to save files. If \code{NULL}, plots are printed
-to the R plot window and CSVs are not saved.}
+\item{output_folder}{Path to save files. \code{NULL} prints plots to
+the R plot window and skips CSV saving.}
 
 \item{verbose}{Logical.}
+}
+\value{
+A named character vector of paths to the files that were written,
+or \code{invisible(NULL)} when \code{output_folder} is \code{NULL}.
 }
 \description{
 Writes MCMC results to CSV files and generates descriptive and
