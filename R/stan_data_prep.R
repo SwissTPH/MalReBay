@@ -1,4 +1,3 @@
-# =============================================================================
 # R/stan_data_prep.R
 # Step 1 of Stan transition — pure R, no Stan dependency
 #
@@ -14,10 +13,6 @@
 # Debugging workflow:
 #   sd <- prepare_stan_data(...)
 #   validate_stan_data(sd)   # must print ALL CHECKS PASSED before running Stan
-# =============================================================================
-
-
-# -----------------------------------------------------------------------------
 # prepare_stan_data()
 #
 # Arguments:
@@ -33,7 +28,6 @@
 # Returns:
 #   Named list ready for rstan::stan(data = ...).
 #   Also carries $allele_frequencies for use in extract_results().
-# -----------------------------------------------------------------------------
 #' Prepare Stan data for the length-polymorphic model
 #'
 #' Converts site-filtered genotype data and allele definitions into a named
@@ -113,8 +107,7 @@ prepare_stan_data <- function(late_failures_site,
     day0_rows <- grepl("Day 0",      late_failures_site$Sample.ID)
     dayf_rows <- grepl("recurrence", late_failures_site$Sample.ID)
 
-    # Fix #8: build a named lookup once (O(1) per query) rather than calling
-    # which(ids == p_id) inside the loop (O(N) per query).
+    # Build a named lookup once for O(1) per-query patient-index resolution.
     pid_idx <- setNames(seq_along(ids), ids)
 
     for(row_idx in seq_len(nrow(late_failures_site))){
@@ -133,10 +126,8 @@ prepare_stan_data <- function(late_failures_site,
       }
     }
     
-    # BUG 2 FIX: Count ALL observed alleles (trial + additional) into tmp_counts
-    # so that freq[k] is informed by real data, not just a flat Dirichlet(1,...,1).
-    # Previously only additional_site was counted; this mirrors what the old R
-    # does in findposteriorfrequencies (uses reinfection day-0 + recurrence alleles).
+    # Count all observed alleles (trial + additional) into tmp_counts so that 
+    # the Dirichlet prior on allele frequencies is informed by the observed data.
     
     # Count trial data alleles
     if(nrow(obs_trial) > 0){
@@ -166,7 +157,7 @@ prepare_stan_data <- function(late_failures_site,
   max_K <- max(K_site)
   additional_counts <- tmp_counts[, 1:max_K, drop=FALSE]
 
-  # ---- 3. Pruned Distance Array ----
+  # Pruned Distance Array
   dist_array <- array(0, dim = c(nloci, max_K, max_K))
   for (j in seq_len(nloci)) {
     if (K_site[j] > 0) {
@@ -175,7 +166,7 @@ prepare_stan_data <- function(late_failures_site,
     }
   }
   
-  # ---- 4. Method & Threshold logic ----
+  # Method & Threshold logic
   method_int <- sapply(locinames, function(ln) {
     m <- marker_info$binning_method[match(ln, marker_info$marker_id)]
     if(is.na(m)) return(3L)
@@ -189,9 +180,8 @@ prepare_stan_data <- function(late_failures_site,
     } else return(0)
   })
 
-  # ---- 5. Assemble and Return ----
-  # Fix #6: derive max_dist from the actual largest allele distance observed,
-  # not a hardcoded 100. This keeps log_dvect as small as needed.
+  # Derive max_dist from the largest allele distance in the data, 
+  # ensuring the distance vector is no larger than necessary.
   computed_max_dist <- max(1L, ceiling(max(dist_array)))
 
   return(list(

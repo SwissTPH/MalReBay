@@ -29,8 +29,8 @@ prepare_stan_data_ampseq <- function(late_failures_site,
   nids  <- length(ids)
   nloci <- length(locinames)
 
-  # ---- 1. Per-locus MOI and recoding ----
-  # MOI0 and MOIf are N x J (per locus), unlike length-polymorphic which is N x 1
+  # Per-locus MOI and recoded haplotype matrices
+  # MOI0 and MOIf are N x J (per locus)
   MOI0     <- matrix(0L, nids, nloci)
   MOIf     <- matrix(0L, nids, nloci)
   recoded0 <- matrix(0L, nids, maxMOI * nloci)
@@ -38,7 +38,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
 
   K_site      <- integer(nloci)
   id_maps     <- vector("list", nloci)
-  tmp_counts  <- matrix(0L, nloci, 500)  # 500-allele buffer; ampseq can have many haplotypes
+  tmp_counts  <- matrix(0L, nloci, 500)  
 
   for (j in seq_len(nloci)) {
     locus <- locinames[j]
@@ -82,7 +82,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
       n_fill <- min(n_alleles, maxMOI)
       slots  <- (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + n_fill)
       coded  <- as.integer(id_map[alleles_row[1:n_fill]])
-      coded[is.na(coded)] <- 0L  # safety: unknown haplotype -> 0
+      coded[is.na(coded)] <- 0L
 
       if (day0_rows[row_idx]) {
         recoded0[p_idx, slots] <- coded
@@ -94,8 +94,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
       }
     }
 
-    # BUG 2 equivalent fix: count BOTH trial and additional alleles for freq prior
-    # Trial data
+    # Prepare data
     trial_raw <- as.vector(obs_trial)
     trial_raw <- trial_raw[!is.na(trial_raw) & nchar(trimws(trial_raw)) > 0 & trial_raw != "NA"]
     if (length(trial_raw) > 0) {
@@ -126,14 +125,11 @@ prepare_stan_data_ampseq <- function(late_failures_site,
   max_K             <- max(K_site)
   additional_counts <- tmp_counts[, 1:max_K, drop = FALSE]
 
-  # ---- 2. Hidden flags ----
-  # For ampseq, all observed alleles are fully typed: hidden = 0 everywhere an
-  # allele was recorded, and position remains 0 (beyond MOI) otherwise.
-  # We still build the matrices for model generality.
+  # Hidden alleles 
   hidden0 <- matrix(0L, nids, maxMOI * nloci)
   hiddenf <- matrix(0L, nids, maxMOI * nloci)
 
-  # ---- 3. Assemble ----
+  # Define the variables
   return(list(
     N                 = nids,
     J                 = nloci,
@@ -148,7 +144,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
     hiddenf           = hiddenf,
     comparable        = matrix(as.integer(is_locus_comparable), nids, nloci),
     additional_counts = additional_counts,
-    # id_maps kept for diagnostics / back-mapping (not passed to Stan)
+    # id_maps kept for diagnostics
     .id_maps          = id_maps,
     .locinames        = locinames
   ))

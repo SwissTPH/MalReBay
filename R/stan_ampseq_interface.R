@@ -134,20 +134,18 @@ run_stan_sites_ampseq <- function(late_failures,
 
     if (!validate_stan_data_ampseq(stan_input)) next
 
-    # Init function: flat frequencies, low error/loss rates.
-    # Closure over sd so freq dimensions are correct.
-    # Note: q_dropout included to match all three parameters declared in the model.
+    # Define model priors
     init_fun <- local({
       sd_local <- sd
       function() {
         list(
-          q_mismatch = 0.01,   # matches old R initial value
-          q_loss     = 0.10,   # matches old R initial value
-          q_dropout  = 0.05,   # matches old R initial value
+          q_mismatch = 0.01,   
+          q_loss     = 0.10,   
+          q_dropout  = 0.05,   
           freq       = lapply(seq_len(sd_local$J), function(j) {
             x <- rep(0.1 / sd_local$max_K, sd_local$max_K)
             x[1:sd_local$K[j]] <- 1.0 / sd_local$K[j]
-            x / sum(x)  # ensure valid simplex
+            x / sum(x)  
           })
         )
       }
@@ -234,8 +232,6 @@ extract_stan_results_ampseq <- function(fit, ids, locinames, nloci, nids) {
   }
 
   n_draws     <- nrow(p_recrud_draws)
-  # locus_lrs and locus_dists not directly available from Stan output for ampseq.
-  # They would require adding generated quantities per locus — left as NA for now.
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))
   locus_dists <- array(NA_real_, dim = c(nids, nloci, n_draws))
 

@@ -1,8 +1,3 @@
-# =============================================================================
-# R/stan_interface.R
-# Revised version for optimized performance
-# =============================================================================
-
 #' Run Stan MCMC for length-polymorphic marker sites
 #'
 #' Loops over sites in the data, prepares Stan input, runs HMC sampling, and
@@ -67,7 +62,7 @@ run_stan_sites <- function(late_failures,
   out_stan_fits       <- list()
   
   # Initialization function to prevent Stan from getting stuck at start.
-  # Note: theta_recrud is NOT a parameter (removed in BUG 1 FIX) — do not include it.
+  # Note: theta_recrud is not a model parameter; recrudescence prior is fixed at 0.5.
   init_fun <- function() {
     list(
       qq             = 0.1,

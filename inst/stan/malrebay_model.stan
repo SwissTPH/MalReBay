@@ -1,9 +1,23 @@
 // =============================================================================
-// inst/stan/malrebay_model.stan
-// MalReBay -- length-polymorphic Bayesian recrudescence model
+// malrebay_model.stan
+// Bayesian recrudescence model for genotyping markers
+//
+// Goal: classify each recurrence as recrudescence (same infection) or
+// reinfection (new infection) using Day 0 vs recurrence genotypes.
+//
+// For each patient, we compute a summary log-likelihood ratio (SLR):
+//   SLR > 0 → supports recrudescence
+//   SLR < 0 → supports reinfection
+//
+// Posterior probability = inv_logit(SLR)
+// Prior P(recrudescence) = 0.5 (data-driven classification)
 // =============================================================================
 
 functions {
+  // Allele similarity:
+  // 1 = microsatellite (distance-based decay)
+  // 2 = MSP/GLURP (same vs different family)
+  // 3 = exact match only
   real dist_log_prob_logic(data real dist, vector log_dvect, data int method,
                            real l_q_cf, real l1m_q_cf, data real threshold) {
     if (method == 1) {
@@ -18,6 +32,11 @@ functions {
   }
 }
 data {
+  // N patients, J loci, up to maxMOI clones per locus
+  // Alleles encoded as integers (1..K[j])
+  // hidden0/hiddenf: unobserved allele slots
+  // comparable[i,j]: locus observed at both timepoints
+  // additional_counts: background data for allele frequencies
   int<lower=1> N; int<lower=1> J; int<lower=1> maxMOI; int<lower=1> max_K; int<lower=1> max_dist;
   array[J] int<lower=1> K;
   array[N, J*maxMOI] int<lower=0> recoded0; array[N, J*maxMOI] int<lower=0> recodedf;
@@ -30,16 +49,23 @@ data {
   array[J, max_K] int<lower=0> additional_counts;
 }
 parameters {
+  // qq: within-family mismatch (genotyping error)
+  // qq_crossfamily: cross-family similarity (rare)
+  // d_param: decay rate for microsatellite distance
+  // freq[j]: allele frequencies per locus
   real<lower=0,upper=1> qq;
   real<lower=0,upper=1> qq_crossfamily;
   real<lower=0,upper=1> d_param;
-  // BUG 1 FIX: theta_recrud removed -- implicit 50/50 prior per patient,
-  // matching the old R MCMC. A shared theta caused a positive feedback loop
-  // pulling all p_recrud toward 1.
   array[J] simplex[max_K] freq;
 }
 transformed parameters {
-  // --- Distance distribution ---
+  // 1. Build similarity distribution from d_param
+  // 2. Precompute locus-level log-probability matrices
+  // 3. Compute SLR per patient:
+  //    - compare all allele pairs
+  //    - handle hidden alleles via marginalisation
+  //    - divide by freq → likelihood ratio
+  //    - sum across loci (assumes independence)
   vector[max_dist] log_dvect;
   {
     vector[max_dist] dvect;
@@ -50,16 +76,15 @@ transformed parameters {
 
   real l_q_cf   = log(qq_crossfamily + 1e-10);
   real l1m_q_cf = log1m(qq_crossfamily);
-  // Note: l_q (log qq) was removed -- BUG 3 FIX showed qq cancels in all LR cases.
 
-  // --- Per-locus precomputed matrices ---
+  // Per-locus precomputed matrices
   array[J] vector[max_K]        log_freq;
   array[J] matrix[max_K, max_K] log_dist_mat;
   array[J] vector[max_K]        log_dist_row_sums;
 
-  // Fix #3: locus-level constants -- computed once per leapfrog step, not per patient.
-  // log_both_hidden[j] : LR numerator when both alleles are hidden (h0=1, hf=1).
-  // log_col_sum[j][kf] : LR numerator when only h0 is hidden (h0=1, hf=0), indexed by kf.
+  // Per-locus constants computed once per leapfrog step rather than per patient. 
+  // log_both_hidden[j] : LR contribution when both Day-0 and recurrence alleles are hidden. 
+  // log_col_sum[j][kf] : LR contribution when only the Day-0 allele is hidden, indexed by kf.
   array[J] real           log_both_hidden;
   array[J] vector[max_K]  log_col_sum;
 
@@ -79,14 +104,14 @@ transformed parameters {
       log_dist_row_sums[j][k1] = log_sum_exp(log_dist_mat[j][k1, 1:K[j]]);
     }
 
-    // Precompute per-locus constants (fix #3)
+    // Precompute per-locus constants
     log_both_hidden[j] = log_sum_exp(log_freq[j, 1:K[j]] + log_dist_row_sums[j, 1:K[j]]);
     for (kf in 1:K[j])
       log_col_sum[j][kf] = log_sum_exp(log_freq[j, 1:K[j]] + col(log_dist_mat[j], kf)[1:K[j]]);
   }
 
-  // Fix #2: move per-patient SLR into transformed parameters so the model block
-  // is trivial and generated quantities requires no re-computation.
+  // Per-patient summary log-likelihood ratios (SLR) computed here so the model 
+  // block stays concise and generated quantities avoids redundant computation.
   vector[N] slr_vec;
   for (i in 1:N) {
     real slr = 0.0;
@@ -102,13 +127,10 @@ transformed parameters {
             if (h0 == 0 && hf == 0) {
               lpr[p_idx] = log_dist_mat[j, k0, kf] - log_freq[j, kf];
             } else if (h0 == 1 && hf == 0) {
-              // BUG 3 FIX: l_q cancelled; use precomputed log_col_sum[j][kf]
               lpr[p_idx] = log_col_sum[j][kf] - log_freq[j, kf];
             } else if (h0 == 0 && hf == 1) {
-              // BUG 3 FIX: l_q cancelled; denominator sums to 1
               lpr[p_idx] = log_dist_row_sums[j, k0];
             } else {
-              // BUG 3 FIX: both hidden; use precomputed log_both_hidden[j]
               lpr[p_idx] = log_both_hidden[j];
             }
             p_idx += 1;
@@ -120,23 +142,34 @@ transformed parameters {
     slr_vec[i] = slr;
   }
 }
+
 model {
+  // Priors:
+  // qq ~ Beta(1,1)
+  // qq_crossfamily ~ Beta(1,1000)
+  // d_param ~ Beta(2,2)
+  // freq ~ Dirichlet (with additional data)
+
+  // Likelihood:
+  // 50/50 mixture of recrudescence vs reinfection
+  // log_sum_exp(slr, 0) implements this
   qq             ~ beta(1, 1);
   qq_crossfamily ~ beta(1, 1000);
   d_param        ~ beta(2, 2);
-  // BUG 1 FIX: theta_recrud prior removed
   for (j in 1:J) {
     vector[max_K] alpha = rep_vector(0.1, max_K);
     for (k in 1:K[j]) alpha[k] = 1.0;
     freq[j]              ~ dirichlet(alpha);
     additional_counts[j] ~ multinomial(freq[j]);
   }
-  // BUG 1 FIX: log_sum_exp(slr, 0.0) = log(exp(slr) + 1), equivalent to theta=0.5
   for (i in 1:N)
     target += log_sum_exp(slr_vec[i], 0.0);
 }
+
+
 generated quantities {
-  // Fix #2: slr_vec already computed in transformed parameters -- trivial here.
-  // Fix #4 (consistency): inv_logit(slr) = LR/(1+LR), equivalent to theta=0.5
+  // Convert each patient's SLR back to a probability on [0, 1].
+  // inv_logit(slr) is equivalent to LR / (1 + LR), which is the posterior
+  // probability of recrudescence under the equal 0.5 / 0.5 prior.
   vector[N] p_recrud = inv_logit(slr_vec);
 }
