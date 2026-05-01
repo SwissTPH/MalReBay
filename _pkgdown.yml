@@ -1,4 +1,27 @@
-url: ~
+url: https://swisstph.github.io/MalReBay
 template:
   bootstrap: 5
 
+reference:
+- title: Functions
+  desc: >
+    Run the full Bayesian recrudescence classification pipeline,
+    from importing genotype data to saving posterior probabilities and diagnostic plots. 
+  contents:
+  - MalReBay
+- title: Data import
+  desc: >
+   Import and validate paired genotyping data from an Excel file, automatically detecting 
+   whether the data is length-polymorphic or amplicon sequencing.
+  contents:
+  - import_data
+- title: Plotting helpers
+  desc: >
+    Visualize results to help you tune hyperparameters and choose model methods.
+  contents:
+  - plot_likelihood_diagnostics
+  - plot_probability_histogram
+  - plot_moi
+  - plot_markers_diversity  
+  
+  

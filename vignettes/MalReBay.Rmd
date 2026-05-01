@@ -1,11 +1,11 @@
 ---
-title: "MalReBay"
+title: "Getting Started with MalReBay"
 output:
   rmarkdown::html_vignette:
     toc: true
-    toc_depth: 4
+    toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{MalReBay}
+  %\VignetteIndexEntry{Getting Started with MalReBay}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,118 +22,108 @@ color: grey
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment  = "#>",
+  message  = FALSE,
+  warning  = FALSE
 )
+
+# Skip Stan-dependent chunks if CmdStan is not available (e.g. during R CMD check)
+cmdstan_ok <- tryCatch({
+  path <- cmdstanr::cmdstan_path()
+  nzchar(path) && file.exists(path)
+}, error = function(e) FALSE)
+
+knitr::opts_chunk$set(eval = cmdstan_ok)
 ```
 
 
 ## 1. Introduction
 
-To monitor the effectiveness of antimalarial drugs, the **World Health Organization (WHO)** recommends the use of **Therapeutic Efficacy Studies (TES)**. TES are observational studies in which patients with uncomplicated malaria are treated and followed for several weeks to check if the infection clears and remains suppressed. Because patients can become re-infected during this follow-up period, distinguishing whether a recurrence is due to **recrudescence** (the reappearance of parasites from the original infection after partial clearance) or a **reinfection** (a new infection from a separate mosquito bite) is essential. This process, known as **molecular correction**, relies on comparing parasite genotypes from the initial infection and any subsequent recurrence.
+The **World Health Organization (WHO)** recommends **Therapeutic Efficacy Studies (TES)** to monitor how well antimalarial drugs are working. In a TES, patients with uncomplicated malaria are treated and then followed for several weeks. The goal is to check whether their infection cleared and stayed away.
 
-`MalReBay` is an R package that implements a **Bayesian framework** for molecular correction in malaria therapeutic efficacy studies. Instead of making a direct deterministic call, it uses genotyping data from a patient’s initial infection (day 0) and their recurrent infection to estimate the probability that a **recurrence** is due to **recrudescence** versus **reinfection**. Unlike rule-based methods, it explicitly incorporates genotyping uncertainty, within-host diversity, and local allele frequency information, providing a principled and robust classification.
+A key challenge in these studies is telling apart two reasons why parasites may return after treatment:
 
-This tutorial provides a step-by-step guide to the main analysis workflow, from loading your data to interpreting the final results. We will first review the conceptual framework of the package and then walk through a practical example, from loading data to interpreting the final results.
++ **Recrudescence:** the same parasites from the original infection come back. This means the treatment did not fully work.
+
++ **Reinfection:** a completely new infection from a different mosquito bite.
+
+Telling these two apart is called **molecular correction**. It works by comparing the parasite's genetic fingerprint from the start of treatment (Day 0) to the fingerprint from the time of recurrence.
+
+`MalReBay` is an R package that does this comparison using a **Bayesian statistical model**. Instead of giving a simple yes or no answer, it gives a probability score between 0 and 1 for each patient. A score close to 1 means recrudescence is very likely. A score close to 0 means reinfection is very likely. This approach is more informative than simple rule-based methods because it accounts for uncertainty in the data.
 
 
-## 2. Bayesian framework for molecular correction
+## 2. How MalReBay works
 
-`MalReBay` applies a Bayesian model to classify each malaria recurrence as a **recrudescence** or a **reinfection**. For each patient $i$, a binary variable $R_i$ indicates the recurrence cause:
-$R_i = 1$ for recrudescence and $R_i = 0$ for reinfection.
+For each patient, the model asks: given the genetic data we have, how likely is it that this recurrence is a treatment failure?
 
-Bayesian inference updates prior beliefs about $R_i$ using the observed genotyping data $D_i$, producing the posterior probability $P(R_i=1|D_i,\theta)$. 
+![Overview of the Bayesian inference framework workflow.](figure/Bayesian_Framework2.png){width="100%"}
 
-The figure below illustrates this process, in which prior probabilities and data likelihoods are combined through Bayes’ rule to obtain the posterior probabilities that drive recurrence classification.
+The model has three parts:
 
-![Overview of the Bayesian inference framework implemented in MalReBay.](figure/Bayesian_Framework2.png){width="100%"}
++ **Prior belief:** before looking at any data, we assume there is an equal chance of recrudescence or reinfection (50/50). This means the model does not favour one outcome over the other from the start.
 
-+ Prior $P(R_i)$ is the baseline belief about recrudescence before seeing the data.
++ **Likelihood:** the model looks at the genetic data and asks how well each hypothesis (recrudescence or reinfection) explains what was observed. It takes into account allele frequencies in the local population, the number of parasite clones in each sample, and possible laboratory errors such as allele dropout.
 
-+ Likelihood $P(D_i|R_i)$ is the probability of the observed allele patterns given each hypothesis, accounting for allele frequencies, within-host diversity, and genotyping errors.
++ **Posterior probability:** the model combines the prior belief with the evidence from the data to produce a final probability score for each patient.
 
-+ Posterior $P(R_i|D_i)$ is the updated probability that a recurrence is a recrudescence after combining priors and data.
+The model uses a method called **MCMC sampling** (Markov chain Monte Carlo) to calculate these probabilities. Think of MCMC as a search process that explores millions of possible explanations for the data and settles on the most consistent answer. MalReBay runs this process using **Stan**, a widely used statistical computing engine.
 
-+ Recurrences events are classified as recrudescence when $P(R_i|D_i)$ exceeds a threshold (e.g., 0.5).
-
-In practice, these probabilities cannot be solved analytically because the posterior distribution has no closed form; therefore, MalReBay uses Markov chain Monte Carlo (MCMC) sampling to approximate them.
 
 ## 3. The MalReBay workflow
-The workflow begins with paired genotyping data from `day 0` and `day of recurrence` infections. These data are combined with model parameters (e.g., genotyping error rates, within-host diversity, allele frequencies) and analyzed using a Markov chain **Monte Carlo (MCMC)** algorithm. The output is the posterior probability of recrudescence for each recurrence, which can then be summarized at both the patient and study level.
+
+The full analysis runs in four main stages:
+
+```
+import_data()          Read and check your Excel files
+      |
+classify_infections()  Run the Bayesian model
+      |
+summarise_results()    Summarise the outputs
+      |
+save_results()         Save tables and plots to your chosen folder
+```
+
+The main `MalReBay()` function runs all four stages automatically. You only need to provide your data files and a folder to save the results.
 
 
-The main `MalReBay()` function automates this process—from loading the genotyping data and parameter settings to generating posterior estimates and final recurrence classifications. The following sections describe each input type and how to prepare your data for analysis.
+## 4. Preparing your data
 
+`MalReBay` works with two types of genotyping data:
 
-## 4. Input Data
++ **Length-polymorphic markers** such as microsatellites, MSP, and GLURP. These store fragment lengths measured in base pairs.
 
-`MalReBay` can analyze two main types of genotyping data:
++ **Amplicon sequencing data.** These store haplotype labels (text codes) instead of numbers.
 
-+ Length-polymorphic markers (e.g., microsatellites, MSP, GLURP).
-
-+ Amplicon sequencing data (haplotype).
-
-The primary input is an Excel file containing genotyping data from a TES.
-
-The input format differs slightly depending on which data type you are working with. Below we describe each format and provide examples.
-
-
+Both types are provided as Excel files. The structure is the same for both.
 
 ### 4.1 Length-polymorphic markers
 
-For length-polymorphic markers, the input Excel file should have the following structure:
-+ A `Sample.ID` column that uniquely identifies each sample and includes "Day 0" or "Day of recurrence".
+Your Excel file must have:
 
-+ The day of sampling (0 for baseline, X for recurrence). Note sometimes this is included in the Sample.ID column (e.g., `BD21-002D0` and `BD21-002D42`).
++ A `Sample.ID` column that identifies each sample. Each name must include either "Day 0" or "recurrence" so the package knows which sample is which. For example: `BD21-002 Day 0` and `BD21-002 recurrence`.
 
-+ A `Site` column indicating the geographical origin of the sample.
++ A `Site` column showing where the sample was collected.
 
-+ Marker columns named like `LocusName_AlleleNumber` (e.g., `313_1`, `313_2`, `313_3`, etc.), where each cell represents the parasite clones fragment length observed in base pairs.
++ Marker columns named as `MarkerName_AlleleNumber` (for example `TA1_1`, `TA1_2`). Each cell holds the fragment length in base pairs for one parasite clone.
 
-Here is an example of the expected input format for length-polymorphic data:
-![Length polymorphic](figure/angola_1.png){width="100%"}
+Here is an example of the expected layout:
+
+![Length polymorphic data layout.](figure/angola_1.png){width="100%"}
 
 ### 4.2 Amplicon sequencing data
 
-For amplicon sequencing, the marker columns store haplotype labels instead of allele lengths. The input Excel file has a similar structure to length-polymorphic data:
+The layout is the same as for length-polymorphic data. The only difference is that the marker columns contain haplotype labels (text strings) instead of fragment lengths.
 
-Here is an example of the expected input format for amplicon sequencing data:
-![Amplicon sequencingt](figure/ampseq_1.png){width="100%"}
+Here is an example of the expected layout:
 
-
-## 5. Descriptive analysis
-
-Before running the main classification analysis, it is often helpful to explore your genotyping data. `MalReBay` provides specialized functions to visualize **allele and haplotype diversity**, tailored to the type of data you are analyzing. These exploratory analyses can reveal which markers are **most informative or frequent in the population**, assess the **quality and completeness of the genotyping data**, and evaluate the **overall polymorphism and richness of the markers**, all of which are important for robust downstream analyses.
+![Amplicon sequencing data layout.](figure/ampseq_1.png){width="100%"}
 
 
-### 5.1 Length-polymorphic markers
+## 5. Step-by-step example: length-polymorphic markers
 
-For datasets with length-polymorphic markers, we now focus on **MOI (Multiplicity of Infection) and allele diversity visualizations**:
+This section walks through a complete analysis using an example dataset that comes with the package. The data are from a Therapeutic Efficacy Study carried out in Angola in 2021. It includes 7 microsatellite markers (`313`, `383`, `TA1`, `POLYA`, `PFPK2`, `2490`, `TA109`) from 70 patients across three study sites: Benguela, Lunda Sul and Zaire.
 
-+ **MOI Violin Plots:** Show the distribution of the number of distinct parasite clones per infection, providing insight into infection complexity across samples.  
-
-+ **Allele Diversity Pie Charts:** Display the relative frequencies of different alleles within each marker, highlighting dominant alleles and overall marker polymorphism.
-
-+ These plots facilitate comparison of parasite population structure between baseline and recurrence samples.
-
-### 5.2 Amplicon sequencing data
-
-For amplicon sequencing datasets, we present similar visualizations:
-
-+ **MOI Violin Plots:** Illustrate the number of distinct haplotypes per infection. 
-
-+ **Haplotype Diversity Pie Charts:** Summarize the relative abundance of haplotypes for each marker.  
-+ These plots help identify dominant haplotypes, assess genetic diversity, and detect shifts in the parasite population over time.
-
-
-
-
-## 6. Example of classification: length-polymorphic markers
-
-In this section, we provide a step-by-step example of using the `MalReBay` package to classify recurrent malaria infections with length-polymorphic genotyping data.
-
-We will use an example dataset included with the package, containing data from a Therapeutic Efficacy Study (TES) conducted in Angola in 2021. The dataset includes 7 microsatellite markers; `313`, `383`, `TA1`, `POLYA`, `PFPK2`, `2490`, `TA109`, genotyped from 70 patients from three study sites: Benguela, Lunda Sul and Zaire.
-
-First, we need to load the `MalReBay` package, along with a couple of other useful packages for data handling and plotting.
+The example focuses on the Benguela site.
 
 ```{r required packages, message=FALSE, warning=FALSE}
 library(MalReBay)
@@ -145,52 +135,41 @@ library(here)
 library(kableExtra)
 ```
 
-#### Step 1: Load data
+### Step 1: Load the data
 
-We import the example dataset using `MalReBay:::import_data()`. The dataset includes both late failure samples and any additional samples. We then process the sample IDs to extract the patient identifier and day of sampling (baseline or day of recurrence).
+We read the example files using `import_data()`. This function reads both the genotyping file and the marker information file, checks the data, and prepares it for analysis.
 
 ```{r get-data-path-length}
 input_file_lp <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
 marker_file   <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
-# Import and validate data
 imported_data <- MalReBay::import_data(
-  filepath = input_file_lp, 
+  filepath        = input_file_lp,
   marker_filepath = marker_file
 )
 ```
 
+### Step 2: Set an output folder
 
-#### Step 2: Define an Output Folder
-
-An output folder is defined to store results generated by the analysis. If the folder does not already exist, it will be created automatically.
+Choose a folder where all results, tables, and plots will be saved. If the folder does not exist yet, it will be created automatically.
 
 ```{r define-output-dir-length}
-# Use a temporary directory 
 output_dir_lp <- file.path(tempdir(), "malrebay_results")
 
-if (!dir.exists(output_dir_lp)) { 
+if (!dir.exists(output_dir_lp)) {
   dir.create(output_dir_lp, recursive = TRUE)
 }
 
-# Prepare data for descriptive plots
 genotypedata_lp <- dplyr::bind_rows(imported_data$late_failures, imported_data$additional)
 ```
 
+### Step 3: Explore your data
 
-#### Step 3: Descriptive statistics
+Before running the model, it is good practice to look at the data. MalReBay provides two plots to help with this.
 
-In this step, we generate summary statistics to explore the genetic characteristics of the data before running the Bayesian model. Two key measures are considered:
+**Multiplicity of Infection (MOI):** this plot shows how many distinct parasite clones were found per marker in each sample. A higher MOI means the patient was infected by more than one parasite strain at the same time.
 
-+ Multiplicity of Infection (MOI): estimates the number of distinct parasite clones per marker in each sample, providing insight into within-host diversity.
-
-+ Marker diversity: visualizes the distribution of allele sizes for each marker, helping to assess the level of genetic variability in the study population.
-
-These descriptive outputs give context for interpreting molecular correction results and can highlight potential sources of genotyping uncertainty.
-
-##### Multiplicity of Infection (MOI) 
-
-```{r MOI,fig.width=7, fig.height=5, message=FALSE, out.width='100%', fig.alt="Violin plot showing the multiplicity of infection per marker for the length-polymorphic dataset."}
+```{r MOI, fig.width=7, fig.height=5, message=FALSE, out.width='100%', fig.alt="Violin plot showing the multiplicity of infection per marker."}
 if (nrow(genotypedata_lp) > 0) {
   first_site      <- unique(genotypedata_lp$Site)[1]
   genotypedata_s1 <- dplyr::filter(genotypedata_lp, Site == first_site)
@@ -203,48 +182,42 @@ if (nrow(genotypedata_lp) > 0) {
 }
 ```
 
+**Marker diversity:** this plot shows how common each allele is within each marker. Markers with many different alleles at similar frequencies are more useful for telling apart recrudescence from reinfection.
 
-##### Marker diversity
-```{r marker-diversity-length-descriptive,fig.width=7, out.width='100%', fig.height=5, message=FALSE, fig.alt="A set of pie charts showing the allele diversity for each microsatellite marker."}
+```{r marker-diversity-length-descriptive, fig.width=7, out.width='100%', fig.height=5, message=FALSE, fig.alt="Pie charts showing allele diversity for each microsatellite marker."}
 if (nrow(genotypedata_lp) > 0) {
-  MalReBay::plot_markers_diversity(
-    genotypedata    = genotypedata_lp,
-    data_type       = "length_polymorphic",
-    marker_info     = imported_data$marker_info,
-    output_folder   = output_dir_lp
+  div_plot <- MalReBay::plot_markers_diversity(
+    genotypedata  = genotypedata_lp,
+    data_type     = "length_polymorphic",
+    marker_info   = imported_data$marker_info,
+    output_folder = output_dir_lp
   )
+  if (!is.null(div_plot)) print(div_plot)
 }
 ```
 
-#### Step 4: MCMC Configuration
+### Step 4: Configure and run the analysis
 
-The MCMC sampler has several parameters that control its runtime and convergence criteria. For this quick tutorial, we will use a relaxed configuration. For a real analysis, you should use more iterations (e.g., `max_iterations` should be 10000 or more) and stricter thresholds to ensure robust convergence.
+The model has a few settings that control how long the sampling runs. The table below explains each one.
 
-##### Parameter Definitions
+| Setting | What it does |
+|---|---|
+| `n_chains` | How many independent sampling runs to perform. More chains give more reliable results. |
+| `iter` | Total number of steps per chain. More steps improve accuracy but take longer. For a real study use 2000 or more. |
+| `burn_in_frac` | The fraction of early steps to discard while the sampler is warming up. The default of 0.5 works well in most cases. |
+| `adapt_delta` | Controls how carefully the sampler moves through the parameter space. A higher value (up to 1.0) reduces errors but runs more slowly. |
 
-+ **iter:** The total number of iterations per chain (including warmup).
-
-+ **burn_in_frac:** The fraction of iterations used for warmup (typically 0.5).
-
-+ **chains:** The number of independent Markov chains to run..
-
-+ **adapt_delta:** (Stan-specific) Controls the step size during sampling. Increasing this (e.g., to 0.95) helps with "divergent transitions."
-
-
-#### Step 5: Execute the Main Function
-
-Now we can run the analysis. `MalReBay()` will print progress messages to the console, informing you about the data type it detected, the sites it is analyzing, and the status of the MCMC convergence.  The 'future' package is used in the background for parallel processing, so you can expect the analysis to run faster on multi-core machines.
+For a real analysis, use at least 2000 iterations. The quick settings below are fine for exploring the results but may not be suitable for publication.
 
 ```{r run-analysis-length, cache=TRUE}
-# Define a config list
 quick_config <- list(
   n_chains     = 2,
-  iter         = 1000,   # Increased from 300 to ensure Stan finishes
+  iter         = 1000,
   burn_in_frac = 0.5,
+  adapt_delta  = 0.8,
   random_seed  = 42
 )
 
-# Run the full pipeline
 results <- MalReBay::MalReBay(
   filepath        = input_file_lp,
   marker_filepath = marker_file,
@@ -254,87 +227,61 @@ results <- MalReBay::MalReBay(
 )
 
 if (is.null(results)) {
-  knitr::knit_exit("MCMC failed to produce results; skipping remaining chunks.")
+  knitr::knit_exit("The model did not produce results. Please check your data and try again.")
 }
 ```
 
+### Step 5: View the results
 
+The `results` object contains four items:
 
-The `MalReBay()` function returns a list containing two key data frames:
++ `posterior_probabilities`: the main results table with one row per patient.
++ `comparison`: a side-by-side table comparing MalReBay probabilities with match-counting results.
++ `convergence`: convergence diagnostic summaries for each site.
++ `mcmc_loglikelihoods`: the raw sampling history, used for diagnostic plots.
 
-+ `summary`: Main results for each patient, including the posterior probability of recrudescence and the number of comparable loci.
+The most important output is `posterior_probabilities`. The key columns are:
 
-+ `marker_details`: Detailed information on each marker for each patient.
++ **Site:** the study site where the sample was collected.
++ **Sample.ID:** the patient identifier.
++ **Probability:** the probability that the recurrence is a recrudescence. A value close to 1 means recrudescence is very likely. A value close to 0 means reinfection is very likely.
++ **N_Available_D0 / N_Available_DF:** the number of markers with data at Day 0 and at the day of recurrence.
++ **N_Comparable_Loci:** the number of markers that had data at both time points and were used in the classification.
 
 ```{r view-summary-length}
-# Access the main results table
 summary_df <- results$posterior_probabilities
 
-knitr::kable(head(summary_df), caption = "Classification results showing posterior probabilities.")
+benguela_df <- dplyr::filter(summary_df, Site == "Benguela")
+
+knitr::kable(
+  benguela_df,
+  caption = "Classification results for Benguela showing posterior probabilities.",
+  digits  = 3
+)
 ```
 
-Key columns in the summary include:
+### Step 6: Plot the results
 
-+ **Site**: The geographical site of the sample.
+A histogram of all posterior probabilities gives a quick overview of the study population. If patients separate clearly into two groups (one near 0 and one near 1), the model is confident in its classifications. Patients with probabilities in the middle (around 0.5) are harder to classify and may need further review.
 
-+ **Sample.ID**: The unique patient identifier.
-
-+ **Probability**: The posterior probability that the infection is a **recrudescence**. A value near 1.0 suggests recrudescence, while a value near 0.0 suggests reinfection.
-
-+ **N_Available_D0 / N_Available_DF**: The number of loci with genetic data at Day 0 and Day of Failure, respectively.
-
-+ **N_Comparable_Loci**: The number of loci with data at *both* time points, which is the amount of data used for the classification.
-
-
-
-#### Step 6: Visualizing the Results
-
-A histogram of the posterior probabilities provides a clear overview of the classification results. If the histogram shows a clear separation into two groups (one near 0 and one near 1), this indicates high confidence in distinguishing recrudescence from reinfection.
-
-The histogram allows you to visually assess the certainty of the classifications and to identify any ambiguous cases for further investigation.
-
-```{r plot-histogram-length, fig.width=6, fig.height=4, out.width='100%', fig.alt="Histogram showing the distribution of posterior probabilities of recrudescence."}
-# Generate the histogram (this is also saved in Step 4 automatically)
+```{r plot-histogram-length, fig.width=6, fig.height=4, out.width='100%', fig.alt="Histogram of posterior probabilities of recrudescence."}
 MalReBay::plot_probability_histogram(results)
 ```
 
-<p class="caption"> In this example run, we see a clear group of patients with low probability (likely reinfections) and another group with high probability (likely recrudescences).</p>
+<p class="caption">A clear split between patients near 0 (likely reinfections) and patients near 1 (likely recrudescences) shows that the model has enough information to classify most cases with confidence.</p>
 
+### Step 7: Check convergence
 
+Convergence means that the sampling process has settled on a stable answer. MalReBay checks this automatically and reports the results in `results$convergence`. You can also view the diagnostic plots interactively.
 
-#### Step 7: Convergence diagnosis
+Good convergence is shown by:
 
-Convergence is monitored automatically during sampling using both the log-likelihood and standard diagnostics. By default, the algorithm will stop once the following criteria are met:
++ **R-hat values below 1.1:** R-hat measures how similar the results are across independent chains. A value close to 1.0 is ideal.
++ **Effective Sample Size (ESS) above your chosen threshold:** ESS measures how many truly independent samples were produced. A higher value means more reliable estimates.
++ **Trace plots that look like fuzzy caterpillars:** chains should overlap and move up and down without any clear trend or drift.
++ **Autocorrelation that drops to zero quickly:** this means each sample is contributing new information.
 
-+ **R-hat (Gelman–Rubin diagnostic):** All monitored parameters must have $\hat{R} < 1.1$ and the Gelman–Rubin plot should stabilize near 1.0 and remain below the 1.1 threshold.
-
-+ **Effective Sample Size (ESS):** The number of effectively independent samples must exceed the user-defined threshold (the value defined in parameter `ess_threshold`)
-
-+ **Maximum iterations:** If convergence has not been reached, sampling stops once the iteration cap (the value defined in parameter `max_iterations`).
-
-
-
-##### How to Generate Plots Interactively
-
-The `MalReBay()` function saves the MCMC log-likelihood data for each site within its results object. You can use the exported `plot_likelihood_diagnostics` function to view the plots for any site interactively in your R session.
-
-The key plots for diagnostics are:
-
-+ **Trace plot:** Chains should look like "fuzzy caterpillars" with no trends.
-
-+ **Gelman-Rubin plot:** The shrink factor should approach 1.
-
-+ **Histogram:** Shows the posterior distribution of the log-likelihood.
-
-+ **Autocorrelation (ACF) plot:** Correlation should drop to zero quickly.
-
-
-##### Example: Diagnostics for a Single Site
-
-Below is an example using the site `Benguela`, demonstrating how to generate and visualize the convergence diagnostics:
-
-```{r convergence-diagnostics-LP, dev = "png", fig.width = 10, fig.height = 8, fig.alt = "Convergence diagnostic plots for the Benguela site."}
-# Select the first site for diagnostic plotting
+```{r convergence-diagnostics-LP, fig.width=10, fig.height=8, out.width='100%', fig.alt="Four convergence diagnostic plots arranged in a 2 by 2 grid for the Benguela site."}
 site_to_plot <- names(results$mcmc_loglikelihoods)[1]
 loglik_data  <- results$mcmc_loglikelihoods[[site_to_plot]]
 
@@ -344,137 +291,125 @@ if (!is.null(loglik_data)) {
     site_name                = site_to_plot,
     stan_fit                 = results$stan_fits[[site_to_plot]],
     save_plot                = FALSE,
-    output_folder            = NULL,
+    combine_plots            = TRUE,
     verbose                  = FALSE
   )
 }
 ```
 
+### Step 8: Compare with match counting
 
-These trace, Gelman–Rubin, histogram, and ACF plots collectively provide visual assurance that the MCMC chains have mixed well and stabilized.
-
-#### Step 8: Comparison with other methods
-
-To evaluate the performance of the Bayesian classification in MalReBay, we compare its results against a simpler **match-counting algorithm**. This algorithm counts allele matches between Day 0 and recurrence samples to provide a baseline for comparison.
-
-For length-polymorphic markers, we combine the outputs of `MalReBay` and the `match-counting` algorithm into a single table. This allows us to examine, for each patient:
-
-+ The number of loci compared and the number of matches between samples.
-+ The per-locus results from match-counting (`R` for match, `NI` for non-match, `IND` for indeterminate).
-+ The posterior probability of recrudescence from `MalReBay` (MalReBay_Probability).
+The `results$comparison` table lets you compare MalReBay probabilities against the traditional match-counting method. Each row shows, for one patient, how many markers were compared, how many matched, the per-marker result (R for match, NI for no match, IND for not enough data), and the MalReBay probability.
 
 ```{r comparison-methods, cache=TRUE, message=FALSE, warning=FALSE}
 final_table <- results$comparison
 
 knitr::kable(
-  head(final_table), 
-  caption = "Comparison of MalReBay probabilities and traditional match-counting.",
-  digits = 3
+  head(final_table),
+  caption = "Comparison of MalReBay probabilities and traditional match counting.",
+  digits  = 3
 ) %>%
   kableExtra::scroll_box(width = "100%")
 ```
 
 
+## 6. Understanding convergence
 
-#### output non-convergence
-```{r output-non-convergence, dev = "png", fig.width = 10, fig.height = 8, fig.alt = "Example of non-converged MCMC chains for the Benguela site."}
+### 6.1 What poor convergence looks like
+
+The example below shows what diagnostic plots look like when the model has not had enough iterations to converge. This can happen when the number of iterations is too low.
+
+```{r output-non-convergence, fig.width=10, fig.height=8, out.width='100%', fig.alt="Four convergence diagnostic plots showing a non-converged model arranged in a 2 by 2 grid."}
 bad_mcmc_config <- list(
   n_chains     = 2,
-  iter         = 200, 
+  iter         = 200,
   burn_in_frac = 0.5,
   random_seed  = 1
 )
 
-# Run MalReBay but SET output_folder to NULL 
-# and ensure your R functions handle NULL as fixed above.
 results_nonconverge <- MalReBay::MalReBay(
   filepath        = input_file_lp,
   marker_filepath = marker_file,
   mcmc_config     = bad_mcmc_config,
-  output_folder   = NULL,   
+  output_folder   = NULL,
   verbose         = FALSE
 )
 
 if (!is.null(results_nonconverge)) {
   site_to_plot <- names(results_nonconverge$mcmc_loglikelihoods)[1]
-  
+
   MalReBay::plot_likelihood_diagnostics(
     all_chains_loglikelihood = results_nonconverge$mcmc_loglikelihoods[[site_to_plot]],
     site_name                = site_to_plot,
     stan_fit                 = results_nonconverge$stan_fits[[site_to_plot]],
-    save_plot                = FALSE
+    save_plot                = FALSE,
+    combine_plots            = TRUE,
+    verbose                  = FALSE
   )
 }
 ```
 
-#### Identifying lack of convergence
+Signs to watch for in the plots:
 
-When diagnosing MCMC output, the following visual patterns indicate that chains may not have converged:
++ **R-hat stays well above 1.1:** the chains have not agreed on a stable answer.
++ **Chains in the trace plot sit at different levels or drift apart:** the sampling is not exploring the same area of the parameter space.
++ **Autocorrelation stays high for many lags:** the sampler is moving slowly and each sample carries little new information.
 
-+ **$\hat{R}$ values:** In the Gelman–Rubin plot, values should stabilize close to 1.0. If the curve stays well above 1.1 or drifts without settling, it signals non-convergence.
+### 6.2 How to improve convergence
 
-+ **Chain mixing:** In well-mixed traceplots, chains appear as overlapping “caterpillars” that fluctuate around a common mean. If the traces show different levels, do not overlap, or drift apart, it suggests poor mixing.
+If your results show poor convergence, try the following:
 
-+ **Autocorrelation:** A good autocorrelation plot shows a rapid decline toward zero within a few lags. If autocorrelation remains high or decays slowly across iterations, it means the chains are exploring the parameter space inefficiently and convergence has not been reached.
++ **Increase the number of iterations.** This gives the sampler more time to explore the data and settle on a stable answer.
++ **Run more chains.** Having at least 4 chains makes it easier to spot when something is wrong.
++ **Increase `adapt_delta`.** Setting this closer to 1.0 makes the sampler take more careful steps, which can help with difficult datasets.
 
-
-#### How to improve convergence
-If chains fail to converge, several adjustments can help improve stability and mixing:
-
-+ Increase the number of iterations: Allow more sampling time so chains have a better chance to explore the parameter space thoroughly.
-
-+ Run additional chains in parallel: More chains improve the chances of detecting convergence and can reveal mixing issues more clearly.
-
-+ Adjust the chunk size or apply thinning: Modifying these settings can reduce autocorrelation and improve the efficiency of the samples.
-
-The package also includes an automatic convergence check: sampling will stop early once the criteria above are satisfied, so in many cases you will not need to tune these settings manually.
+MalReBay also checks convergence automatically during sampling and stops early once the criteria are met. In most cases you will not need to adjust the settings manually.
 
 
+## 7. Using amplicon sequencing data
 
-## 10. Package structure and specifications
-The `MalReBay` package is organized around three main stages: data preparation, Bayesian inference with MCMC, and summarization of results.
+The workflow for amplicon sequencing data is exactly the same as for length-polymorphic markers. The only differences are:
 
-![MalReBay framework.](figure/MalReBay_Framework.png){width="100%"}
++ The marker columns in your Excel file contain haplotype labels (text) instead of fragment lengths.
++ You do not need a repeat length value in the marker information file.
 
-### 10.1 Data preparation
-
-+ `import_data()` function reads the input Excel file, automatically detects the data type (length-polymorphic vs. amplicon sequencing), and applies basic cleaning.
-
-+ For length-polymorphic markers, `define_alleles()` groups raw fragment lengths into discrete, well-defined allele bins.
-
-+ `calculate_frequencies()` function estimates the initial population-level frequency of each allele, which serves as the prior for the MCMC algorithm.
-
-+ `recode_alleles()` converts allele values into integer-based codes, ensuring consistency across sites and markers.
-
-**Output**: A clean, structured dataset ready to be passed into the Bayesian engine.
+MalReBay detects the data type automatically when you call `import_data()`. From that point, all the same steps apply: load the data, explore it, run the model, and check the results.
 
 
-### 10.2 Bayesian inference with MCMC
+## 8. Package structure
 
-At the core of the package is a Gibbs sampling engine that explores the probability space and classifies recurrent infections as reinfections or recrudescences.
+This section gives a brief overview of how MalReBay is organised for users who want to understand or extend the package.
 
-+ `run_all_sites()` organizes the analysis across geographical sites, calling the relevant MCMC functions (`run_one_chain()` or `run_one_chain_ampseq()`).
+![MalReBay package structure.](figure/MalReBay_User.png){width="100%"}
 
-+ During each iteration, the algorithm updates key parameters:
+### 8.1 Data preparation
 
-  + Hidden alleles (`switch_hidden_length()` / `switch_hidden_ampseq()`).
-  
-  + Population allele frequencies (`findposteriorfrequencies()`)
-  
-+ Multiple chains run in parallel, with automatic convergence checks based on R-hat and ESS.
++ `import_data()` reads the input Excel file, detects the data type automatically, and carries out basic data cleaning.
++ For length-polymorphic markers, `define_alleles()` groups raw fragment lengths into clearly defined allele bins.
++ `calculate_frequencies()` estimates how common each allele is in the study population. This information is used as a starting point for the model.
++ `recode_alleles()` converts allele values into integer codes so they can be passed to the statistical engine.
+
+### 8.2 Bayesian inference with Stan
+
+The core of MalReBay is a Stan model that uses Hamiltonian Monte Carlo sampling to estimate posterior probabilities.
+
++ `run_stan_sites()` organises the analysis across study sites and runs the Stan model for length-polymorphic data.
++ `run_stan_sites_ampseq()` does the same for amplicon sequencing data.
++ Multiple chains run in parallel. Convergence is checked automatically using R-hat and ESS after each run.
+
+### 8.3 Results and output
+
+Once sampling is complete, the package turns the raw MCMC output into clear summaries.
+
++ **Posterior probabilities:** a table with one row per patient showing the probability of recrudescence.
++ **Convergence diagnostics:** `plot_likelihood_diagnostics()` produces trace plots, R-hat plots, histograms, and autocorrelation plots.
++ **Diversity plots:** `plot_markers_diversity()` and `plot_moi()` visualise allele distributions and within-host diversity.
++ **Comparison table:** `results$comparison` shows MalReBay results alongside match-counting results for easy comparison.
 
 
-### 10.3 Summarization and output
+## 9. Getting help
 
-Once the MCMC converges, the package distills the results into clear, interpretable outputs.
+If you run into a problem or have a question, please open an issue on the
+[MalReBay GitHub page](https://github.com/SwissTPH/MalReBay/issues).
 
-+ Posterior Probabilities: A summary table reporting, for each patient, the posterior probability of recrudescence.
-
-+ Diagnostic Reports: Functions such as `plot_likelihood_diagnostics()` produce trace plots and Gelman–Rubin plots for convergence checks.
-
-+ Allele Frequency Plots: `generate_allele_frequency_plot()` visualizes allele distributions overall and by site.
-
-+ Marker-Level Analysis: Detailed tables show how individual genetic markers contribute to each classification
-
-
-
+For a detailed description of the statistical model and the methods used, see the package documentation with `?MalReBay`.

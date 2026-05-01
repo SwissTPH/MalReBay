@@ -10,7 +10,8 @@ plot_likelihood_diagnostics(
   stan_fit = NULL,
   save_plot = TRUE,
   output_folder = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  combine_plots = FALSE
 )
 }
 \arguments{
@@ -19,18 +20,39 @@ representing the log-likelihood history of one MCMC chain.}
 
 \item{site_name}{A character string for labeling plots.}
 
-\item{stan_fit}{An optional \code{stanfit} object (from rstan) for additional diagnostics.}
+\item{stan_fit}{An optional \code{CmdStanMCMC} object (from cmdstanr) for additional diagnostics.}
 
 \item{save_plot}{A logical. If \code{TRUE}, plots are saved as PNG files.}
 
 \item{output_folder}{A character string specifying the path to save plots.}
 
 \item{verbose}{A logical. If \code{TRUE}, prints diagnostic summaries.}
+
+\item{combine_plots}{A logical. If \code{TRUE}, all four panels are drawn in a
+single 2x2 grid on the current graphics device. Defaults to \code{TRUE} when
+\code{save_plot = FALSE}. Ignored when \code{save_plot = TRUE}.}
 }
 \value{
 An invisible list containing the calculated diagnostic results.
 }
 \description{
-Calculates standard MCMC convergence diagnostics and generates diagnostic plots
-in a multi-stage process: 1) Gelman-Rubin, 2) Traceplot & Histogram, 3) All ACF plots.
+Calculates standard MCMC convergence diagnostics and generates four diagnostic
+plots: Gelman-Rubin, Traceplot, Log-Posterior Histogram, and Autocorrelation.
+When \code{save_plot = FALSE} (interactive use), all four panels are arranged
+in a single 2x2 grid by default.
+}
+\examples{
+\dontrun{
+  chains <- list(
+    c(-10.2, -9.8, -10.5, -9.9, -10.1),
+    c(-9.9,  -10.3, -10.0, -9.7, -10.4)
+  )
+  plot_likelihood_diagnostics(
+    all_chains_loglikelihood = chains,
+    site_name  = "TestSite",
+    save_plot  = FALSE,
+    verbose    = FALSE
+  )
+}
+
 }

@@ -31,3 +31,14 @@ data is attached to each plot as the attribute \code{"moi_data"}.
 This function calculates the MOI (number of distinct alleles per marker per
 sample) and generates one violin plot per site for improved readability.
 }
+\examples{
+\dontrun{
+  gdata <- data.frame(
+    Sample.ID = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+    Site      = "SiteA",
+    TA1_1     = c(174, 177, 162, 162),
+    TA1_2     = c(177,  NA, 171,  NA)
+  )
+  plot_moi(genotypedata = gdata, output_folder = NULL)
+}
+}

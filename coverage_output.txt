@@ -1,0 +1,4 @@
+G3;Running specific tests for package ‘MalReBay’
+gG3;  Running ‘testthat.R’
+gG3;Error: running the tests in ‘testthat.R’ failed
+gError: Failure in `C:/Users/veron/AppData/Local/Temp/Rtmp8OyQcv/R_LIBS643c2c302d19/MalReBay/MalReBay-tests/testthat.Rout.fail`

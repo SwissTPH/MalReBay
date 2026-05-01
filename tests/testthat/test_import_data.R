@@ -203,6 +203,39 @@ test_that("import_data: all allele columns empty throws error", {
                regexp = "All allele columns are empty")
 })
 
+# ============================================================
+# Sheet 2 — additional background data (length_polymorphic)
+# ============================================================
+
+test_that("import_data: loads additional data from Sheet 2", {
+  main_data <- create_mock_microsat_data()
+
+  # Additional background samples — same column layout as main data
+  additional_data <- data.frame(
+    Sample.ID = c("BG-001 Day 0", "BG-001 recurrence"),
+    Site      = "Benguela",
+    TA1_1     = c(174, 174), TA1_2   = c(NA,  NA),
+    POLYA_1   = c(162, 162), POLYA_2 = c(NA,  NA),
+    PFPK2_1   = c(168, 168), PFPK2_2 = c(NA,  NA),
+    TA109_1   = c(184, 184), TA109_2 = c(NA,  NA),
+    check.names      = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  tmp_data   <- tempfile(fileext = ".xlsx")
+  tmp_marker <- tempfile(fileext = ".xlsx")
+  writexl::write_xlsx(list(Sheet1 = main_data, Sheet2 = additional_data), tmp_data)
+  writexl::write_xlsx(create_mock_markers(), tmp_marker)
+  on.exit(unlink(c(tmp_data, tmp_marker)))
+
+  result <- suppressMessages(suppressWarnings(
+    import_data(tmp_data, tmp_marker, verbose = FALSE)
+  ))
+
+  expect_gt(nrow(result$additional), 0L)
+  expect_equal(colnames(result$additional), colnames(result$late_failures))
+})
+
 test_that("import_data: no matching markers throws error", {
   files <- create_mock_xlsx(
     data = data.frame(

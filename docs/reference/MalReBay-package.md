@@ -1,7 +1,7 @@
 # MalReBay: Bayesian classification for malaria recurrences
 
 Classification of malaria infection recurrence using a Bayesian
-algorithm.
+algorithm implemented in Stan for efficient sampling.
 
 ## See also
 

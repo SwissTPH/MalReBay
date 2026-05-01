@@ -8,6 +8,7 @@ library(MalReBay)
 # the installed package. If the package is not installed these will be ""
 # and the skip_on_cran() + path guard will skip the tests cleanly.
 run_pipeline <- function(tmp) {
+  skip_stan_on_check()
   suppressMessages(suppressWarnings(
     MalReBay(
       filepath        = angola_data_path,
@@ -81,6 +82,85 @@ test_that("MalReBay: saves all expected output files", {
   expect_gt(length(list.files(tmp, pattern = "^moi_per_marker_.*\\.png$")), 0)
   expect_true(file.exists(file.path(tmp, "recrudescence_probability_histogram.png")))
   expect_true(dir.exists( file.path(tmp, "convergence_diagnosis")))
+})
+
+# ============================================================
+# Full pipeline — mock microsatellite data (no skip, fast)
+# Covers MalReBay.R lines 60-80: classify_infections →
+# summarise_results → save_results → invisible(summary_results)
+# ============================================================
+
+test_that("MalReBay: runs end-to-end on mock data with fast_mcmc", {
+  skip_stan_on_check()
+  files <- create_mock_xlsx(create_mock_microsat_data())
+  tmp   <- tempfile()
+  on.exit({
+    unlink(c(files$data, files$marker))
+    unlink(tmp, recursive = TRUE)
+  })
+
+  result <- suppressMessages(suppressWarnings(
+    MalReBay(
+      filepath        = files$data,
+      marker_filepath = files$marker,
+      mcmc_config     = fast_mcmc,
+      output_folder   = tmp,
+      n_workers       = 1,
+      verbose         = FALSE
+    )
+  ))
+
+  expect_named(result, c("posterior_probabilities", "comparison",
+                          "convergence", "mcmc_loglikelihoods"))
+})
+
+test_that("MalReBay: mock pipeline output has correct probability columns", {
+  skip_stan_on_check()
+  files <- create_mock_xlsx(create_mock_microsat_data())
+  tmp   <- tempfile()
+  on.exit({
+    unlink(c(files$data, files$marker))
+    unlink(tmp, recursive = TRUE)
+  })
+
+  result <- suppressMessages(suppressWarnings(
+    MalReBay(
+      filepath        = files$data,
+      marker_filepath = files$marker,
+      mcmc_config     = fast_mcmc,
+      output_folder   = tmp,
+      n_workers       = 1,
+      verbose         = FALSE
+    )
+  ))
+
+  probs <- result$posterior_probabilities$Probability
+  expect_true(all(probs >= 0 & probs <= 1, na.rm = TRUE))
+  expect_equal(nrow(result$posterior_probabilities), 3L)  # 3 patient pairs
+})
+
+test_that("MalReBay: mock pipeline saves CSV output files", {
+  skip_stan_on_check()
+  files <- create_mock_xlsx(create_mock_microsat_data())
+  tmp   <- tempfile()
+  on.exit({
+    unlink(c(files$data, files$marker))
+    unlink(tmp, recursive = TRUE)
+  })
+
+  suppressMessages(suppressWarnings(
+    MalReBay(
+      filepath        = files$data,
+      marker_filepath = files$marker,
+      mcmc_config     = fast_mcmc,
+      output_folder   = tmp,
+      n_workers       = 1,
+      verbose         = FALSE
+    )
+  ))
+
+  expect_true(file.exists(file.path(tmp, "posterior_probabilities.csv")))
+  expect_true(file.exists(file.path(tmp, "bayesian_match_counting_comparison.csv")))
 })
 
 # ============================================================

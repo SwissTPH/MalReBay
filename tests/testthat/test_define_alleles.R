@@ -58,7 +58,48 @@ test_that("recodeallele: returns NA_integer_ for NA, empty bins, or beyond max d
 test_that("calculate_frequencies: microsatellite frequencies sum to 1", {
   defs  <- suppressMessages(define_alleles(create_mock_microsat_data(), create_mock_markers()))
   freqs <- calculate_frequencies(create_mock_microsat_data(), defs, create_mock_markers())
-  
+
   expect_equal(sum(freqs$freq_matrix["POLYA", ]), 1, tolerance = 1e-6)
   expect_equal(unname(freqs$n_alleles["POLYA"]), nrow(defs$POLYA))
+})
+
+test_that("calculate_frequencies: exact method frequencies sum to 1", {
+  # ampseq data: character haplotype strings, binning_method = "exact"
+  # create_mock_ampseq_markers() uses binning_method="ampseq" which is the
+  # import-level label; calculate_frequencies expects "exact" for this branch.
+  exact_markers <- data.frame(
+    marker_id      = c("cpmp", "cpp"),
+    markertype     = "amplicon",
+    binning_method = "exact",
+    repeatlength   = c(NA_real_, NA_real_),
+    stringsAsFactors = FALSE
+  )
+  freqs <- calculate_frequencies(
+    genotypedata        = create_mock_ampseq_data(),
+    alleles_definitions = list(),         # not used by exact branch
+    marker_info         = exact_markers
+  )
+
+  # cpmp: HAPL_A appears 5×, HAPL_B 1× -> 2 distinct alleles, freqs sum to 1
+  expect_equal(sum(freqs$freq_matrix["cpmp", ]), 1, tolerance = 1e-6)
+  expect_equal(unname(freqs$n_alleles["cpmp"]), 2L)
+})
+
+test_that("calculate_frequencies: exact method variability is expected heterozygosity", {
+  # cpmp: HAPL_A (5/6) and HAPL_B (1/6)
+  #   EH = 1 - ((5/6)^2 + (1/6)^2) = 10/36 ≈ 0.2778
+  exact_markers <- data.frame(
+    marker_id      = c("cpmp", "cpp"),
+    markertype     = "amplicon",
+    binning_method = "exact",
+    repeatlength   = c(NA_real_, NA_real_),
+    stringsAsFactors = FALSE
+  )
+  freqs <- calculate_frequencies(
+    genotypedata        = create_mock_ampseq_data(),
+    alleles_definitions = list(),
+    marker_info         = exact_markers
+  )
+  expected_eh_cpmp <- 1 - ((5/6)^2 + (1/6)^2)
+  expect_equal(unname(freqs$variability["cpmp"]), expected_eh_cpmp, tolerance = 1e-6)
 })

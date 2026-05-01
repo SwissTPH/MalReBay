@@ -1,21 +1,8 @@
-#' Run Stan MCMC for length-polymorphic marker sites
-#'
-#' Loops over sites in the data, prepares Stan input, runs HMC sampling, and
-#' collects results. Only supports \code{data_type = "length_polymorphic"}.
-#'
-#' @param late_failures  Data frame of late-failure patient rows (all sites).
-#' @param additional     Data frame of additional background allele data (all sites).
-#' @param marker_info    Data frame of marker metadata.
-#' @param mcmc_config    Named list with fields \code{n_chains}, \code{iter},
-#'   \code{burn_in_frac}, \code{random_seed}, and optionally \code{adapt_delta}.
-#' @param data_type      Must be \code{"length_polymorphic"}.
-#' @param verbose        Logical; print progress messages.
-#'
-#' @return A named list with elements \code{classifications},
-#'   \code{all_chains_loglikelihood}, \code{ids}, \code{locus_summary},
-#'   \code{locus_lrs}, \code{locus_dists}, \code{locinames}, and
-#'   \code{stan_fits}, each a named list over sites.
-#' @noRd
+# =============================================================================
+# R/stan_interface.R
+# Revised version for optimized performance
+# =============================================================================
+
 run_stan_sites <- function(late_failures,
                            additional,
                            marker_info,
@@ -27,7 +14,7 @@ run_stan_sites <- function(late_failures,
     stop("run_stan_sites() only supports data_type='length_polymorphic'.")
   }
   
-  # Extract mcmc configuration parameters 
+  # --- 1. Extract Config ---
   n_chains     <- as.integer(mcmc_config$n_chains)
   iter_total   <- as.integer(mcmc_config$iter) 
   burn_in_frac <- as.numeric(mcmc_config$burn_in_frac)
@@ -37,18 +24,18 @@ run_stan_sites <- function(late_failures,
   iter_warmup   <- max(200L, as.integer(floor(burn_in_frac * iter_total)))
   iter_sampling <- max(200L, iter_total - iter_warmup)
   
-  # Locate and compile model
-  stan_model_obj <- tryCatch(stanmodels$malrebay_model, error = function(e) NULL)
+  # --- 2. Stan Global Setup ---
+  # cmdstanr compiles to a native binary and caches it automatically.
+  # parallel_chains runs each chain as a separate OS process — reliable on Windows.
 
-  if (is.null(stan_model_obj)) {
-    stan_file <- system.file("stan", "malrebay_model.stan", package = "MalReBay")
-    if (file.exists(stan_file)) {
-      if (verbose) message("Compiling Stan model from source (first time only)...")
-      stan_model_obj <- rstan::stan_model(file = stan_file)
-    } else {
-      stop("Could not find pre-compiled 'malrebay_model' or .stan source file.")
-    }
+  # Locate and Compile Model
+  stan_file <- system.file("stan", "malrebay_model.stan", package = "MalReBay")
+  if (!file.exists(stan_file)) {
+    stan_file <- file.path("inst", "stan", "malrebay_model.stan")
   }
+
+  if (verbose) message("Compiling Stan model...")
+  stan_model_obj <- cmdstanr::cmdstan_model(stan_file)
   
   # Initialize Containers
   site_names          <- as.character(unique(late_failures$Site))
@@ -61,17 +48,8 @@ run_stan_sites <- function(late_failures,
   out_locinames       <- list()
   out_stan_fits       <- list()
   
-  # Initialization function to prevent Stan from getting stuck at start.
-  # Note: theta_recrud is not a model parameter; recrudescence prior is fixed at 0.5.
-  init_fun <- function() {
-    list(
-      qq             = 0.1,
-      qq_crossfamily = 0.001,
-      d_param        = 0.5
-    )
-  }
   
-  # Site analysis loop
+  # --- 3. Site Loop ---
   for (site in site_names) {
     if (verbose) message("\n--- Processing Site: ", site, " ---")
     
@@ -116,7 +94,7 @@ run_stan_sites <- function(late_failures,
     
     # C. Prepare Stan Data (Now includes additional_counts)
     if (verbose) message("  Preparing Stan data...")
-    stan_input <- prepare_stan_data(
+    sd <- prepare_stan_data(
       late_failures_site  = late_site,
       additional_site     = add_site,
       allele_definitions  = allele_definitions,
@@ -126,24 +104,40 @@ run_stan_sites <- function(late_failures,
       maxMOI              = maxMOI,
       is_locus_comparable = is_locus_comparable
     )
-
-    if (!validate_stan_data(stan_input)) next
-
+    
+    if (!validate_stan_data(sd)) next
+    init_fun <- local({
+      sd_local <- sd
+      function() {
+        list(
+          qq             = 0.1,
+          qq_crossfamily = 0.001,
+          d_param        = 0.5,
+          freq           = lapply(seq_len(sd_local$J), function(j) {
+            x <- rep(0.1 / sd_local$max_K, sd_local$max_K)
+            x[1:sd_local$K[j]] <- 1.0 / sd_local$K[j]
+            x / sum(x)
+          })
+        )
+      }
+    })
+    
     # D. Run Stan Sampling (CALLED ONCE)
     if (verbose) message("  Running Stan (", n_chains, " chains, ", iter_sampling, " samples)...")
-
+    
     fit <- tryCatch({
-      rstan::sampling(
-        object  = stan_model_obj,
-        data    = stan_data_only(stan_input),
-        chains  = n_chains,
-        cores   = min(n_chains, parallel::detectCores(logical = FALSE)),
-        iter    = iter_warmup + iter_sampling,
-        warmup  = iter_warmup,
-        init    = init_fun, 
-        control = list(adapt_delta = adapt_delta, max_treedepth = 12),
-        seed    = base_seed,
-        refresh = if (verbose) 100L else 0L
+      stan_model_obj$sample(
+        data            = stan_data_only(sd),
+        chains          = n_chains,
+        parallel_chains = min(n_chains, parallel::detectCores(logical = FALSE)),
+        iter_warmup     = iter_warmup,
+        iter_sampling   = iter_sampling,
+        init            = init_fun,
+        adapt_delta     = adapt_delta,
+        max_treedepth   = 12L,
+        seed            = base_seed,
+        refresh         = if (verbose) 100L else 0L,
+        output_dir      = tempdir()
       )
     }, error = function(e) {
       warning("Stan sampling failed for site '", site, "': ", e$message)
@@ -151,6 +145,13 @@ run_stan_sites <- function(late_failures,
     })
     
     if (is.null(fit)) next
+    
+    # check all chains actually completed
+    if (all(fit$return_codes() != 0)) {
+      message(paste(fit$output(), collapse = "\n"))
+      warning("All chains failed for site '", site, "'. Skipping.")
+      next
+    }
     
     # E. Extract and Store Results
     extracted <- extract_stan_results(fit, ids, locinames, nloci, length(ids))
@@ -177,41 +178,21 @@ run_stan_sites <- function(late_failures,
   ))
 }
 
-#' Extract posterior draws from a fitted Stan model (length-polymorphic)
-#'
-#' Pulls \code{p_recrud} draws and per-chain log-posterior traces from a
-#' \code{stanfit} object returned by \code{run_stan_sites}.
-#'
-#' @param fit       A \code{stanfit} object.
-#' @param ids       Character vector of patient IDs.
-#' @param locinames Character vector of locus names.
-#' @param nloci     Integer number of loci.
-#' @param nids      Integer number of patients.
-#'
-#' @return A list with \code{p_recrud_draws} (draws x patients matrix),
-#'   \code{loglik_chains} (list of per-chain lp__ vectors), \code{locus_lrs},
-#'   and \code{locus_dists} (both \code{NA}-filled arrays for now).
-#' @noRd
+# Add this to the bottom of R/stan_interface.R
+
 extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
 
   # 1. Pull the continuous probability of recrudescence
-  p_recrud_draws <- rstan::extract(fit, pars = "p_recrud")$p_recrud
+  # draws_matrix: rows = draws (all chains merged), cols = p_recrud[1..N]
+  p_recrud_draws <- fit$draws("p_recrud", format = "draws_matrix")
 
-  # 2. Pull the log-likelihood (lp__) for diagnostics
-  # permuted=FALSE gives array [iterations, chains, 1]; use dim() to get
-  # n_chains before subsetting so a single chain doesn't drop to a vector.
-  lp_array <- tryCatch(
-    rstan::extract(fit, pars = "lp__", permuted = FALSE),
-    error = function(e) NULL
-  )
-
-  if (!is.null(lp_array) && length(dim(lp_array)) == 3) {
-    n_chains      <- dim(lp_array)[2]
-    lp_matrix     <- matrix(lp_array[, , 1], ncol = n_chains)
-    loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
-  } else {
-    loglik_chains <- list()
-  }
+  # 2. Pull the log-likelihood (lp__) per chain for diagnostics
+  # draws_array: [iterations, chains, variables] — preserves chain structure
+  lp_array  <- fit$draws("lp__", format = "draws_array")
+  n_iter    <- dim(lp_array)[1]
+  n_chains  <- dim(lp_array)[2]
+  lp_matrix <- matrix(as.numeric(lp_array), nrow = n_iter, ncol = n_chains)
+  loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
   
   n_draws     <- nrow(p_recrud_draws)
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))

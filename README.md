@@ -10,77 +10,52 @@ coverage](https://codecov.io/gh/SwissTPH/MalReBay/graph/badge.svg)](https://app.
 [![R-CMD-check](https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-## Overview
-
 **MalReBay** is an R package for Bayesian molecular correction of
 malaria therapeutic efficacy studies (TES). Given paired genotyping data
-from a patient’s initial infection (Day 0) and a later recurrence, it
-estimates the posterior probability that the recurrence is a
-**recrudescence** (treatment failure, same parasite persisting) versus a
-**reinfection** (new parasite acquired after treatment).
+from a patient’s Day 0 infection and a later recurrence, it estimates
+the posterior probability of **recrudescence** (treatment failure)
+versus **reinfection** (new parasite). It supports length-polymorphic
+markers (microsatellites, MSP, GLURP) and amplicon sequencing data, and
+uses Stan HMC-NUTS via `cmdstanr` for inference.
 
-Unlike rule-based allele-matching methods, MalReBay:
-
-- models sequencing error, allelic dropout, and allele loss explicitly
-- handles **polyclonal infections** (MOI \> 1) at every locus
-- incorporates **local allele frequency** information to weigh evidence
-- uses a full **Bayesian MCMC** engine (Stan HMC-NUTS) for principled
-  uncertainty quantification
-- supports both **length-polymorphic markers** (microsatellites, MSP,
-  GLURP) and **amplicon sequencing** (haplotype) data
-
-------------------------------------------------------------------------
-
-## Key Features
-
-| Feature | Detail |
-|----|----|
-| **Data types** | Length-polymorphic markers and amplicon sequencing |
-| **MCMC engine** | Stan HMC-NUTS via `rstan` — fast, well-mixing, gradient-based |
-| **Polyclonal infections** | Analytically marginalises over within-host clone multiplicity |
-| **Error model** | Estimates `q_mismatch`, `q_loss`, `q_dropout` from the data |
-| **Prior** | Recrudescence probability fixed at 0.5 (no directional bias) |
-| **Convergence** | Rank-normalised R̂, bulk/tail ESS, Geweke, Gelman-Rubin |
-| **Output** | Per-patient posterior probability + match-counting comparison table |
-
-------------------------------------------------------------------------
+For a full walkthrough see the [package
+vignette](https://swisstph.github.io/MalReBay/).
 
 ## Installation
 
+MalReBay is installed in two steps. The second step is a one-time setup
+and only needs to be done once, even across future R sessions.
+
+**Install MalReBay** from GitHub:
+
 ``` r
-# Install the development version from GitHub
+# install.packages("remotes")  # run this line first if you don't have remotes
 remotes::install_github("SwissTPH/MalReBay")
 ```
 
-> **Note:** MalReBay links against `rstan` and `StanHeaders`. On first
-> use the Stan model is compiled once and cached. This may take a few
-> minutes but only happens once per R installation.
+**Install CmdStan** (the statistical engine MalReBay uses for Bayesian
+inference):
 
-------------------------------------------------------------------------
+``` r
+cmdstanr::install_cmdstan()
+```
+
+> CmdStan is a standalone statistical computing toolkit that MalReBay
+> uses behind the scenes to run its Bayesian model. Think of it like a
+> calculator engine MalReBay provides the interface, CmdStan does the
+> heavy computation. This download takes around 5 minutes and only needs
+> to be done once on your computer.
 
 ## Quick Start
 
 ``` r
 library(MalReBay)
 
-# Run the full pipeline on the bundled Angola 2021 TES example data
-results <- MalReBay(output_folder = "my_results")
+results <- MalReBay(
+  filepath        = "path/to/genotype_data.xlsx",
+  marker_filepath = "path/to/marker_info.xlsx",
+  output_folder   = "my_results"
+)
 
-# View posterior probabilities
 head(results$posterior_probabilities)
 ```
-
-------------------------------------------------------------------------
-
-## Workflow
-
-MalReBay wraps a four-step pipeline that can also be called step by
-step:
-
-    import_data()
-        ↓
-    classify_infections()
-        ↓
-    summarise_results()
-        ↓
-    save_results()

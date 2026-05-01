@@ -20,3 +20,10 @@ A list containing the imported data.
 Reads data from a specified Excel file, automatically detecting
 the data type and separating sheets into a structured list.
 }
+\examples{
+\dontrun{
+  data_file   <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+  marker_file <- system.file("extdata", "makers_details.xlsx",       package = "MalReBay")
+  imported    <- import_data(filepath = data_file, marker_filepath = marker_file)
+}
+}

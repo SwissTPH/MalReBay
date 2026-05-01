@@ -33,3 +33,13 @@ Creates and saves a histogram of posterior probabilities of recrudescence
 for all patients. This is an internal function called automatically by
 \code{\link{MalReBay}}.
 }
+\examples{
+summary_results <- list(
+  posterior_probabilities = data.frame(
+    Patient_ID  = c("P1", "P2", "P3"),
+    Probability = c(0.12, 0.87, 0.45)
+  )
+)
+plot_probability_histogram(summary_results)
+
+}

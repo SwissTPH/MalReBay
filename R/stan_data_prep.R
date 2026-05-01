@@ -1,9 +1,10 @@
+# =============================================================================
 # R/stan_data_prep.R
 # Step 1 of Stan transition — pure R, no Stan dependency
 #
 # Purpose:
-#   Packages allele_utils.R output into a named list that rstan::stan()
-#   accepts as its `data` argument.
+#   Packages allele_utils.R output into a named list that
+#   cmdstanr::cmdstan_model()$sample() accepts as its `data` argument.
 #
 # Depends on:  R/allele_utils.R  (unchanged)
 # Called by:   R/stan_interface.R  (Step 3)
@@ -13,6 +14,10 @@
 # Debugging workflow:
 #   sd <- prepare_stan_data(...)
 #   validate_stan_data(sd)   # must print ALL CHECKS PASSED before running Stan
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
 # prepare_stan_data()
 #
 # Arguments:
@@ -26,31 +31,9 @@
 #   is_locus_comparable  matrix     — logical [nids × nloci]
 #
 # Returns:
-#   Named list ready for rstan::stan(data = ...).
+#    Named list ready for cmdstanr::cmdstan_model()$sample(data = ...).
 #   Also carries $allele_frequencies for use in extract_results().
-#' Prepare Stan data for the length-polymorphic model
-#'
-#' Converts site-filtered genotype data and allele definitions into a named
-#' list accepted by \code{rstan::sampling(data = ...)}.
-#'
-#' @param late_failures_site   Data frame of late-failure rows for one site
-#'   (Site column removed).
-#' @param additional_site      Data frame of additional background rows for one
-#'   site (Site column removed).
-#' @param allele_definitions   List of allele bin definition data frames, one
-#'   per locus (output of \code{define_alleles}).
-#' @param marker_info          Data frame of marker metadata pre-filtered to
-#'   the site's loci.
-#' @param ids                  Character vector of patient IDs.
-#' @param locinames            Character vector of locus names.
-#' @param maxMOI               Integer maximum multiplicity of infection.
-#' @param is_locus_comparable  Logical matrix \code{[nids x nloci]} indicating
-#'   whether both day-0 and recurrence data are available for each
-#'   patient/locus combination.
-#'
-#' @return A named list ready for \code{rstan::sampling}. Also carries
-#'   \code{$allele_frequencies} for use in result extraction.
-#' @noRd
+# -----------------------------------------------------------------------------
 prepare_stan_data <- function(late_failures_site,
                               additional_site,
                               allele_definitions,
@@ -63,7 +46,7 @@ prepare_stan_data <- function(late_failures_site,
   nids  <- length(ids)
   nloci <- length(locinames)
   
-  # ---- 1. MOI per patient ----
+  # 1. MOI per patient
   MOI0 <- rep(1L, nids); MOIf <- rep(1L, nids)
   for (i in seq_len(nids)) {
     for (j in seq_len(nloci)) {
@@ -74,7 +57,7 @@ prepare_stan_data <- function(late_failures_site,
     }
   }
 
-  # ---- 2. Site-Specific Allele Pruning & Recoding ----
+  # 2. Site-specific allele pruning & recoding
   recoded0 <- matrix(0L, nids, maxMOI * nloci)
   recodedf <- matrix(0L, nids, maxMOI * nloci)
   
@@ -107,7 +90,8 @@ prepare_stan_data <- function(late_failures_site,
     day0_rows <- grepl("Day 0",      late_failures_site$Sample.ID)
     dayf_rows <- grepl("recurrence", late_failures_site$Sample.ID)
 
-    # Build a named lookup once for O(1) per-query patient-index resolution.
+    # Fix #8: build a named lookup once (O(1) per query) rather than calling
+    # which(ids == p_id) inside the loop (O(N) per query).
     pid_idx <- setNames(seq_along(ids), ids)
 
     for(row_idx in seq_len(nrow(late_failures_site))){
@@ -126,10 +110,12 @@ prepare_stan_data <- function(late_failures_site,
       }
     }
     
-    # Count all observed alleles (trial + additional) into tmp_counts so that 
-    # the Dirichlet prior on allele frequencies is informed by the observed data.
-    
-    # Count trial data alleles
+    # Count ALL trial alleles (Day 0 + recurrence) into additional_counts.
+    # Stan marginalises the recrudescence indicator R_i out, so we cannot
+    # condition on classification the way the Gibbs sampler did. Using all
+    # trial rows keeps the Dirichlet posterior well-informed and prevents
+    # freq[j] from being under-estimated, which would inflate SLR and produce
+    # false-positive recrudescence calls.
     if(nrow(obs_trial) > 0){
       trial_ids_raw <- sapply(as.vector(obs_trial), function(x) recodeallele(allele_definitions[[j]], x))
       trial_ids_raw <- trial_ids_raw[!is.na(trial_ids_raw) & trial_ids_raw > 0]
@@ -140,8 +126,9 @@ prepare_stan_data <- function(late_failures_site,
           tmp_counts[j, seq_along(all_obs_ids)] + as.integer(cnts)
       }
     }
-    
-    # Count additional_site alleles (as before)
+
+    # Background additional_site data: population survey Day-0 samples,
+    # not trial recurrence samples — safe to include without classification.
     if(nrow(obs_add) > 0){
       add_ids_raw <- sapply(obs_add, function(x) recodeallele(allele_definitions[[j]], x))
       add_ids_raw <- add_ids_raw[!is.na(add_ids_raw) & add_ids_raw > 0]
@@ -157,7 +144,7 @@ prepare_stan_data <- function(late_failures_site,
   max_K <- max(K_site)
   additional_counts <- tmp_counts[, 1:max_K, drop=FALSE]
 
-  # Pruned Distance Array
+  # 3. Pruned distance array
   dist_array <- array(0, dim = c(nloci, max_K, max_K))
   for (j in seq_len(nloci)) {
     if (K_site[j] > 0) {
@@ -166,7 +153,7 @@ prepare_stan_data <- function(late_failures_site,
     }
   }
   
-  # Method & Threshold logic
+  # 4. Method & threshold logic
   method_int <- sapply(locinames, function(ln) {
     m <- marker_info$binning_method[match(ln, marker_info$marker_id)]
     if(is.na(m)) return(3L)
@@ -180,8 +167,9 @@ prepare_stan_data <- function(late_failures_site,
     } else return(0)
   })
 
-  # Derive max_dist from the largest allele distance in the data, 
-  # ensuring the distance vector is no larger than necessary.
+  # 5. Assemble and return
+  # Fix #6: derive max_dist from the actual largest allele distance observed,
+  # not a hardcoded 100. This keeps log_dvect as small as needed.
   computed_max_dist <- max(1L, ceiling(max(dist_array)))
 
   return(list(
@@ -205,15 +193,6 @@ prepare_stan_data <- function(late_failures_site,
   ))
 }
 
-#' Validate Stan data list for the length-polymorphic model
-#'
-#' Runs a series of checks on the list returned by \code{prepare_stan_data}
-#' and prints \code{[PASS]} / \code{[FAIL]} for each. Returns \code{TRUE}
-#' only if all checks pass.
-#'
-#' @param sd Named list produced by \code{prepare_stan_data}.
-#' @return Logical scalar.
-#' @noRd
 validate_stan_data <- function(sd) {
   ok  <- TRUE
   chk <- function(label, test) {
@@ -238,15 +217,6 @@ validate_stan_data <- function(sd) {
   return(ok)
 }
 
-#' Strip internal bookkeeping fields from a Stan data list
-#'
-#' Removes any element whose name starts with \code{.} (used internally for
-#' diagnostics) before passing the list to \code{rstan::sampling}.
-#'
-#' @param sd Named list produced by \code{prepare_stan_data} or
-#'   \code{prepare_stan_data_ampseq}.
-#' @return The same list with private fields removed.
-#' @noRd
 stan_data_only <- function(sd) {
   sd[!startsWith(names(sd), ".")]
 }

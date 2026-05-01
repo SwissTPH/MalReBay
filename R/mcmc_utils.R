@@ -2,8 +2,6 @@
 #'
 #' @param imported_data List returned by \code{import_data()}.
 #' @param mcmc_config   Path to MCMC configuration Excel file.
-#' @param n_workers     Parallel workers. Ignored for length-polymorphic data
-#'                      (Stan handles parallelism internally). Used for ampseq.
 #' @param verbose       Print progress messages.
 #' @return List of MCMC results passed to \code{summarise_results()}.
 #' @keywords internal
@@ -35,8 +33,6 @@ classify_infections <- function(imported_data,
   data_type     <- imported_data$data_type
   
   if (data_type == "length_polymorphic") {
-    if (n_workers > 1 && verbose)
-      message("INFO: n_workers ignored Stan handles chain parallelism internally.")
     results <- run_stan_sites(
       late_failures = late_failures,
       additional    = additional,

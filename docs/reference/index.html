@@ -17,6 +17,7 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/MalReBay.html">Get started</a></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/swisstph/MalReBay/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -32,9 +33,9 @@
     </div>
 
     <div class="section level2">
-      <h2 id="all-functions">All functions<a class="anchor" aria-label="anchor" href="#all-functions"></a></h2>
+      <h2 id="functions">Functions<a class="anchor" aria-label="anchor" href="#functions"></a></h2>
 
-
+      <div class="section-desc"><p>Run the full Bayesian recrudescence classification pipeline, from importing genotype data to saving posterior probabilities and diagnostic plots.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -43,19 +44,37 @@
 
       <dl><dt>
 
-          <code><a href="classify_infections.html">classify_infections()</a></code>
+          <code><a href="MalReBay.html">MalReBay()</a></code>
 
         </dt>
-        <dd>Classify Infections Using a Bayesian MCMC Framework</dd>
+        <dd>Run the MalReBay malaria recrudescence classification pipeline</dd>
+      </dl></div><div class="section level2">
+      <h2 id="data-import">Data import<a class="anchor" aria-label="anchor" href="#data-import"></a></h2>
 
-        <dt>
+      <div class="section-desc"><p>Import and validate paired genotyping data from an Excel file, automatically detecting whether the data is length-polymorphic or amplicon sequencing.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
 
           <code><a href="import_data.html">import_data()</a></code>
 
         </dt>
         <dd>Import Genotyping Data from Excel</dd>
+      </dl></div><div class="section level2">
+      <h2 id="plotting-helpers">Plotting helpers<a class="anchor" aria-label="anchor" href="#plotting-helpers"></a></h2>
 
-        <dt>
+      <div class="section-desc"><p>Visualize results to help you tune hyperparameters and choose model methods.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
 
           <code><a href="plot_likelihood_diagnostics.html">plot_likelihood_diagnostics()</a></code>
 
@@ -64,10 +83,10 @@
 
         <dt>
 
-          <code><a href="plot_markers_diversity.html">plot_markers_diversity()</a></code>
+          <code><a href="plot_probability_histogram.html">plot_probability_histogram()</a></code>
 
         </dt>
-        <dd>Generate and Save Diversity Pie Charts</dd>
+        <dd>Plot Posterior Probability Histogram</dd>
 
         <dt>
 
@@ -75,8 +94,16 @@
 
         </dt>
         <dd>Plot Multiplicity of Infection (MOI)</dd>
+
+        <dt>
+
+          <code><a href="plot_markers_diversity.html">plot_markers_diversity()</a></code>
+
+        </dt>
+        <dd>Generate and Save Diversity Pie Charts</dd>
       </dl></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

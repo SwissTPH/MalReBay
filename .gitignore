@@ -1,3 +1,11 @@
+# C++ build artifacts (regenerated automatically, never need to be committed)
+src/*.o
+src/*.so
+src/*.dll
+src/*.a
+*.dll
+inst/stan/*.exe  
+
 # macOS files ----
 .DS_Store
 

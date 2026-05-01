@@ -2,4 +2,4 @@
 
 ### All vignettes
 
-- [MalReBay](MalReBay.md):
+- [MalReBay](https://swisstph.github.io/MalReBay/articles/MalReBay.md):

@@ -60,9 +60,13 @@ MalReBay <- function(
   mcmc_results <- classify_infections(
     imported_data = imported_data,
     mcmc_config   = mcmc_config,
-    n_workers     = n_workers,
     verbose       = verbose
   )
+
+  if (is.null(mcmc_results)) {
+    if (verbose) message("classify_infections() returned no results. Returning NULL.")
+    return(NULL)
+  }
 
   summary_results <- summarise_results(
     mcmc_results  = mcmc_results,

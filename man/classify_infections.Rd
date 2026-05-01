@@ -16,9 +16,6 @@ classify_infections(
 
 \item{mcmc_config}{Path to MCMC configuration Excel file.}
 
-\item{n_workers}{Parallel workers. Ignored for length-polymorphic data
-(Stan handles parallelism internally). Used for ampseq.}
-
 \item{verbose}{Print progress messages.}
 }
 \value{

@@ -1,24 +1,3 @@
-#' Prepare Stan data for the amplicon-sequencing model
-#'
-#' Converts site-filtered haplotype data into a named list accepted by
-#' \code{rstan::sampling(data = ...)} for the ampseq Stan model.
-#' Haplotype strings are mapped to integers; allele counts from both trial
-#' and additional-site data are used to inform the Dirichlet frequency prior.
-#'
-#' @param late_failures_site   Data frame of late-failure rows for one site
-#'   (Site column removed).
-#' @param additional_site      Data frame of additional background rows for
-#'   one site, or \code{NULL} / zero-row data frame if absent.
-#' @param marker_info          Data frame of marker metadata.
-#' @param ids                  Character vector of patient IDs.
-#' @param locinames            Character vector of locus names.
-#' @param maxMOI               Integer maximum multiplicity of infection.
-#' @param is_locus_comparable  Logical matrix \code{[nids x nloci]}.
-#'
-#' @return A named list ready for \code{rstan::sampling}. Private fields
-#'   (names starting with \code{.}) carry diagnostics and are stripped by
-#'   \code{stan_data_only} before sampling.
-#' @noRd
 prepare_stan_data_ampseq <- function(late_failures_site,
                                       additional_site,
                                       marker_info,
@@ -29,8 +8,8 @@ prepare_stan_data_ampseq <- function(late_failures_site,
   nids  <- length(ids)
   nloci <- length(locinames)
 
-  # Per-locus MOI and recoded haplotype matrices
-  # MOI0 and MOIf are N x J (per locus)
+  # Per-locus MOI and recoding
+  # MOI0 and MOIf are N x J (per locus), unlike length-polymorphic which is N x 1
   MOI0     <- matrix(0L, nids, nloci)
   MOIf     <- matrix(0L, nids, nloci)
   recoded0 <- matrix(0L, nids, maxMOI * nloci)
@@ -38,7 +17,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
 
   K_site      <- integer(nloci)
   id_maps     <- vector("list", nloci)
-  tmp_counts  <- matrix(0L, nloci, 500)  
+  tmp_counts  <- matrix(0L, nloci, 500)  # 500-allele buffer; ampseq can have many haplotypes
 
   for (j in seq_len(nloci)) {
     locus <- locinames[j]
@@ -66,13 +45,12 @@ prepare_stan_data_ampseq <- function(late_failures_site,
 
     day0_rows <- grepl("Day 0",      late_failures_site$Sample.ID)
     dayf_rows <- grepl("recurrence", late_failures_site$Sample.ID)
-    pid_idx   <- setNames(seq_along(ids), ids)
 
     # Fill recoded0 / recodedf and compute per-locus MOI
     for (row_idx in seq_len(nrow(late_failures_site))) {
       p_id  <- gsub(" Day 0| recurrence", "", late_failures_site$Sample.ID[row_idx])
-      p_idx <- pid_idx[p_id]
-      if (is.na(p_idx)) next
+      p_idx <- which(ids == p_id)
+      if (length(p_idx) == 0) next
 
       alleles_row <- as.character(obs_trial[row_idx, ])
       alleles_row <- alleles_row[!is.na(alleles_row) & nchar(trimws(alleles_row)) > 0 & alleles_row != "NA"]
@@ -82,7 +60,7 @@ prepare_stan_data_ampseq <- function(late_failures_site,
       n_fill <- min(n_alleles, maxMOI)
       slots  <- (maxMOI * (j - 1) + 1):(maxMOI * (j - 1) + n_fill)
       coded  <- as.integer(id_map[alleles_row[1:n_fill]])
-      coded[is.na(coded)] <- 0L
+      coded[is.na(coded)] <- 0L  # safety: unknown haplotype -> 0
 
       if (day0_rows[row_idx]) {
         recoded0[p_idx, slots] <- coded
@@ -94,7 +72,10 @@ prepare_stan_data_ampseq <- function(late_failures_site,
       }
     }
 
-    # Prepare data
+    # Count ALL trial alleles (Day 0 + recurrence) into additional_counts,
+    # matching the LP model. Stan marginalises R_i out so we cannot condition
+    # on classification; using all rows keeps freq[j] well-informed and prevents
+    # the underestimation that inflates SLR and produces false positives.
     trial_raw <- as.vector(obs_trial)
     trial_raw <- trial_raw[!is.na(trial_raw) & nchar(trimws(trial_raw)) > 0 & trial_raw != "NA"]
     if (length(trial_raw) > 0) {
@@ -106,7 +87,8 @@ prepare_stan_data_ampseq <- function(late_failures_site,
           tmp_counts[j, seq_along(unique_alleles)] + as.integer(cnts)
       }
     }
-    # Additional site data
+    # Background additional_site data: Day-0 samples from population surveys,
+    # not trial recurrence samples — safe to include without classification.
     if (nrow(obs_add) > 0) {
       add_raw <- as.vector(obs_add)
       add_raw <- add_raw[!is.na(add_raw) & nchar(trimws(add_raw)) > 0 & add_raw != "NA"]
@@ -125,11 +107,14 @@ prepare_stan_data_ampseq <- function(late_failures_site,
   max_K             <- max(K_site)
   additional_counts <- tmp_counts[, 1:max_K, drop = FALSE]
 
-  # Hidden alleles 
+  # Hidden alleles
+  # For ampseq, all observed alleles are fully typed: hidden = 0 everywhere an
+  # allele was recorded, and position remains 0 (beyond MOI) otherwise.
+  # We still build the matrices for model generality.
   hidden0 <- matrix(0L, nids, maxMOI * nloci)
   hiddenf <- matrix(0L, nids, maxMOI * nloci)
 
-  # Define the variables
+  # Assemble
   return(list(
     N                 = nids,
     J                 = nloci,
@@ -144,20 +129,12 @@ prepare_stan_data_ampseq <- function(late_failures_site,
     hiddenf           = hiddenf,
     comparable        = matrix(as.integer(is_locus_comparable), nids, nloci),
     additional_counts = additional_counts,
-    # id_maps kept for diagnostics
+    # id_maps kept for diagnostics / back-mapping (not passed to Stan)
     .id_maps          = id_maps,
     .locinames        = locinames
   ))
 }
 
-#' Validate Stan data list for the ampseq model
-#'
-#' Runs a series of dimension and range checks on the list returned by
-#' \code{prepare_stan_data_ampseq}.
-#'
-#' @param sd Named list produced by \code{prepare_stan_data_ampseq}.
-#' @return Logical scalar — \code{TRUE} if all checks pass.
-#' @noRd
 validate_stan_data_ampseq <- function(sd) {
   ok  <- TRUE
   chk <- function(label, test) {

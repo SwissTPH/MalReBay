@@ -9,6 +9,7 @@ library(MalReBay)
 # used for direction tests — it is ambiguous alongside BD21-040.
 
 run_classify <- function() {
+  skip_stan_on_check()
   suppressMessages(suppressWarnings(
     classify_infections(
       imported_data = create_mock_imported_data(),
@@ -75,6 +76,7 @@ test_that("classify_infections: BD21-040 (1/4 match) classified towards reinfect
 
 test_that("classify_infections: runs on real Angola data without error", {
   skip_on_cran()
+  skip_stan_on_check()
   results <- suppressMessages(suppressWarnings(
     classify_infections(
       imported_data = angola_imported_data,
@@ -85,5 +87,5 @@ test_that("classify_infections: runs on real Angola data without error", {
   ))
   expect_type(results, "list")
   expect_true(length(unlist(results$ids)) > 0)
-  expect_s4_class(results$stan_fits[[1]], "stanfit")
+  expect_s3_class(results$stan_fits[[1]], "CmdStanMCMC")
 })

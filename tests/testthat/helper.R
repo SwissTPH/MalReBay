@@ -1,4 +1,18 @@
 # ============================================================
+# Skip helper — replaces skip_on_check() (testthat >= 3.2.0 only)
+# ============================================================
+
+#' Skip a Stan-dependent test when running under R CMD check.
+#' Uses the _R_CHECK_PACKAGE_NAME_ environment variable, which R sets
+#' during check but not during interactive devtools::test().
+skip_stan_on_check <- function() {
+  skip_if(
+    nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")),
+    "Skipping Stan-dependent test during R CMD check"
+  )
+}
+
+# ============================================================
 # Creating example data to be used as moch data
 # ============================================================
 
@@ -156,6 +170,7 @@ angola_marker_path <- system.file("extdata", "makers_details.xlsx",
 #' Run classify_infections on mock data with fast_mcmc
 #' Used by: test_4
 make_test_mcmc_results <- function() {
+  skip_stan_on_check()
   suppressMessages(suppressWarnings(
     classify_infections(
       imported_data = create_mock_imported_data(),
@@ -174,12 +189,98 @@ make_test_mcmc_results <- function() {
 #' Used by: test_4
 make_test_summary_results <- function(output_folder = NULL) {
   use_folder <- if (!is.null(output_folder)) output_folder else tempdir()
-  
+
   suppressMessages(suppressWarnings(
     summarise_results(
       mcmc_results  = make_test_mcmc_results(),
       imported_data = create_mock_imported_data(),
       output_folder = use_folder,
+      verbose       = FALSE
+    )
+  ))
+}
+
+# ------------------------------------------------------------
+# Ampseq mock data
+# ------------------------------------------------------------
+
+#' Ampseq late_failures data frame (3 patient pairs, 2 loci, maxMOI = 2)
+#'
+#' Patient profiles (verified match outcomes):
+#'
+#'  AMP-001 — strong recrudescence: 2/2 loci identical haplotypes
+#'    cpmp: HAPL_A vs HAPL_A  -> match
+#'    cpp:  HAPL_C vs HAPL_C  -> match
+#'
+#'  AMP-002 — strong reinfection: 2/2 loci different haplotypes
+#'    cpmp: HAPL_A vs HAPL_B  -> differ
+#'    cpp:  HAPL_C vs HAPL_D  -> differ
+#'
+#'  AMP-003 — partial: 1/2 loci match
+#'    cpmp: HAPL_A vs HAPL_A  -> match
+#'    cpp:  HAPL_C vs HAPL_D  -> differ
+#'
+#' Used by: test_ampseq
+create_mock_ampseq_data <- function() {
+  data.frame(
+    Sample.ID     = c(
+      "AMP-001 Day 0", "AMP-001 recurrence",
+      "AMP-002 Day 0", "AMP-002 recurrence",
+      "AMP-003 Day 0", "AMP-003 recurrence"
+    ),
+    Site          = "TestSite",
+    cpmp_allele_1 = c("HAPL_A", "HAPL_A",
+                      "HAPL_A", "HAPL_B",
+                      "HAPL_A", "HAPL_A"),
+    cpmp_allele_2 = c(NA, NA, NA, NA, NA, NA),
+    cpp_allele_1  = c("HAPL_C", "HAPL_C",
+                      "HAPL_C", "HAPL_D",
+                      "HAPL_C", "HAPL_D"),
+    cpp_allele_2  = c(NA, NA, NA, NA, NA, NA),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Marker metadata matching create_mock_ampseq_data()
+#' repeatlength is NA for ampseq (not applicable)
+create_mock_ampseq_markers <- function() {
+  data.frame(
+    marker_id      = c("cpmp", "cpp"),
+    markertype     = "amplicon",
+    binning_method = "ampseq",
+    repeatlength   = c(NA_real_, NA_real_),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Full import_data-style list wrapping create_mock_ampseq_data()
+#' Used by: test_ampseq
+create_mock_ampseq_imported_data <- function() {
+  list(
+    late_failures = create_mock_ampseq_data(),
+    additional    = data.frame(
+      Sample.ID     = character(0),
+      Site          = character(0),
+      cpmp_allele_1 = character(0),
+      cpmp_allele_2 = character(0),
+      cpp_allele_1  = character(0),
+      cpp_allele_2  = character(0),
+      stringsAsFactors = FALSE
+    ),
+    marker_info = create_mock_ampseq_markers(),
+    data_type   = "ampseq"
+  )
+}
+
+#' Run classify_infections on mock ampseq data with fast_mcmc
+#' Used by: test_ampseq
+make_test_ampseq_results <- function() {
+  skip_stan_on_check()
+  suppressMessages(suppressWarnings(
+    classify_infections(
+      imported_data = create_mock_ampseq_imported_data(),
+      mcmc_config   = fast_mcmc,
+      n_workers     = 1,
       verbose       = FALSE
     )
   ))

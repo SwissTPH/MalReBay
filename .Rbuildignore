@@ -20,3 +20,4 @@
 ^vignettes/figure$
 ^pkgdown$
 ^\.claude$
+^coverage_output\.txt$

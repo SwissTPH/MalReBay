@@ -1,8 +1,10 @@
 #' Plot MCMC Likelihood Diagnostics
 #'
 #' @description
-#' Calculates standard MCMC convergence diagnostics and generates diagnostic plots
-#' in a multi-stage process: 1) Gelman-Rubin, 2) Traceplot & Histogram, 3) All ACF plots.
+#' Calculates standard MCMC convergence diagnostics and generates four diagnostic
+#' plots: Gelman-Rubin, Traceplot, Log-Posterior Histogram, and Autocorrelation.
+#' When \code{save_plot = FALSE} (interactive use), all four panels are arranged
+#' in a single 2x2 grid by default.
 #'
 #' @param all_chains_loglikelihood A list where each element is a numeric vector
 #'   representing the log-likelihood history of one MCMC chain.
@@ -10,9 +12,26 @@
 #' @param save_plot A logical. If `TRUE`, plots are saved as PNG files.
 #' @param output_folder A character string specifying the path to save plots.
 #' @param verbose A logical. If `TRUE`, prints diagnostic summaries.
-#' @param stan_fit An optional \code{stanfit} object (from rstan) for additional diagnostics.
+#' @param stan_fit An optional \code{CmdStanMCMC} object (from cmdstanr) for additional diagnostics.
+#' @param combine_plots A logical. If \code{TRUE}, all four panels are drawn in a
+#'   single 2x2 grid on the current graphics device. Defaults to \code{TRUE} when
+#'   \code{save_plot = FALSE}. Ignored when \code{save_plot = TRUE}.
 #'
 #' @return An invisible list containing the calculated diagnostic results.
+#'
+#' @examples
+#' \dontrun{
+#'   chains <- list(
+#'     c(-10.2, -9.8, -10.5, -9.9, -10.1),
+#'     c(-9.9,  -10.3, -10.0, -9.7, -10.4)
+#'   )
+#'   plot_likelihood_diagnostics(
+#'     all_chains_loglikelihood = chains,
+#'     site_name  = "TestSite",
+#'     save_plot  = FALSE,
+#'     verbose    = FALSE
+#'   )
+#' }
 #'
 #' @importFrom coda as.mcmc.list mcmc varnames gelman.diag effectiveSize gelman.plot
 #' @importFrom grDevices png dev.off rainbow n2mfrow
@@ -22,19 +41,22 @@
 #' @export
 plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
                                          site_name,
-                                         stan_fit      = NULL,   # NEW optional
+                                         stan_fit      = NULL,
                                          save_plot     = TRUE,
                                          output_folder = NULL,
-                                         verbose       = TRUE) {
+                                         verbose       = TRUE,
+                                         combine_plots = FALSE) {
 
   if (save_plot && is.null(output_folder))
     stop("`output_folder` must be provided when `save_plot = TRUE`.",
          call. = FALSE)
-
-  if (!is.null(stan_fit) && inherits(stan_fit, "stanfit") &&
+  
+  if (!is.null(stan_fit) && inherits(stan_fit, "CmdStanMCMC") &&
       is.null(all_chains_loglikelihood)) {
-    lp_mat <- rstan::extract(stan_fit, pars = "lp__",
-                              permuted = FALSE)[, , "lp__"]
+    lp_arr <- stan_fit$draws("lp__", format = "draws_array")
+    lp_mat <- matrix(as.numeric(lp_arr),
+                     nrow = dim(lp_arr)[1],
+                     ncol = dim(lp_arr)[2])
     all_chains_loglikelihood <- lapply(
       seq_len(ncol(lp_mat)), function(ch) lp_mat[, ch]
     )
@@ -66,6 +88,12 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
   }, error = function(e) NULL)
 
   if (is.null(loglikelihood_mcmc)) return(invisible(NULL))
+
+  # When drawing to screen, arrange all four panels in a 2x2 grid
+  if (combine_plots && !save_plot) {
+    old_outer_par <- graphics::par(mfrow = c(2, 2), mar = c(4.1, 4.1, 3.5, 1.1))
+    on.exit(graphics::par(old_outer_par), add = TRUE)
+  }
 
   # Convergence diagnostics
   gelman_result <- NULL
@@ -192,15 +220,21 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
                    width = 1200, height = 1000, res = 120)
     on.exit(grDevices::dev.off(), add = TRUE)
   }
-  plot_dims <- grDevices::n2mfrow(length(clean_chains))
-  old_par   <- graphics::par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
-  on.exit(graphics::par(old_par), add = TRUE)
-  for (i in seq_along(clean_chains)) {
-    stats::acf(clean_chains[[i]], lag.max = 50, main = "")
-    graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
+  if (combine_plots && !save_plot) {
+    # Single panel in the 2x2 grid: show chain 1 only
+    stats::acf(clean_chains[[1]], lag.max = 50, main = "")
+    graphics::title(main = "Autocorrelation - Chain 1", cex.main = 1.2)
+  } else {
+    plot_dims <- grDevices::n2mfrow(length(clean_chains))
+    old_par   <- graphics::par(mfrow = plot_dims, mar = c(4, 4, 3, 1))
+    on.exit(graphics::par(old_par), add = TRUE)
+    for (i in seq_along(clean_chains)) {
+      stats::acf(clean_chains[[i]], lag.max = 50, main = "")
+      graphics::title(main = paste("Autocorrelation - Chain", i), cex.main = 1.2)
+    }
+    if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
+    graphics::par(old_par); on.exit(NULL, add = FALSE)
   }
-  if (save_plot) { grDevices::dev.off(); on.exit(NULL, add = FALSE) }
-  graphics::par(old_par); on.exit(NULL, add = FALSE)
 
   invisible(list(
     gelman    = gelman_result,
@@ -231,6 +265,15 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
 #'   When \code{output_folder} is provided, saves a PNG and returns the file
 #'   path invisibly. Returns \code{invisible(NULL)} if no probabilities are
 #'   available.
+#'
+#' @examples
+#' summary_results <- list(
+#'   posterior_probabilities = data.frame(
+#'     Patient_ID  = c("P1", "P2", "P3"),
+#'     Probability = c(0.12, 0.87, 0.45)
+#'   )
+#' )
+#' plot_probability_histogram(summary_results)
 #'
 #' @export
 plot_probability_histogram <- function(summary_results, output_folder = NULL, verbose = TRUE) {
@@ -287,6 +330,17 @@ plot_probability_histogram <- function(summary_results, output_folder = NULL, ve
 #'
 #' @return A named list of ggplot objects, one per site. The underlying MOI
 #'   data is attached to each plot as the attribute `"moi_data"`.
+#'
+#' @examples
+#' \dontrun{
+#'   gdata <- data.frame(
+#'     Sample.ID = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+#'     Site      = "SiteA",
+#'     TA1_1     = c(174, 177, 162, 162),
+#'     TA1_2     = c(177,  NA, 171,  NA)
+#'   )
+#'   plot_moi(genotypedata = gdata, output_folder = NULL)
+#' }
 #' @export
 plot_moi <- function(genotypedata,
                      marker_pattern  = "(_allele_\\d+|_\\d+)$",
@@ -604,6 +658,17 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #' @param filename_prefix A string prefix for the output filename.
 #' @param max_cols Maximum number of pie charts per row. Defaults to 4.
 #' @return Invisibly returns the combined ggplot object, or `NULL` if no data.
+#'
+#' @examples
+#' \dontrun{
+#'   gdata <- data.frame(
+#'     Sample.ID     = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+#'     Site          = "SiteA",
+#'     cpmp_allele_1 = c("HAPL_A", "HAPL_A", "HAPL_A", "HAPL_B"),
+#'     cpmp_allele_2 = c(NA, NA, NA, NA)
+#'   )
+#'   plot_markers_diversity(genotypedata = gdata, data_type = "ampseq")
+#' }
 #'
 #' @importFrom dplyr %>% filter mutate select distinct group_by summarise
 #'   left_join all_of n

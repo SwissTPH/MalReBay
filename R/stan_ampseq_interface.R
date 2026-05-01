@@ -4,53 +4,38 @@
 # Parallel structure to stan_interface.R for length-polymorphic data
 # =============================================================================
 
-#' Run Stan MCMC for amplicon-sequencing marker sites
-#'
-#' Loops over sites in the data, prepares Stan input for the ampseq model,
-#' runs HMC sampling, and collects results.
-#'
-#' @param late_failures  Data frame of late-failure patient rows (all sites).
-#' @param additional     Data frame of additional background allele data (all sites).
-#' @param marker_info    Data frame of marker metadata.
-#' @param mcmc_config    Named list with fields \code{n_chains}, \code{iter},
-#'   \code{burn_in_frac}, \code{random_seed}, and optionally \code{adapt_delta}.
-#' @param verbose        Logical; print progress messages.
-#'
-#' @return A named list with elements \code{classifications},
-#'   \code{all_chains_loglikelihood}, \code{ids}, \code{locus_summary},
-#'   \code{locus_lrs}, \code{locus_dists}, \code{locinames}, and
-#'   \code{stan_fits}, each a named list over sites.
-#' @noRd
 run_stan_sites_ampseq <- function(late_failures,
                                    additional,
                                    marker_info,
                                    mcmc_config,
                                    verbose = TRUE) {
 
-  # Extract mcmc configuration parameters 
+  # --- 1. Extract config ---
   n_chains     <- as.integer(mcmc_config$n_chains)
   iter_total   <- as.integer(mcmc_config$iter)
   burn_in_frac <- as.numeric(mcmc_config$burn_in_frac)
   base_seed    <- as.integer(mcmc_config$random_seed)
-  adapt_delta  <- as.numeric(if (!is.null(mcmc_config$adapt_delta)) mcmc_config$adapt_delta else 0.85)
+  adapt_delta  <- as.numeric(
+    if (!is.null(mcmc_config$adapt_delta)) mcmc_config$adapt_delta else 0.85
+  )
 
   iter_warmup   <- max(200L, as.integer(floor(burn_in_frac * iter_total)))
   iter_sampling <- max(200L, iter_total - iter_warmup)
 
-  # Locate and compile model
-  stan_model_obj <- tryCatch(stanmodels$malrebay_ampseq_model, error = function(e) NULL)
+  # --- 2. Stan global setup ---
+  # cmdstanr compiles to a native binary and caches it automatically.
+  # parallel_chains runs each chain as a separate OS process — reliable on Windows.
 
-  if (is.null(stan_model_obj)) {
-    stan_file <- system.file("stan", "malrebay_ampseq_model.stan", package = "MalReBay")
-    if (file.exists(stan_file)) {
-      if (verbose) message("Compiling Stan ampseq model from source (first time only)...")
-      stan_model_obj <- rstan::stan_model(file = stan_file)
-    } else {
-      stop("Could not find pre-compiled 'malrebay_ampseq_model' or .stan source file.")
-    }
+  stan_file <- system.file("stan", "malrebay_ampseq_model.stan", package = "MalReBay")
+  if (!file.exists(stan_file)) {
+    stan_file <- file.path("inst", "stan", "malrebay_ampseq_model.stan")
   }
+  if (!file.exists(stan_file)) stop("Cannot find malrebay_ampseq_model.stan", call. = FALSE)
 
-  # Output containers
+  if (verbose) message("Compiling Stan ampseq model...")
+  stan_model_obj <- cmdstanr::cmdstan_model(stan_file)
+
+  # --- 3. Output containers ---
   site_names          <- as.character(unique(late_failures$Site))
   out_classifications <- list()
   out_loglikelihood   <- list()
@@ -61,7 +46,7 @@ run_stan_sites_ampseq <- function(late_failures,
   out_locinames       <- list()
   out_stan_fits       <- list()
 
-  # Site analysis loop
+  # --- 4. Site loop ---
   for (site in site_names) {
     if (verbose) message("\n--- Processing Site: ", site, " ---")
 
@@ -122,7 +107,7 @@ run_stan_sites_ampseq <- function(late_failures,
 
     # Prepare Stan data
     if (verbose) message("  Preparing Stan ampseq data...")
-    stan_input <- prepare_stan_data_ampseq(
+    sd <- prepare_stan_data_ampseq(
       late_failures_site  = late_site,
       additional_site     = add_site,
       marker_info         = marker_info,
@@ -132,20 +117,22 @@ run_stan_sites_ampseq <- function(late_failures,
       is_locus_comparable = is_locus_comparable
     )
 
-    if (!validate_stan_data_ampseq(stan_input)) next
+    if (!validate_stan_data_ampseq(sd)) next
 
-    # Define model priors
+    # Init function: flat frequencies, low error/loss rates.
+    # Closure over sd so freq dimensions are correct.
+    # Note: q_dropout included to match all three parameters declared in the model.
     init_fun <- local({
       sd_local <- sd
       function() {
         list(
-          q_mismatch = 0.01,   
-          q_loss     = 0.10,   
-          q_dropout  = 0.05,   
+          q_mismatch = 0.01,   # matches old R initial value
+          q_loss     = 0.10,   # matches old R initial value
+          q_dropout  = 0.05,   # matches old R initial value
           freq       = lapply(seq_len(sd_local$J), function(j) {
             x <- rep(0.1 / sd_local$max_K, sd_local$max_K)
             x[1:sd_local$K[j]] <- 1.0 / sd_local$K[j]
-            x / sum(x)  
+            x / sum(x)  # ensure valid simplex
           })
         )
       }
@@ -156,17 +143,18 @@ run_stan_sites_ampseq <- function(late_failures,
                          iter_sampling, " samples)...")
 
     fit <- tryCatch({
-      rstan::sampling(
-        object  = stan_model_obj,
-        data    = stan_data_only(stan_input),
-        chains  = n_chains,
-        cores   = min(n_chains, parallel::detectCores(logical = FALSE)),
-        iter    = iter_warmup + iter_sampling,
-        warmup  = iter_warmup,
-        init    = init_fun,
-        control = list(adapt_delta = adapt_delta, max_treedepth = 12),
-        seed    = base_seed,
-        refresh = if (verbose) 100L else 0L
+      stan_model_obj$sample(
+        data            = stan_data_only(sd),
+        chains          = n_chains,
+        parallel_chains = min(n_chains, parallel::detectCores(logical = FALSE)),
+        iter_warmup     = iter_warmup,
+        iter_sampling   = iter_sampling,
+        init            = init_fun,
+        adapt_delta     = adapt_delta,
+        max_treedepth   = 12L,
+        seed            = base_seed,
+        refresh         = if (verbose) 100L else 0L,
+        output_dir      = tempdir()
       )
     }, error = function(e) {
       warning("Stan sampling failed for site '", site, "': ", e$message)
@@ -174,6 +162,13 @@ run_stan_sites_ampseq <- function(late_failures,
     })
 
     if (is.null(fit)) next
+    
+    # check all chains actually completed
+    if (all(fit$return_codes() != 0)) {
+      message(paste(fit$output(), collapse = "\n"))
+      warning("All chains failed for site '", site, "'. Skipping.")
+      next
+    }
 
     # Extract results
     extracted <- extract_stan_results_ampseq(fit, ids, locinames, nloci, length(ids))
@@ -200,38 +195,21 @@ run_stan_sites_ampseq <- function(late_failures,
   ))
 }
 
-#' Extract posterior draws from a fitted Stan ampseq model
-#'
-#' Pulls \code{p_recrud} draws and per-chain log-posterior traces from a
-#' \code{stanfit} object returned by \code{run_stan_sites_ampseq}.
-#'
-#' @param fit       A \code{stanfit} object.
-#' @param ids       Character vector of patient IDs.
-#' @param locinames Character vector of locus names.
-#' @param nloci     Integer number of loci.
-#' @param nids      Integer number of patients.
-#'
-#' @return A list with \code{p_recrud_draws}, \code{loglik_chains},
-#'   \code{locus_lrs}, and \code{locus_dists}.
-#' @noRd
 extract_stan_results_ampseq <- function(fit, ids, locinames, nloci, nids) {
 
-  p_recrud_draws <- rstan::extract(fit, pars = "p_recrud")$p_recrud
+  # draws_matrix: rows = draws (all chains merged), cols = p_recrud[1..N]
+  p_recrud_draws <- fit$draws("p_recrud", format = "draws_matrix")
 
-  lp_array <- tryCatch(
-    rstan::extract(fit, pars = "lp__", permuted = FALSE),
-    error = function(e) NULL
-  )
-
-  if (!is.null(lp_array) && length(dim(lp_array)) == 3) {
-    n_chains      <- dim(lp_array)[2]
-    lp_matrix     <- matrix(lp_array[, , 1], ncol = n_chains)
-    loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
-  } else {
-    loglik_chains <- list()
-  }
+  # draws_array: [iterations, chains, variables] — preserves chain structure
+  lp_array  <- fit$draws("lp__", format = "draws_array")
+  n_iter    <- dim(lp_array)[1]
+  n_chains  <- dim(lp_array)[2]
+  lp_matrix <- matrix(as.numeric(lp_array), nrow = n_iter, ncol = n_chains)
+  loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
 
   n_draws     <- nrow(p_recrud_draws)
+  # locus_lrs and locus_dists not directly available from Stan output for ampseq.
+  # They would require adding generated quantities per locus — left as NA for now.
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))
   locus_dists <- array(NA_real_, dim = c(nids, nloci, n_draws))
 

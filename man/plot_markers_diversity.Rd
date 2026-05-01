@@ -35,3 +35,15 @@ Creates pie charts visualising allele or haplotype diversity
 across all samples combined (Day 0 and recurrences pooled). Pies are
 arranged with at most \code{max_cols} per row.
 }
+\examples{
+\dontrun{
+  gdata <- data.frame(
+    Sample.ID     = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+    Site          = "SiteA",
+    cpmp_allele_1 = c("HAPL_A", "HAPL_A", "HAPL_A", "HAPL_B"),
+    cpmp_allele_2 = c(NA, NA, NA, NA)
+  )
+  plot_markers_diversity(genotypedata = gdata, data_type = "ampseq")
+}
+
+}

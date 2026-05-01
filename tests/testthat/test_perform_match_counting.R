@@ -118,3 +118,30 @@ test_that("perform_match_counting: match at boundary of repeat length tolerance"
   result <- perform_match_counting(mock, create_mock_markers())
   expect_equal(result$TA1, "R")
 })
+
+# ============================================================
+# assign_clusters — edge cases
+# ============================================================
+
+test_that("assign_clusters: returns character(0) for empty input", {
+  result <- MalReBay:::assign_clusters(numeric(0), threshold = 3)
+  expect_equal(result, character(0))
+  expect_length(result, 0)
+})
+
+test_that("assign_clusters: returns cluster 1 for single unique allele", {
+  # One unique value — no diffs to compute; all elements assigned cluster 1
+  result <- MalReBay:::assign_clusters(c(174, 174, 174), threshold = 3)
+  expect_equal(unname(result), 1L)
+  expect_equal(names(result), "174")
+})
+
+test_that("assign_clusters: two alleles within threshold share one cluster", {
+  result <- MalReBay:::assign_clusters(c(174, 177), threshold = 3)
+  expect_equal(length(unique(unname(result))), 1L)
+})
+
+test_that("assign_clusters: two alleles beyond threshold get distinct clusters", {
+  result <- MalReBay:::assign_clusters(c(174, 200), threshold = 3)
+  expect_equal(length(unique(unname(result))), 2L)
+})
