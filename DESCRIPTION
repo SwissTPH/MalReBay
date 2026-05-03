@@ -26,7 +26,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Biarch: true
 Depends:
-    R (>= 3.5.0)
+    R (>= 4.1.0)
 Imports:
     cmdstanr (>= 0.7.0),
     coda,
