@@ -2,14 +2,21 @@
 # Skip helper — replaces skip_on_check() (testthat >= 3.2.0 only)
 # ============================================================
 
-#' Skip a Stan-dependent test when running under R CMD check.
-#' Uses the _R_CHECK_PACKAGE_NAME_ environment variable, which R sets
-#' during check but not during interactive devtools::test().
+#' Skip a Stan-dependent test when CmdStan is not available.
+#' Covers two situations:
+#'   1. R CMD check  — _R_CHECK_PACKAGE_NAME_ is set by R.
+#'   2. covr / any other runner where cmdstanr is installed but
+#'      CmdStan itself has not been installed on the machine.
 skip_stan_on_check <- function() {
   skip_if(
     nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")),
     "Skipping Stan-dependent test during R CMD check"
   )
+  cmdstan_ok <- tryCatch({
+    path <- cmdstanr::cmdstan_path()
+    nzchar(path) && file.exists(path)
+  }, error = function(e) FALSE)
+  skip_if(!cmdstan_ok, "CmdStan not installed — skipping Stan-dependent test")
 }
 
 # ============================================================
