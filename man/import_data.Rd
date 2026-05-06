@@ -4,7 +4,11 @@
 \alias{import_data}
 \title{Import Genotyping Data from Excel}
 \usage{
-import_data(filepath, marker_filepath = NULL, verbose = TRUE)
+import_data(
+  filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
+  marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
+  verbose = TRUE
+)
 }
 \arguments{
 \item{filepath}{The full path to the input Excel file.}

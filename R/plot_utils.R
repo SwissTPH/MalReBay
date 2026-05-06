@@ -149,6 +149,19 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
     cat(strrep("-", 50), "\n")
   }
 
+  # When no output_folder is provided, return diagnostics without attempting
+  # to draw plots — avoids "figure margins too large" in small RStudio windows
+  if (!save_plot) {
+    return(invisible(list(
+      gelman    = gelman_result,
+      ess       = ess_result,
+      rhat_rank = rhat_rank,
+      ess_bulk  = ess_bulk,
+      ess_tail  = ess_tail,
+      geweke    = geweke_result
+    )))
+  }
+
   # Gelman-Rubin plot
   if (save_plot) {
     grDevices::png(file.path(site_dir,
@@ -558,8 +571,7 @@ process_pie_data <- function(plot_data_df, data_type) {
 #' @return A ggplot object representing the pie chart.
 #'
 #' @importFrom dplyr mutate lead if_else
-#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text
-#'   theme_void theme element_text ggtitle
+#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text theme_void theme element_text ggtitle
 #' @importFrom forcats fct_inorder
 #' @importFrom grDevices colorRampPalette
 #' @noRd
@@ -670,8 +682,7 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #'   plot_markers_diversity(genotypedata = gdata, data_type = "ampseq")
 #' }
 #'
-#' @importFrom dplyr %>% filter mutate select distinct group_by summarise
-#'   left_join all_of n
+#' @importFrom dplyr %>% filter mutate select distinct group_by summarise left_join all_of n
 #' @importFrom tidyr pivot_longer
 #' @importFrom ggplot2 ggsave
 #' @importFrom ggpubr ggarrange

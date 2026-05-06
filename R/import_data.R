@@ -15,7 +15,9 @@
 #'   imported    <- import_data(filepath = data_file, marker_filepath = marker_file)
 #' }
 #' @export
-import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
+import_data <- function(filepath        = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
+                        marker_filepath = system.file("extdata", "makers_details.xlsx",        package = "MalReBay"),
+                        verbose         = TRUE) {
   # Load Workbook and Sheets
   sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
   if (inherits(sheet_names, "try-error")) stop("ERROR: Cannot read file: ", filepath)

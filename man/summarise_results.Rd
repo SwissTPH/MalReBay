@@ -31,4 +31,15 @@ interpretable summaries including posterior probabilities, convergence
 diagnostics, and a match counting comparison table. Called automatically
 by \code{\link{MalReBay}}.
 }
-\keyword{internal}
+\examples{
+\dontrun{
+imported <- import_data()
+results  <- classify_infections(imported)
+summary  <- summarise_results(results, imported)
+}
+
+}
+\seealso{
+\code{\link{classify_infections}}, \code{\link{save_results}},
+\code{\link{MalReBay}}
+}

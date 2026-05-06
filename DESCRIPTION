@@ -23,7 +23,6 @@ BugReports: https://github.com/swisstph/MalReBay/issues
 License: GPL (>= 3) + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Biarch: true
 Depends:
     R (>= 4.1.0)
@@ -59,3 +58,4 @@ VignetteBuilder: knitr
 Additional_repositories:
     https://stan-dev.r-universe.dev
 SystemRequirements: CmdStan (>= 2.32.0); install via cmdstanr::install_cmdstan()
+Config/roxygen2/version: 8.0.0

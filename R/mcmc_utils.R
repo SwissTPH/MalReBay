@@ -1,10 +1,29 @@
 #' Classify malaria infections using Bayesian MCMC
 #'
-#' @param imported_data List returned by \code{import_data()}.
-#' @param mcmc_config   Path to MCMC configuration Excel file.
-#' @param verbose       Print progress messages.
-#' @return List of MCMC results passed to \code{summarise_results()}.
-#' @keywords internal
+#' Runs the Bayesian MCMC engine across all sites to classify patient samples
+#' as recrudescence or reinfection. Called automatically by
+#' \code{\link{MalReBay}}, but can also be used directly for a step-by-step
+#' workflow.
+#'
+#' @param imported_data A list returned by \code{\link{import_data}}.
+#' @param mcmc_config   Path to an MCMC configuration Excel file, or a named
+#'   list of parameters. Defaults to the bundled configuration.
+#' @param n_workers     Number of parallel workers. Defaults to \code{1}.
+#' @param verbose       Logical. Print progress messages. Defaults to \code{TRUE}.
+#'
+#' @return A named list of raw MCMC results per site, or \code{NULL} if no
+#'   valid results are produced. Pass this to \code{\link{summarise_results}}.
+#'
+#' @seealso \code{\link{import_data}}, \code{\link{summarise_results}},
+#'   \code{\link{MalReBay}}
+#'
+#' @examples
+#' \dontrun{
+#' imported <- import_data()
+#' results  <- classify_infections(imported)
+#' }
+#'
+#' @export
 classify_infections <- function(imported_data,
                                 mcmc_config = system.file(
                                   "extdata", "default_mcmc_config.xlsx",
@@ -80,7 +99,18 @@ classify_infections <- function(imported_data,
 #'
 #' @return A named list with \code{posterior_probabilities}, \code{comparison},
 #'   \code{convergence}, and \code{mcmc_loglikelihoods}.
-#' @keywords internal
+#'
+#' @seealso \code{\link{classify_infections}}, \code{\link{save_results}},
+#'   \code{\link{MalReBay}}
+#'
+#' @examples
+#' \dontrun{
+#' imported <- import_data()
+#' results  <- classify_infections(imported)
+#' summary  <- summarise_results(results, imported)
+#' }
+#'
+#' @export
 summarise_results <- function(mcmc_results,
                               imported_data,
                               output_folder = NULL,
@@ -218,7 +248,18 @@ summarise_results <- function(mcmc_results,
 #' @param verbose         Logical.
 #' @return A named character vector of paths to the files that were written,
 #'   or \code{invisible(NULL)} when \code{output_folder} is \code{NULL}.
-#' @keywords internal
+#'
+#' @seealso \code{\link{summarise_results}}, \code{\link{MalReBay}}
+#'
+#' @examples
+#' \dontrun{
+#' imported <- import_data()
+#' results  <- classify_infections(imported)
+#' summary  <- summarise_results(results, imported)
+#' save_results(summary, imported, output_folder = "my_results")
+#' }
+#'
+#' @export
 save_results <- function(summary_results,
                          imported_data = NULL,
                          output_folder = NULL,
@@ -231,30 +272,30 @@ save_results <- function(summary_results,
          call. = FALSE)
   }
 
-  # If no folder is provided, we skip all saving logic
-  if (is.null(output_folder)) {
-    if (verbose) message("INFO: No output_folder provided. Skipping file saving.")
-    return(invisible(NULL))
-  }
-
-  if (!dir.exists(output_folder)) {
+  if (!is.null(output_folder) && !dir.exists(output_folder)) {
     dir.create(output_folder, recursive = TRUE)
     if (verbose) message("INFO: Created output folder: ", output_folder)
   }
 
+  # Generate descriptive plots — display on screen when no output_folder,
+  # save to disk when output_folder is provided
   if (!is.null(imported_data)) {
     all_data <- dplyr::bind_rows(imported_data$late_failures,
                                  imported_data$additional)
 
     if (nrow(all_data) > 0) {
-      plot_markers_diversity(
+      p_div <- plot_markers_diversity(
         all_data,
         imported_data$data_type,
         imported_data$marker_info,
         output_folder = output_folder
       )
+      if (is.null(output_folder) && !is.null(p_div)) print(p_div)
 
-      plot_moi(all_data, output_folder = output_folder)
+      p_moi <- plot_moi(all_data, output_folder = output_folder)
+      if (is.null(output_folder) && !is.null(p_moi)) {
+        for (p in p_moi) print(p)
+      }
     }
   }
 
@@ -263,6 +304,12 @@ save_results <- function(summary_results,
     output_folder = output_folder,
     verbose       = verbose
   )
+
+  # Stop here if no output folder — plots already shown above
+  if (is.null(output_folder)) {
+    if (verbose) message("INFO: No output_folder provided. Skipping file saving.")
+    return(invisible(NULL))
+  }
 
   # Write CSVs
   saved_paths <- character(0)

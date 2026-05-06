@@ -12,16 +12,33 @@ classify_infections(
 )
 }
 \arguments{
-\item{imported_data}{List returned by \code{import_data()}.}
+\item{imported_data}{A list returned by \code{\link{import_data}}.}
 
-\item{mcmc_config}{Path to MCMC configuration Excel file.}
+\item{mcmc_config}{Path to an MCMC configuration Excel file, or a named
+list of parameters. Defaults to the bundled configuration.}
 
-\item{verbose}{Print progress messages.}
+\item{n_workers}{Number of parallel workers. Defaults to \code{1}.}
+
+\item{verbose}{Logical. Print progress messages. Defaults to \code{TRUE}.}
 }
 \value{
-List of MCMC results passed to \code{summarise_results()}.
+A named list of raw MCMC results per site, or \code{NULL} if no
+valid results are produced. Pass this to \code{\link{summarise_results}}.
 }
 \description{
-Classify malaria infections using Bayesian MCMC
+Runs the Bayesian MCMC engine across all sites to classify patient samples
+as recrudescence or reinfection. Called automatically by
+\code{\link{MalReBay}}, but can also be used directly for a step-by-step
+workflow.
 }
-\keyword{internal}
+\examples{
+\dontrun{
+imported <- import_data()
+results  <- classify_infections(imported)
+}
+
+}
+\seealso{
+\code{\link{import_data}}, \code{\link{summarise_results}},
+\code{\link{MalReBay}}
+}

@@ -30,4 +30,15 @@ or \code{invisible(NULL)} when \code{output_folder} is \code{NULL}.
 Writes MCMC results to CSV files and generates descriptive and
 result-based plots (Diversity, MOI, and Posterior Histograms).
 }
-\keyword{internal}
+\examples{
+\dontrun{
+imported <- import_data()
+results  <- classify_infections(imported)
+summary  <- summarise_results(results, imported)
+save_results(summary, imported, output_folder = "my_results")
+}
+
+}
+\seealso{
+\code{\link{summarise_results}}, \code{\link{MalReBay}}
+}
