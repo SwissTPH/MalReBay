@@ -241,7 +241,7 @@ results <- MalReBay::MalReBay(
   marker_filepath = marker_file,
   mcmc_config     = quick_config,
   output_folder   = output_dir_lp,
-  n_workers       = 2,
+  n_workers       = 1,
   verbose         = FALSE
 )
 ```
@@ -383,7 +383,7 @@ results_nonconverge <- MalReBay::MalReBay(
   marker_filepath = marker_file,
   mcmc_config     = quick_mcmc_config,
   output_folder   = output_dir_nonconverge,
-  n_workers       = 2,
+  n_workers       = 1,
   verbose         = FALSE
 )
 

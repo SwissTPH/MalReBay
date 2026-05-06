@@ -21,6 +21,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Veronica Adhiambo Ochieng \email{veronica.adhiambo@aims.ac.rw}
   \item Mateusz Plucinski
   \item Monica Golumbeanu \email{monica.golumbeanu@swisstph.ch}
 }
