@@ -59,6 +59,9 @@ classify_infections <- function(imported_data,
 
   if (workers_to_use > 1) {
     cl <- parallel::makeCluster(workers_to_use)
+    # Pass current library paths so workers find the package in check/temp environments
+    lib_paths <- .libPaths()
+    parallel::clusterCall(cl, function(lp) .libPaths(lp), lib_paths)
     doParallel::registerDoParallel(cl)
     on.exit({ parallel::stopCluster(cl); foreach::registerDoSEQ() }, add = TRUE)
   } else {
@@ -154,6 +157,7 @@ summarise_results <- function(mcmc_results, imported_data, output_folder = NULL,
       diag_vals <- plot_likelihood_diagnostics(
         mcmc_results$all_chains_loglikelihood[[site]],
         site,
+        save_plot     = !is.null(output_folder),
         output_folder = output_folder,
         verbose       = verbose
       )

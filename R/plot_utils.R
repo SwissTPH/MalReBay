@@ -138,7 +138,19 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
     }
     cat(strrep("-", 50), "\n")
   }
-  
+
+  # When not saving plots, return diagnostics now to avoid rendering to screen
+  if (!save_plot) {
+    return(invisible(list(
+      gelman    = gelman_result,
+      ess       = ess_result,
+      rhat_rank = rhat_rank,
+      ess_bulk  = ess_bulk,
+      ess_tail  = ess_tail,
+      geweke    = geweke_result
+    )))
+  }
+
   # Gelman-Rubin diagnostic plot
   if (save_plot) {
     grDevices::png(
@@ -246,29 +258,46 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood,
 #'   containing a \code{posterior_probabilities} data frame with a
 #'   \code{Probability} column.
 #' @param output_folder A string specifying the directory where the histogram
-#'   PNG will be saved. Defaults to \code{"results"}.
+#'   PNG will be saved. If \code{NULL}, the plot is displayed on screen and not
+#'   saved. Defaults to \code{NULL}.
 #' @param verbose Logical. If \code{TRUE}, prints a message when the file is
 #'   saved. Defaults to \code{TRUE}.
 #'
-#' @return Invisibly returns the file path of the saved PNG. Returns
-#'   \code{invisible(NULL)} if no probabilities are available to plot.
+#' @return Invisibly returns the file path of the saved PNG, or \code{NULL}
+#'   when plotting to screen. Returns \code{invisible(NULL)} if no
+#'   probabilities are available to plot.
 #'
 #' @export
-plot_probability_histogram <- function(summary_results, output_folder = "results", verbose = TRUE) {
-  
+plot_probability_histogram <- function(summary_results, output_folder = NULL, verbose = TRUE) {
+
   posterior_probabilities <- summary_results$posterior_probabilities
-  
+
   if (is.null(posterior_probabilities) || nrow(posterior_probabilities) == 0) {
     warning("No posterior probabilities to plot.")
     return(invisible(NULL))
   }
-  
+
+  probs <- as.numeric(as.character(posterior_probabilities$Probability))
+
+  # Display to screen when no output_folder is given
+  if (is.null(output_folder)) {
+    graphics::hist(
+      probs,
+      breaks = seq(0, 1, by = 0.05),
+      col    = "skyblue",
+      main   = "Posterior Probability Distribution",
+      xlab   = "Probability of Recrudescence",
+      ylab   = "Number of Patients"
+    )
+    return(invisible(NULL))
+  }
+
   if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  
+
   path <- file.path(output_folder, "recrudescence_probability_histogram.png")
   grDevices::png(path, width = 8, height = 6, units = "in", res = 300)
   graphics::hist(
-    as.numeric(as.character(posterior_probabilities$Probability)),
+    probs,
     breaks = seq(0, 1, by = 0.05),
     col    = "skyblue",
     main   = "Posterior Probability Distribution",
@@ -276,7 +305,7 @@ plot_probability_histogram <- function(summary_results, output_folder = "results
     ylab   = "Number of Patients"
   )
   grDevices::dev.off()
-  
+
   if (verbose) message("INFO: Probability histogram saved to: ", output_folder)
   invisible(path)
 }
@@ -512,8 +541,7 @@ process_pie_data <- function(plot_data_df, data_type) {
 #' @return A ggplot object representing the pie chart.
 #'
 #' @importFrom dplyr mutate lead if_else
-#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text
-#'   theme_void theme element_text ggtitle
+#' @importFrom ggplot2 ggplot aes geom_col coord_polar scale_fill_manual geom_text theme_void theme element_text ggtitle
 #' @importFrom forcats fct_inorder
 #' @importFrom grDevices colorRampPalette
 #' @noRd
@@ -613,8 +641,7 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #' @param max_cols Maximum number of pie charts per row. Defaults to 4.
 #' @return Invisibly returns the combined ggplot object, or `NULL` if no data.
 #'
-#' @importFrom dplyr %>% filter mutate select distinct group_by summarise
-#'   left_join all_of n
+#' @importFrom dplyr %>% filter mutate select distinct group_by summarise left_join all_of n
 #' @importFrom tidyr pivot_longer
 #' @importFrom ggplot2 ggsave
 #' @importFrom ggpubr ggarrange
@@ -624,7 +651,7 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 plot_markers_diversity <- function(genotypedata,
                                    data_type,
                                    marker_info     = NULL,
-                                   output_folder,
+                                   output_folder   = NULL,
                                    filename_prefix = "diversity",
                                    max_cols        = 4) {
   
@@ -640,8 +667,10 @@ plot_markers_diversity <- function(genotypedata,
   if (length(sid_col) == 0) stop("Input data must contain a 'Sample.ID' column.")
   genotypedata$Sample.ID <- as.character(genotypedata[[sid_col[1]]])
   
-  if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-  
+  if (!is.null(output_folder) && !dir.exists(output_folder)) {
+    dir.create(output_folder, recursive = TRUE)
+  }
+
   # Build combined frequency data
   if (data_type == "length_polymorphic") {
     alleles_definitions_bin <- define_alleles_for_plotting(genotypedata, marker_info)
@@ -689,16 +718,18 @@ plot_markers_diversity <- function(genotypedata,
     return(invisible(NULL))
   }
   
-  # Arrange and save 
+  # Arrange and (optionally) save
   num_cols     <- min(length(p_array), max_cols)
   num_rows     <- ceiling(length(p_array) / num_cols)
   final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
-  
-  output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
-  ggplot2::ggsave(output_path, plot = final_figure,
-                  width  = num_cols * 4,
-                  height = num_rows * 4,
-                  limitsize = FALSE)
-  
+
+  if (!is.null(output_folder)) {
+    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
+    ggplot2::ggsave(output_path, plot = final_figure,
+                    width     = num_cols * 4,
+                    height    = num_rows * 4,
+                    limitsize = FALSE)
+  }
+
   invisible(final_figure)
 }

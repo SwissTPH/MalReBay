@@ -8,7 +8,9 @@
 #' @param marker_filepath Path to Excel file containing marker metadata (optional if marker_info sheet is present)
 #' @return A list containing the imported data.
 #' @export
-import_data <- function(filepath, marker_filepath = NULL, verbose = TRUE) {
+import_data <- function(filepath        = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
+                        marker_filepath = system.file("extdata", "makers_details.xlsx",        package = "MalReBay"),
+                        verbose         = TRUE) {
   # Load Workbook and Sheets
   sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
   if (inherits(sheet_names, "try-error")) stop("ERROR: Cannot read file: ", filepath)
