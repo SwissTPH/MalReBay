@@ -163,8 +163,6 @@ run_all_sites <- function(
       chunk_results <- foreach::foreach(
         id             = 1:n_chains,
         .packages      = c("abind", "coda", "MalReBay"),
-        .export        = c("engine_args", "chunk_size",
-                           "mcmc_engine_function", "base_seed"),
         .errorhandling = "stop"
       ) %dopar% {
         set.seed(base_seed + id)

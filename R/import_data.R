@@ -45,7 +45,7 @@ import_data <- function(filepath        = system.file("extdata", "Angola_2021_TE
 
   # Ensure marker_id is always a string
   marker_info$marker_id <- as.character(marker_info$marker_id)
-  marker_info$repeatlength <- as.numeric(as.character(marker_info$repeatlength))
+  marker_info$repeatlength <- suppressWarnings(as.numeric(as.character(marker_info$repeatlength)))
 
   # Standardize metadata for the columns (1, 2, and 3)
   # Column 1 = Sample.ID, Column 2 = Site, Columns 3+ = Alleles
@@ -93,7 +93,7 @@ import_data <- function(filepath        = system.file("extdata", "Angola_2021_TE
     df[df %in% missing_alleles] <- NA
     # Convert allele columns (3 onwards) to numeric if length polymorphic
     if (data_type == "length_polymorphic" && ncol(df) > 2) {
-      df[, 3:ncol(df)] <- lapply(df[, 3:ncol(df)], function(x) as.numeric(as.character(x)))
+      df[, 3:ncol(df)] <- lapply(df[, 3:ncol(df)], function(x) suppressWarnings(as.numeric(as.character(x))))
     }
     return(df)
   }

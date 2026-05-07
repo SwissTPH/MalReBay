@@ -1,0 +1,294 @@
+---
+title: "Classification of P. falciparum infection recurrences with MalReBay"
+author: "Monica Golumbeanu, Veronica Adhiambo Ochieng"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    code-line-numbers: true
+    theme: cosmo
+    highlight-style: github
+    df-print: paged
+    fig-width: 9
+    fig-height: 5
+execute:
+  warning: false
+  message: false
+---
+
+## Overview
+
+**MalReBay** is an R package for classifying recurrent *Plasmodium falciparum* infections in Therapeutic Efficacy Studies (TES). For each patient, it estimates the **posterior probability that a recurrence is a recrudescence** (treatment failure) versus a new infection (reinfection).
+
+MalReBay uses a fully Bayesian algorithm solved with Markov Chain Monte Carlo (MCMC) sampling. Key advantages:
+
+-   Handles **polyclonal infections** (multiple parasite strains per patient)
+-   Imputes **missing genotypes** as part of the MCMC
+-   Supports two data types:
+    -   **Length-polymorphic markers**: microsatellites, MSP1, MSP2, GLURP (allele sizes as numbers)
+    -   **Amplicon sequencing (AmpSeq)**: discrete haplotypes
+
+This notebook walks through a complete analysis of MSP/GLURP length-polymorphic data using the example dataset bundled with the package.
+
+------------------------------------------------------------------------
+
+## Installation
+
+```{r}
+#| eval: false
+# Install from GitHub (development version)
+remotes::install_github("SwissTPH/MalReBay")
+```
+
+```{r}
+library(MalReBay)
+```
+
+------------------------------------------------------------------------
+
+## Input data
+
+MalReBay requires up to three inputs: a **genotyping data file**, a **marker metadata file**, and an **MCMC configuration**. All three can be Excel (`.xlsx`) files or, for the MCMC configuration, an R named list.
+
+### Genotyping data file
+
+The main input is an Excel workbook. The first sheet must contain one row per sample with the following column layout:
+
+| Column 1  | Column 2 | Column 3 | Columns4+                                  |
+|-----------|----------|----------|--------------------------------------------|
+| PatientID | Day      | Site     | Allele columns (`marker_1`, `marker_2`, …) |
+
+Each patient must have exactly two rows:
+
+-   A **Day 0** row
+-   A **recurrence** row
+
+**Allele column naming.** Columns are named `<marker_id>_1`, `<marker_id>_2`, … up to the maximum multiplicity of infection (MOI). For example, three columns `msp1_1`, `msp1_2`, `msp1_3` encode up to three distinct MSP1 alleles per sample.
+
+-   For **length-polymorphic** data, values are numeric allele sizes (e.g. `200`, `230.5`).
+-   For **AmpSeq** data, values are haplotype strings (e.g. `"Haplotyp1"`, etc.).
+
+Missing values are recognised and set to `NA` automatically for: `N/A`, `-`, `NA`, `na`, `""`, `" "`.
+
+A second sheet (optional, for length-polymorphic markers only) can supply additional Day 0 samples.
+
+```{r}
+# Preview the example MSP/GLURP dataset
+example_file   <- "example_msp_glurp.xlsx"
+marker_file    <- "makers_details.xlsx"
+
+imported_data <- import_data(
+  filepath        = example_file,
+  marker_filepath = marker_file,
+  verbose         = TRUE
+)
+
+# The imported object is a list with four elements
+names(imported_data)
+```
+
+```{r}
+# Main data: one row per sample (Day 0 and recurrence)
+head(imported_data$late_failures)
+```
+
+```{r}
+# Detected data type
+imported_data$data_type
+```
+
+### Marker metadata file
+
+The marker metadata file is an Excel file with one row per marker. Required columns:
+
+| Column | Description |
+|------------------------------------|------------------------------------|
+| `marker_id` | Marker name: must match the prefix of the allele columns in the genotyping file |
+| `marker_type` | Marker type: microsatellite,msp_glurp or ampseq |
+| `repeatlength` | Repeat unit length (bp) for microsatellites; gap threshold for MSP/GLURP |
+| `binning_method` | `"microsatellite"`, `"msp_glurp"`, or `"exact"` for each data type, respectively |
+
+```{r}
+# Inspect marker metadata
+print(imported_data$marker_info)
+```
+
+### MCMC configuration
+
+The MCMC behaviour is controlled by a set of parameters, supplied either as an Excel file or a named R list.
+
+```{r}
+# Read and display the default configuration
+config_file <- "default_mcmc_config.xlsx"
+cfg <- as.data.frame(readxl::read_excel(config_file))
+cfg
+```
+
+| Parameter | Description |
+|------------------------------------|------------------------------------|
+| `n_chains` | Number of independent MCMC chains. More chains improve convergence diagnostics. |
+| `chunk_size` | Number of MCMC iterations run per convergence-check cycle. |
+| `max_iterations` | Hard upper limit on total MCMC iterations per site. |
+| `burn_in_frac` | Fraction of samples discarded as burn-in (e.g. `0.5` → first 50 % discarded). |
+| `rhat_threshold` | Gelman–Rubin R-hat upper bound for convergence (typically `1.05`). |
+| `ess_threshold` | Minimum bulk effective sample size required for convergence. |
+| `thinning_interval` | how many samples are skipped during thinning |
+| `record_hidden_alleles` | If `TRUE`, saves the imputed latent allele states for every MCMC sample. Increases memory use. |
+
+**Convergence rule.** The algorithm runs in chunks of `chunk_size` iterations. After each chunk it checks three criteria simultaneously: rank-normalised R-hat, bulk ESS, and tail ESS. If all pass, sampling stops early. As a fallback it also checks classical Gelman–Rubin and Geweke Z-scores. If none of the criteria are met by `max_iterations`, the run completes with a warning.
+
+You can also pass the configuration directly as a named list instead of an Excel file.
+
+------------------------------------------------------------------------
+
+## Running the pipeline
+
+The main package function `MalReBay()` runs data import, MCMC classification, result summarisation, and output saving.
+
+```{r}
+results <- MalReBay(
+  filepath        = example_file,
+  marker_filepath = marker_file,
+  mcmc_config     = config_file,
+  output_folder   = "bayesian_algorithm_output",
+  n_workers       = 4,
+  verbose         = TRUE
+)
+```
+
+### Parameters
+
+| Parameter | Description |
+|------------------------------------|------------------------------------|
+| `filepath` | Path to the genotyping Excel file. |
+| `marker_filepath` | Path to the marker metadata Excel file. |
+| `mcmc_config` | Path to the MCMC configuration Excel file, or a named list. |
+| `output_folder` | Directory where all output files and plots are written. Set to `NULL` to suppress file saving. |
+| `n_workers` | Number of parallel workers for multi-chain MCMC. Capped at the number of physical cores. |
+| `verbose` | If `TRUE`, prints progress and convergence messages to the console. |
+
+------------------------------------------------------------------------
+
+## Output
+
+`MalReBay()` returns a named list with four elements and, when `output_folder` is set, saves the CSV files and diagnostic plots.
+
+### Return value
+
+```{r}
+names(results)
+```
+
+#### `posterior_probabilities`
+
+One row per patient. The key column is `Probability`: the posterior probability that the recurrence is a **recrudescence**. Also includes per-patient locus availability counts.
+
+```{r}
+head(results$posterior_probabilities)
+```
+
+A probability close to **1** indicates recrudescence; close to **0** indicates reinfection. Values near **0.5** reflect uncertainty, often due to limited or missing genotyping data.
+
+#### `comparison`
+
+Combines the Bayesian posterior probabilities with the traditional **allele match counting** result for each patient, enabling side-by-side comparison of both methods.
+
+```{r}
+head(results$comparison)
+```
+
+#### `convergence`
+
+Per-site MCMC convergence diagnostics: Gelman–Rubin R-hat and effective sample size.
+
+```{r}
+results$convergence
+```
+
+An R-hat below `rhat_threshold` (typically 1.05) and ESS above `ess_threshold` indicate that the chains have mixed well and the posterior estimates are reliable.
+
+#### `mcmc_loglikelihoods`
+
+Raw per-chain log-likelihood traces, one list element per site. Useful for manual convergence inspection.
+
+```{r}
+# Sites present in the data
+names(results$mcmc_loglikelihoods)
+```
+
+### Output files
+
+When `output_folder` is provided, the following files are written:
+
+| File | Contents |
+|------------------------------------|------------------------------------|
+| `posterior_probabilities.csv` | Posterior probability of recrudescence per patient, with locus counts. |
+| `bayesian_match_counting_comparison.csv` | Bayesian results alongside traditional match counting. |
+| `mcmc_convergence_summary.csv` | R-hat and ESS per site. |
+| `recrudescence_probability_histogram.png` | Distribution of posterior probabilities across all patients. |
+| `diversity_length_polymorphic_comparison.png` | Allele/haplotype diversity pie charts per marker. |
+| `moi_per_marker_by_site.png` | Violin plots of multiplicity of infection per marker and site. |
+| `convergence_diagnosis/<site>/` | Per-site MCMC trace plots, Gelman–Rubin plot, log-likelihood histogram, and autocorrelation plots. |
+
+### Plots
+
+The pipeline automatically generates and displays the following plots.
+
+**Allele diversity**: pie charts showing the frequency distribution of each allele (or haplotype) across all samples:
+
+```{r}
+p_div <- plot_markers_diversity(
+  genotypedata  = imported_data$late_failures,
+  data_type     = imported_data$data_type,
+  marker_info   = imported_data$marker_info,
+  output_folder = NULL
+)
+print(p_div)
+```
+
+**Multiplicity of infection (MOI)**: violin plots showing the number of distinct alleles per marker per sample, split by site:
+
+```{r}
+p_moi <- plot_moi(imported_data$late_failures, output_folder = NULL)
+print(p_moi)
+```
+
+**Posterior probability histogram**: distribution of recrudescence probabilities across all classified patients:
+
+```{r}
+p_hist <- plot_probability_histogram(results, output_folder = NULL)
+```
+
+**MCMC convergence diagnostics**: trace plots, Gelman–Rubin plots, log-likelihood histograms, and autocorrelation plots saved under `convergence_diagnosis/<site>/` when `output_folder` is set.
+
+------------------------------------------------------------------------
+
+## Interpreting the results
+
+A standard classification rule applied to `Probability`:
+
+| Probability | Classification |
+|-------------|----------------|
+| ≥ 0.5       | Recrudescence  |
+| \< 0.5      | Reinfection    |
+
+```{r}
+pp <- results$posterior_probabilities
+pp$Classification <- ifelse(pp$Probability >= 0.5, "Recrudescence", "Reinfection")
+table(pp$Classification)
+```
+
+Patients with few comparable loci (`N_Comparable_Loci`) should be interpreted with caution because the posterior is driven by less information and will be closer to the prior.
+
+```{r}
+# Flag low-information classifications
+pp[pp$N_Comparable_Loci <= 1, c("Sample.ID", "Site", "Probability",
+                                  "N_Comparable_Loci", "Classification")]
+```
+
+If the convergence summary shows high R-hat values or low ESS for a site, consider increasing `max_iterations` or `chunk_size` in the MCMC configuration.
