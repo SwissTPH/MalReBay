@@ -151,12 +151,19 @@ You can also pass the configuration directly as a named list instead of an Excel
 The main package function `MalReBay()` runs data import, MCMC classification, result summarisation, and output saving.
 
 ```{r}
+quick_config <- list(
+  n_chains     = 2,
+  iter         = 1000,
+  burn_in_frac = 0.5,
+  adapt_delta  = 0.8,
+  random_seed  = 42
+)
+
 results <- MalReBay(
   filepath        = example_file,
   marker_filepath = marker_file,
-  mcmc_config     = config_file,
+  mcmc_config     = quick_config,
   output_folder   = "bayesian_algorithm_output",
-  n_workers       = 4,
   verbose         = TRUE
 )
 ```
