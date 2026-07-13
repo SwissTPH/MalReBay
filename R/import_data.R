@@ -5,19 +5,30 @@
 #'
 #' @param filepath The full path to the input Excel file.
 #' @param verbose Logical. If TRUE, prints progress and data-cleaning messages.
-#' @param marker_filepath Path to Excel file containing marker metadata (optional if marker_info sheet is present)
+#' @param marker_filepath Path to Excel file containing marker metadata 
+#' (optional if marker_info sheet is present)
 #' @return A list containing the imported data.
 #'
 #' @examples
 #' \dontrun{
-#'   data_file   <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-#'   marker_file <- system.file("extdata", "makers_details.xlsx",       package = "MalReBay")
-#'   imported    <- import_data(filepath = data_file, marker_filepath = marker_file)
+#'   data_file <- system.file("extdata", 
+#'                            "Angola_2021_TES_7NMS.xlsx", 
+#'                            package = "MalReBay")
+#'   marker_file <- system.file("extdata", 
+#'                              "makers_details.xlsx", 
+#'                              package = "MalReBay")
+#'   imported    <- import_data(filepath = data_file, 
+#'                              marker_filepath = marker_file)
 #' }
 #' @export
-import_data <- function(filepath        = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
-                        marker_filepath = system.file("extdata", "makers_details.xlsx",        package = "MalReBay"),
-                        verbose         = TRUE) {
+import_data <- function(
+    filepath = system.file("extdata", 
+                           "Angola_2021_TES_7NMS.xlsx", 
+                           package = "MalReBay"),
+    marker_filepath = system.file("extdata", 
+                                  "makers_details.xlsx", 
+                                  package = "MalReBay"),
+                        verbose = TRUE) {
   # Load Workbook and Sheets
   sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
   if (inherits(sheet_names, "try-error")) stop("ERROR: Cannot read file: ", filepath)

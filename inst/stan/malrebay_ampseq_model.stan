@@ -99,7 +99,6 @@ parameters {
 }
 transformed parameters {
   // Work in log-space for stability.
-
   // For each patient, compute a summary log-likelihood ratio (SLR):
   //
   // Each recurrence haplotype contributes:

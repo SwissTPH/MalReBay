@@ -60,21 +60,45 @@ run_stan_sites <- function(late_failures,
     late_site <- late_site[, colnames(late_site) != "Site", drop = FALSE]
     add_site  <- add_site[,  colnames(add_site)  != "Site", drop = FALSE]
     
-    ids  <- unique(gsub(" Day 0", "", late_site$Sample.ID[grepl("Day 0", late_site$Sample.ID)]))
+    # Extract sample IDs
+    ids <- unique(gsub(" Day 0", "", 
+                       late_site$Sample.ID[grepl("Day 0", 
+                                                 late_site$Sample.ID)]))
+    
+    #TO DO: add error and stop in no sample IDs could be found
     if (length(ids) == 0) next
     
     # A. Define Alleles (Site-specific)
     allele_definitions <- suppressMessages(define_alleles(rbind(late_site, add_site), marker_info))
     locinames <- names(allele_definitions)
     nloci     <- length(locinames)
+    #TO DO: add error and stop in no alleles could be found
     if (nloci == 0) next
     
+    # Calculate maximum MOI per site
     marker_cols <- grep("_\\d+$", colnames(late_site), value = TRUE)
     maxMOI      <- if (length(marker_cols) > 0) max(as.integer(gsub(".*_", "", marker_cols)), na.rm = TRUE) else 1L
+    # Better aletrnatives to test (safer to group the markers first and then take the max):
+    # maxMOI <- max(as.integer(sub(".*_(\\d+)$", "\\1", marker_cols)), na.rm = TRUE)
+    # allele_cols_per_marker <- tapply(
+    #   marker_cols,
+    #   gsub("_\\d+$", "", marker_cols),
+    #   length
+    # )
+    # maxMOI <- max(allele_cols_per_marker)
+    
+    
     
     # B. Locus Comparability Matrix
-    locus_summary <- data.frame(patient_id=ids, n_available_d0=0L, n_available_df=0L, n_comparable_loci=0L)
-    is_locus_comparable <- matrix(FALSE, nrow=length(ids), ncol=nloci, dimnames=list(ids, locinames))
+    # TO DO: to improve this code as it is currently not efficient and slow
+    locus_summary <- data.frame(patient_id = ids, 
+                                n_available_d0 = 0L, 
+                                n_available_df = 0L, 
+                                n_comparable_loci = 0L)
+    is_locus_comparable <- matrix(FALSE, 
+                                  nrow = length(ids), 
+                                  ncol = nloci, 
+                                  dimnames = list(ids, locinames))
     
     for (i in seq_along(ids)) {
       pid <- ids[i]
@@ -94,6 +118,8 @@ run_stan_sites <- function(late_failures,
     
     # C. Prepare Stan Data (Now includes additional_counts)
     if (verbose) message("  Preparing Stan data...")
+    
+    # TO DO: rename sd into something else, sd is usually standard deviation
     sd <- prepare_stan_data(
       late_failures_site  = late_site,
       additional_site     = add_site,
@@ -105,7 +131,10 @@ run_stan_sites <- function(late_failures,
       is_locus_comparable = is_locus_comparable
     )
     
+    # TO DO: add error message and stop
     if (!validate_stan_data(sd)) next
+    
+    # Define starting values for the stan sampler
     init_fun <- local({
       sd_local <- sd
       function() {
@@ -123,7 +152,9 @@ run_stan_sites <- function(late_failures,
     })
     
     # D. Run Stan Sampling (CALLED ONCE)
-    if (verbose) message("  Running Stan (", n_chains, " chains, ", iter_sampling, " samples)...")
+    if (verbose) message("  Running Stan (", 
+                         n_chains, " chains, ", 
+                         iter_sampling, " samples)...")
     
     fit <- tryCatch({
       stan_model_obj$sample(

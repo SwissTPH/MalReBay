@@ -33,6 +33,7 @@
 # Returns:
 #    Named list ready for cmdstanr::cmdstan_model()$sample(data = ...).
 #   Also carries $allele_frequencies for use in extract_results().
+# TO DO: add details about the output explaining each element of the list
 # -----------------------------------------------------------------------------
 prepare_stan_data <- function(late_failures_site,
                               additional_site,
@@ -46,14 +47,16 @@ prepare_stan_data <- function(late_failures_site,
   nids  <- length(ids)
   nloci <- length(locinames)
   
-  # 1. MOI per patient
+  # 1. Calculate the MOI per patient
+  # TO DO: to be vectorized
   MOI0 <- rep(1L, nids); MOIf <- rep(1L, nids)
   for (i in seq_len(nids)) {
     for (j in seq_len(nloci)) {
       loci_cols <- grepl(paste0(locinames[j], "_"), colnames(late_failures_site))
       n0 <- sum(!is.na(late_failures_site[grepl(paste0("\\b", ids[i], " Day 0\\b"), late_failures_site$Sample.ID), loci_cols]))
       nf <- sum(!is.na(late_failures_site[grepl(paste0("\\b", ids[i], " recurrence\\b"), late_failures_site$Sample.ID), loci_cols]))
-      MOI0[i] <- max(MOI0[i], n0); MOIf[i] <- max(MOIf[i], nf)
+      MOI0[i] <- max(MOI0[i], n0) 
+      MOIf[i] <- max(MOIf[i], nf)
     }
   }
 
@@ -61,40 +64,54 @@ prepare_stan_data <- function(late_failures_site,
   recoded0 <- matrix(0L, nids, maxMOI * nloci)
   recodedf <- matrix(0L, nids, maxMOI * nloci)
   
+  # Allele counts per marker
   K_site <- integer(nloci)
   pruned_defs <- list()
   
   # Temporary storage for counts (will be trimmed to max_K later)
   tmp_counts <- matrix(0L, nloci, 200) 
 
+  # For each marker:
   for (j in seq_len(nloci)) {
     locus <- locinames[j]
     cols  <- grepl(paste0("^", locus, "_"), colnames(late_failures_site))
     
-    obs_trial <- as.matrix(late_failures_site[, cols, drop=FALSE])
+    # Extract the data for each locus (recurrences and day 0 data)
+    obs_trial <- as.matrix(late_failures_site[, cols, drop = FALSE])
     obs_add   <- if(nrow(additional_site) > 0) as.matrix(additional_site[, cols, drop=FALSE]) else matrix(nrow=0, ncol=0)
     
+    # Extract all observed alleles for the given marker
     all_obs_raw <- c(as.vector(obs_trial), as.vector(obs_add))
+    # Using the binning/recoding system
     all_obs_ids <- unique(sapply(all_obs_raw, function(x) recodeallele(allele_definitions[[j]], x)))
     all_obs_ids <- sort(all_obs_ids[!is.na(all_obs_ids) & all_obs_ids > 0])
     
+    # Calculate the number of alleles for the considered marker
     K_site[j] <- length(all_obs_ids)
+    
+    # TO DO: to check if this is correct, normally there should be no empty data
     if(K_site[j] == 0) {
        K_site[j] <- 1
        all_obs_ids <- 1 
     }
     
+    # Attaches an indexed sequence to each allele id
     id_map <- setNames(seq_along(all_obs_ids), all_obs_ids)
+    
+    # Definitions of alleles per marker
     pruned_defs[[j]] <- allele_definitions[[j]][all_obs_ids, , drop=FALSE]
     
+    # TO DO: why doing this here
     day0_rows <- grepl("Day 0",      late_failures_site$Sample.ID)
     dayf_rows <- grepl("recurrence", late_failures_site$Sample.ID)
 
     # Fix #8: build a named lookup once (O(1) per query) rather than calling
     # which(ids == p_id) inside the loop (O(N) per query).
+    # Patient IDs map
     pid_idx <- setNames(seq_along(ids), ids)
 
     for(row_idx in seq_len(nrow(late_failures_site))){
+      # TO DO: this seems inefficient, again extarcting the data
       p_id  <- gsub(" Day 0| recurrence", "", late_failures_site$Sample.ID[row_idx])
       p_idx <- pid_idx[p_id]
       if(is.na(p_idx)) next
@@ -109,6 +126,9 @@ prepare_stan_data <- function(late_failures_site,
         }
       }
     }
+    
+    # TO DO: this bit below was already somehow done before and could be 
+    # embedded in the code before for efficiency
     
     # Count ALL trial alleles (Day 0 + recurrence) into additional_counts.
     # Stan marginalises the recrudescence indicator R_i out, so we cannot

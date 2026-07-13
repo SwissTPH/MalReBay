@@ -79,7 +79,7 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example MSP/GLURP dataset
-example_file   <- "example_msp_glurp.xlsx"
+example_file   <- "Amplicon sequencing data1.xlsx"
 marker_file    <- "makers_details.xlsx"
 
 imported_data <- import_data(

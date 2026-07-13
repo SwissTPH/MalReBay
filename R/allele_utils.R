@@ -173,8 +173,11 @@ define_alleles <- function(genotypedata, marker_info, maxk = Inf) {
 #' @noRd
 #'
 #'
-recodeallele <- function(locus_allele_bins, proposed, max_distance_allowed = Inf) {
-  if (is.na(proposed) || is.null(locus_allele_bins) || nrow(locus_allele_bins) == 0) {
+recodeallele <- function(locus_allele_bins, proposed, 
+                         max_distance_allowed = Inf) {
+  if (is.na(proposed) || 
+      is.null(locus_allele_bins) || 
+      nrow(locus_allele_bins) == 0) {
     return(NA_integer_)
   }
   
