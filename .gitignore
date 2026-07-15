@@ -4,7 +4,12 @@ src/*.so
 src/*.dll
 src/*.a
 *.dll
-inst/stan/*.exe  
+
+# Stan model executables — {instantiate} compiles these into the installed
+# package's bin/stan/ directory, never into src/stan/ in the source tree, but
+# ignore anything non-.stan here as a safety net for local ad hoc compiles.
+src/stan/*
+!src/stan/*.stan
 
 # macOS files ----
 .DS_Store
@@ -37,6 +42,7 @@ README.html
 .Rdata
 .httr-oauth
 .quarto
+.pdf
 /Meta/
 /doc/
 inst/doc

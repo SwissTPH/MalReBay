@@ -33,6 +33,7 @@ Imports:
     forcats,
     ggplot2,
     ggpubr,
+    instantiate,
     magrittr,
     methods,
     posterior,
@@ -56,6 +57,9 @@ Suggests:
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Additional_repositories:
-    https://stan-dev.r-universe.dev
-SystemRequirements: CmdStan (>= 2.32.0); install via cmdstanr::install_cmdstan()
+    https://stan-dev.r-universe.dev,
+    https://mc-stan.org/r-packages/
+SystemRequirements: CmdStan (>= 2.32.0), installed before MalReBay itself so the
+    bundled Stan model can be compiled during installation; see
+    cmdstanr::install_cmdstan()
 Config/roxygen2/version: 8.0.0

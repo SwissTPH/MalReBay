@@ -249,12 +249,15 @@ create_mock_ampseq_data <- function() {
 }
 
 #' Marker metadata matching create_mock_ampseq_data()
-#' repeatlength is NA for ampseq (not applicable)
+#' repeatlength is NA for ampseq (not applicable). binning_method is "exact",
+#' matching the convention used throughout R/allele_utils.R and the real
+#' bundled inst/extdata/makers_details.xlsx (markertype = "ampseq",
+#' binning_method = "exact").
 create_mock_ampseq_markers <- function() {
   data.frame(
     marker_id      = c("cpmp", "cpp"),
-    markertype     = "amplicon",
-    binning_method = "ampseq",
+    markertype     = "ampseq",
+    binning_method = "exact",
     repeatlength   = c(NA_real_, NA_real_),
     stringsAsFactors = FALSE
   )

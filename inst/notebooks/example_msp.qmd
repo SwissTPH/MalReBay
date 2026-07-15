@@ -39,9 +39,14 @@ This notebook walks through a complete analysis of MSP/GLURP length-polymorphic 
 
 ## Installation
 
+CmdStan must be installed before MalReBay, since MalReBay's Stan model is compiled during its own installation (see the package README for details).
+
 ```{r}
 #| eval: false
-# Install from GitHub (development version)
+# 1. Install CmdStan first (one-time, ~5 minutes)
+cmdstanr::install_cmdstan()
+
+# 2. Install MalReBay from GitHub (development version)
 remotes::install_github("SwissTPH/MalReBay")
 ```
 
@@ -79,7 +84,7 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example MSP/GLURP dataset
-example_file   <- "Amplicon sequencing data1.xlsx"
+example_file   <- "Angola_2021_TES_7NMS.xlsx"
 marker_file    <- "makers_details.xlsx"
 
 imported_data <- import_data(

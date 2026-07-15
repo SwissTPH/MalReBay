@@ -393,8 +393,7 @@ This section gives a brief overview of how MalReBay is organised for users who w
 
 The core of MalReBay is a Stan model that uses Hamiltonian Monte Carlo sampling to estimate posterior probabilities.
 
-+ `run_stan_sites()` organises the analysis across study sites and runs the Stan model for length-polymorphic data.
-+ `run_stan_sites_ampseq()` does the same for amplicon sequencing data.
++ `run_stan_sites()` organises the analysis across study sites and runs the same Stan model for both length-polymorphic and amplicon sequencing data — each locus is dispatched internally based on its `binning_method`.
 + Multiple chains run in parallel. Convergence is checked automatically using R-hat and ESS after each run.
 
 ### 8.3 Results and output

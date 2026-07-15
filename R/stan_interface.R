@@ -1,42 +1,39 @@
 # =============================================================================
 # R/stan_interface.R
-# Revised version for optimized performance
+# Single Stan interface for both marker families (length-polymorphic and
+# amplicon sequencing / ampseq). Per-locus dispatch on
+# marker_info$binning_method happens inside prepare_stan_data(); this file
+# just runs the (single) compiled model against whatever prepare_stan_data()
+# produces.
 # =============================================================================
 
 run_stan_sites <- function(late_failures,
                            additional,
                            marker_info,
                            mcmc_config,
-                           data_type,
                            verbose = TRUE) {
-  
-  if (data_type != "length_polymorphic") {
-    stop("run_stan_sites() only supports data_type='length_polymorphic'.")
-  }
-  
+
   # --- 1. Extract Config ---
   n_chains     <- as.integer(mcmc_config$n_chains)
-  iter_total   <- as.integer(mcmc_config$iter) 
+  iter_total   <- as.integer(mcmc_config$iter)
   burn_in_frac <- as.numeric(mcmc_config$burn_in_frac)
   base_seed    <- as.integer(mcmc_config$random_seed)
   adapt_delta  <- as.numeric(if(!is.null(mcmc_config$adapt_delta)) mcmc_config$adapt_delta else 0.85)
-  
+
   iter_warmup   <- max(200L, as.integer(floor(burn_in_frac * iter_total)))
   iter_sampling <- max(200L, iter_total - iter_warmup)
-  
+
   # --- 2. Stan Global Setup ---
-  # cmdstanr compiles to a native binary and caches it automatically.
+  # The model is pre-compiled at package install time via {instantiate}
+  # (see src/stan/malrebay_model.stan, src/install.libs.R); no compilation
+  # happens here, just loading the executable already shipped with the
+  # installed package.
   # parallel_chains runs each chain as a separate OS process — reliable on Windows.
+  stan_model_obj <- instantiate::stan_package_model(
+    name    = "malrebay_model",
+    package = "MalReBay"
+  )
 
-  # Locate and Compile Model
-  stan_file <- system.file("stan", "malrebay_model.stan", package = "MalReBay")
-  if (!file.exists(stan_file)) {
-    stan_file <- file.path("inst", "stan", "malrebay_model.stan")
-  }
-
-  if (verbose) message("Compiling Stan model...")
-  stan_model_obj <- cmdstanr::cmdstan_model(stan_file)
-  
   # Initialize Containers
   site_names          <- as.character(unique(late_failures$Site))
   out_classifications <- list()
@@ -47,59 +44,52 @@ run_stan_sites <- function(late_failures,
   out_locus_dists     <- list()
   out_locinames       <- list()
   out_stan_fits       <- list()
-  
-  
+
+
   # --- 3. Site Loop ---
   for (site in site_names) {
     if (verbose) message("\n--- Processing Site: ", site, " ---")
-    
+
     late_site <- late_failures[late_failures$Site == site, ]
     add_site  <- additional[additional$Site == site, ]
-    
+
     # Remove Site column for internal functions
     late_site <- late_site[, colnames(late_site) != "Site", drop = FALSE]
     add_site  <- add_site[,  colnames(add_site)  != "Site", drop = FALSE]
-    
+
     # Extract sample IDs
-    ids <- unique(gsub(" Day 0", "", 
-                       late_site$Sample.ID[grepl("Day 0", 
+    ids <- unique(gsub(" Day 0", "",
+                       late_site$Sample.ID[grepl("Day 0",
                                                  late_site$Sample.ID)]))
-    
+
     #TO DO: add error and stop in no sample IDs could be found
     if (length(ids) == 0) next
-    
-    # A. Define Alleles (Site-specific)
+
+    # A. Define Alleles (Site-specific). define_alleles() already dispatches
+    # per locus on marker_info$binning_method, skipping numeric binning for
+    # "exact" (ampseq) loci — see R/allele_utils.R.
     allele_definitions <- suppressMessages(define_alleles(rbind(late_site, add_site), marker_info))
     locinames <- names(allele_definitions)
     nloci     <- length(locinames)
     #TO DO: add error and stop in no alleles could be found
     if (nloci == 0) next
-    
-    # Calculate maximum MOI per site
-    marker_cols <- grep("_\\d+$", colnames(late_site), value = TRUE)
-    maxMOI      <- if (length(marker_cols) > 0) max(as.integer(gsub(".*_", "", marker_cols)), na.rm = TRUE) else 1L
-    # Better aletrnatives to test (safer to group the markers first and then take the max):
-    # maxMOI <- max(as.integer(sub(".*_(\\d+)$", "\\1", marker_cols)), na.rm = TRUE)
-    # allele_cols_per_marker <- tapply(
-    #   marker_cols,
-    #   gsub("_\\d+$", "", marker_cols),
-    #   length
-    # )
-    # maxMOI <- max(allele_cols_per_marker)
-    
-    
-    
+
+    # Calculate maximum MOI per site. Matches both length-polymorphic
+    # ("locus_1") and ampseq ("locus_allele_1") column-naming conventions.
+    marker_cols <- grep("(_allele_\\d+|_\\d+)$", colnames(late_site), value = TRUE)
+    maxMOI      <- if (length(marker_cols) > 0) max(as.integer(gsub(".*(_allele_|_)(\\d+)$", "\\2", marker_cols)), na.rm = TRUE) else 1L
+
     # B. Locus Comparability Matrix
     # TO DO: to improve this code as it is currently not efficient and slow
-    locus_summary <- data.frame(patient_id = ids, 
-                                n_available_d0 = 0L, 
-                                n_available_df = 0L, 
+    locus_summary <- data.frame(patient_id = ids,
+                                n_available_d0 = 0L,
+                                n_available_df = 0L,
                                 n_comparable_loci = 0L)
-    is_locus_comparable <- matrix(FALSE, 
-                                  nrow = length(ids), 
-                                  ncol = nloci, 
+    is_locus_comparable <- matrix(FALSE,
+                                  nrow = length(ids),
+                                  ncol = nloci,
                                   dimnames = list(ids, locinames))
-    
+
     for (i in seq_along(ids)) {
       pid <- ids[i]
       d0_row <- late_site[grepl(paste0("\\b", pid, " Day 0\\b"), late_site$Sample.ID), ]
@@ -115,10 +105,10 @@ run_stan_sites <- function(late_failures,
         }
       }
     }
-    
+
     # C. Prepare Stan Data (Now includes additional_counts)
     if (verbose) message("  Preparing Stan data...")
-    
+
     # TO DO: rename sd into something else, sd is usually standard deviation
     sd <- prepare_stan_data(
       late_failures_site  = late_site,
@@ -130,10 +120,10 @@ run_stan_sites <- function(late_failures,
       maxMOI              = maxMOI,
       is_locus_comparable = is_locus_comparable
     )
-    
+
     # TO DO: add error message and stop
     if (!validate_stan_data(sd)) next
-    
+
     # Define starting values for the stan sampler
     init_fun <- local({
       sd_local <- sd
@@ -150,12 +140,12 @@ run_stan_sites <- function(late_failures,
         )
       }
     })
-    
+
     # D. Run Stan Sampling (CALLED ONCE)
-    if (verbose) message("  Running Stan (", 
-                         n_chains, " chains, ", 
+    if (verbose) message("  Running Stan (",
+                         n_chains, " chains, ",
                          iter_sampling, " samples)...")
-    
+
     fit <- tryCatch({
       stan_model_obj$sample(
         data            = stan_data_only(sd),
@@ -174,20 +164,20 @@ run_stan_sites <- function(late_failures,
       warning("Stan sampling failed for site '", site, "': ", e$message)
       NULL
     })
-    
+
     if (is.null(fit)) next
-    
+
     # check all chains actually completed
     if (all(fit$return_codes() != 0)) {
       message(paste(fit$output(), collapse = "\n"))
       warning("All chains failed for site '", site, "'. Skipping.")
       next
     }
-    
+
     # E. Extract and Store Results
     extracted <- extract_stan_results(fit, ids, locinames, nloci, length(ids))
-    
-    out_classifications[[site]] <- extracted$p_recrud_draws 
+
+    out_classifications[[site]] <- extracted$p_recrud_draws
     out_loglikelihood[[site]]   <- extracted$loglik_chains
     out_ids[[site]]             <- ids
     out_locus_summary[[site]]   <- locus_summary
@@ -196,7 +186,7 @@ run_stan_sites <- function(late_failures,
     out_locus_dists[[site]]     <- extracted$locus_dists
     out_stan_fits[[site]]       <- fit
   }
-  
+
   return(list(
     classifications          = out_classifications,
     all_chains_loglikelihood = out_loglikelihood,
@@ -208,8 +198,6 @@ run_stan_sites <- function(late_failures,
     stan_fits                = out_stan_fits
   ))
 }
-
-# Add this to the bottom of R/stan_interface.R
 
 extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
 
@@ -224,11 +212,11 @@ extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
   n_chains  <- dim(lp_array)[2]
   lp_matrix <- matrix(as.numeric(lp_array), nrow = n_iter, ncol = n_chains)
   loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
-  
+
   n_draws     <- nrow(p_recrud_draws)
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))
   locus_dists <- array(NA_real_, dim = c(nids, nloci, n_draws))
-  
+
   return(list(
     p_recrud_draws = p_recrud_draws,
     loglik_chains  = loglik_chains,

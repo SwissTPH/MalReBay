@@ -50,32 +50,15 @@ classify_infections <- function(imported_data,
   late_failures <- imported_data$late_failures
   additional    <- imported_data$additional
   marker_info   <- imported_data$marker_info
-  data_type     <- imported_data$data_type
-  
-  if (data_type == "length_polymorphic") {
-    results <- run_stan_sites(
-      late_failures = late_failures,
-      additional    = additional,
-      marker_info   = marker_info,
-      mcmc_config   = config,
-      data_type     = data_type,
-      verbose       = verbose
-    )
-  }  else if (data_type == "ampseq") {
-    results <- run_stan_sites_ampseq(
-      late_failures = imported_data$late_failures,
-      additional    = imported_data$additional,
-      marker_info   = imported_data$marker_info,
-      mcmc_config   = config,
-      verbose       = verbose
-    )
-  }
-  
-  if (!exists("results")) {
-    stop("Unsupported data_type: '", data_type,
-         "'. Must be 'length_polymorphic' or 'ampseq'.", call. = FALSE)
-  }
-  
+
+  results <- run_stan_sites(
+    late_failures = late_failures,
+    additional    = additional,
+    marker_info   = marker_info,
+    mcmc_config   = config,
+    verbose       = verbose
+  )
+
   if (is.null(results) || length(results$ids) == 0) {
     warning("MCMC results are empty.", call. = FALSE)
     return(NULL)

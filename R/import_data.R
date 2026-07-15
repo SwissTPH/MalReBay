@@ -118,9 +118,11 @@ import_data <- function(
   
   late_failures_df <- clean_data(late_failures_df)
 
-  # Process the additional sheet (Sheet 2)
+  # Process the additional sheet (Sheet 2). Background population data is
+  # useful for allele-frequency estimation regardless of marker type, so this
+  # is not gated on data_type.
   additional_df <- late_failures_df[0, ] # Default empty
-  if (data_type == "length_polymorphic" && length(sheet_names) > 1) {
+  if (length(sheet_names) > 1) {
     raw_add <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
     if (nrow(raw_add) > 0) {
       # Apply same 3-column metadata logic to sheet 2
