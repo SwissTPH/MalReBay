@@ -83,8 +83,8 @@ Missing values are recognised and set to `NA` automatically for: `N/A`, `-`, `NA
 A second sheet (optional, for length-polymorphic markers only) can supply additional Day 0 samples.
 
 ```{r}
-# Preview the example MSP/GLURP dataset
-example_file   <- "Angola_2021_TES_7NMS.xlsx"
+# Preview the example TES dataset
+example_file   <- "Amplicon sequencing data.csv"
 marker_file    <- "makers_details.xlsx"
 
 imported_data <- import_data(
@@ -129,8 +129,8 @@ The MCMC behaviour is controlled by a set of parameters, supplied either as an E
 
 ```{r}
 # Read and display the default configuration
-config_file <- "default_mcmc_config.xlsx"
-cfg <- as.data.frame(readxl::read_excel(config_file))
+config_file <- "default_mcmc_config.rds"
+cfg <- readRDS(config_file)
 cfg
 ```
 
@@ -303,4 +303,4 @@ pp[pp$N_Comparable_Loci <= 1, c("Sample.ID", "Site", "Probability",
                                   "N_Comparable_Loci", "Classification")]
 ```
 
-If the convergence summary shows high R-hat values or low ESS for a site, consider increasing `max_iterations` or `chunk_size` in the MCMC configuration.
+If the convergence summary shows high R-hat (`>1.1`) values or low ESS (`<400`) for a site, consider increasing `iteration` in the MCMC configuration.

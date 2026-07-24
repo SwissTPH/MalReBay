@@ -27,7 +27,7 @@
 classify_infections <- function(imported_data,
                                 mcmc_config = system.file(
                                                   "extdata", 
-                                                  "default_mcmc_config.xlsx",
+                                                  "default_mcmc_config.rds",
                                                   package = "MalReBay"),
                                 n_workers = 1,
                                 verbose   = TRUE) {
@@ -42,7 +42,7 @@ classify_infections <- function(imported_data,
   if (is.list(mcmc_config)) {
     config <- mcmc_config
   } else {
-    cfg_df           <- as.data.frame(readxl::read_excel(mcmc_config))
+    cfg_df           <- as.data.frame(readRDS(mcmc_config))
     cfg_df$parameter <- trimws(cfg_df$parameter)
     config           <- stats::setNames(as.list(cfg_df$value), cfg_df$parameter)
   }

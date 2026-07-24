@@ -30,11 +30,16 @@ import_data <- function(
                                   package = "MalReBay"),
                         verbose = TRUE) {
   # Load Workbook and Sheets
-  sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
-  if (inherits(sheet_names, "try-error")) stop("ERROR: Cannot read file: ", filepath)
+  ext <- tools::file_ext(filepath)
   
-  # Load Primary Data (Sheet 1)
-  temp_df <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[1]))
+  if (ext == "csv") {
+    temp_df <- as.data.frame(readr::read_csv(filepath, show_col_types = FALSE))
+    sheet_names <- NULL
+  } else {
+    sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
+    if (inherits(sheet_names, "try-error")) stop("ERROR: Cannot read file: ", filepath)
+    temp_df <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[1]))
+  }
   
   # Need ID, Site/Day, and at least 2 allele columns to be valid for processing
   if (ncol(temp_df) < 4) {
@@ -55,7 +60,7 @@ import_data <- function(
   # Load Marker Metadata
   if (!is.null(marker_filepath) && file.exists(marker_filepath)) {
     marker_info <- as.data.frame(readxl::read_excel(marker_filepath))
-  } else if ("marker_info" %in% sheet_names) {
+  } else if (!is.null(sheet_names) && "marker_info" %in% sheet_names) {
     marker_info <- as.data.frame(readxl::read_excel(filepath, sheet = "marker_info"))
   } else {
     stop("ERROR: Marker information not found. Provide marker_filepath or add a 'marker_info' sheet to your Excel file.")
@@ -122,7 +127,7 @@ import_data <- function(
   # useful for allele-frequency estimation regardless of marker type, so this
   # is not gated on data_type.
   additional_df <- late_failures_df[0, ] # Default empty
-  if (length(sheet_names) > 1) {
+  if (!is.null(sheet_names) && length(sheet_names) > 1)  {
     raw_add <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
     if (nrow(raw_add) > 0) {
       # Apply same 3-column metadata logic to sheet 2
