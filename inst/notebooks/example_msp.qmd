@@ -84,7 +84,7 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example TES dataset
-example_file   <- "example_msp_glurp.xlsx"
+example_file   <- "input_KAFLUM_bayesian_top3_K_Nanopore.xlsx"
 marker_file    <- "makers_details.xlsx"
 
 imported_data <- import_data(

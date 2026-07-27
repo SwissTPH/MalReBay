@@ -362,7 +362,7 @@ MalReBay <- function(
                                   package = "MalReBay"),
     marker_filepath = system.file("extdata", "makers_details.xlsx",
                                   package = "MalReBay"),
-    mcmc_config     = system.file("extdata", "default_mcmc_config.xlsx",
+    mcmc_config     = system.file("extdata", "default_mcmc_config.rds",
                                   package = "MalReBay"),
     output_folder   = NULL,
     n_workers       = 1,
