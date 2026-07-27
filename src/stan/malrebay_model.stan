@@ -21,15 +21,15 @@ functions {
   real dist_log_prob_logic(data real dist, vector log_dvect, data int method,
                            real l_q_cf, real l1m_q_cf, 
                            real l_q_seq, real l1m_q_seq,
-                           data real threshold) {
+                           data real threshold, data int K_j) {
     if (method == 1) {
       int d = to_int(round(dist / threshold));
       if (threshold <= 0 || d < 0 || d >= num_elements(log_dvect)) return -23.0;
       return log_dvect[d + 1];
     } else if (method == 2) {
-      return dist < 0.5 ? l1m_q_cf : l_q_cf;
+      return dist < 0.5 ? l1m_q_cf : l_q_cf - log(K_j - 1);
     } else {
-      return dist < 0.5 ? l1m_q_seq : l_q_seq;
+      return dist < 0.5 ? l1m_q_seq : l_q_seq - log(K_j - 1);
     }
   }
 }
@@ -126,7 +126,7 @@ transformed parameters {
       for (k2 in 1:K[j]) {
         log_dist_mat[j][k1, k2] = dist_log_prob_logic(
           dist_array[j, k1, k2], log_dvect, method_int[j],
-          l_q_cf, l1m_q_cf, l_q_seq, l1m_q_seq, threshold[j]
+          l_q_cf, l1m_q_cf, l_q_seq, l1m_q_seq, threshold[j], K[j]
         );
       }
       log_dist_row_sums[j][k1] = log_sum_exp(log_dist_mat[j][k1, 1:K[j]]);
@@ -173,7 +173,7 @@ transformed parameters {
 
 model {
   // Priors:
-  // qq ~ Beta(1,1)
+  // qq ~ Beta(1,1000)
   // qq_crossfamily ~ Beta(1,1000)
   // d_param ~ Beta(2,2)
   // freq ~ Dirichlet (with additional data)
@@ -184,12 +184,12 @@ model {
   // Likelihood:
   // 50/50 mixture of recrudescence vs reinfection
   // log_sum_exp(slr, 0) implements this
-  qq             ~ beta(1, 2000);
+  qq             ~ beta(1, 1000);
   qq_crossfamily ~ beta(1, 1000);
   d_param        ~ beta(2, 2);
   p_microsat ~ beta(1, 1);
   p_msp      ~ beta(1, 1);
-  p_seq      ~ beta(1, 1);
+  p_seq      ~ beta(1, 100);
 
   n_hidden_microsat ~ binomial(n_total_microsat, p_microsat);
   n_hidden_msp      ~ binomial(n_total_msp,      p_msp);

@@ -171,10 +171,26 @@ import_data <- function(
   marker_suffix_regex <- "(_allele_|_)\\d+$"
   allele_colnames <- colnames(late_failures_df)[3:ncol(late_failures_df)]
   base_names_in_data <- gsub(marker_suffix_regex, "", allele_colnames)
-  
-  markers_to_use <- intersect(marker_info$marker_id, unique(base_names_in_data))
+  detected_markers <- unique(base_names_in_data)
+
+  markers_to_use <- intersect(marker_info$marker_id, detected_markers)
   if (length(markers_to_use) == 0) stop("No matching markers found between metadata and data.")
-  
+
+  unmatched_markers <- setdiff(detected_markers, markers_to_use)
+
+  if (verbose) {
+    message("")
+    message("INFO: Detected ", length(detected_markers), " marker(s) in the data file.")
+    if (length(unmatched_markers) > 0) {
+      message("INFO: ", length(unmatched_markers),
+              " marker(s) will NOT be processed (no matching entry in the marker metadata):")
+      message("      ", paste(unmatched_markers, collapse = ", "))
+    }
+    message("INFO: Proceeding with analysis using ", length(markers_to_use), " marker(s):")
+    message("      ", paste(markers_to_use, collapse = ", "))
+    message("")
+  }
+
   # Subset dataframes to only include columns belonging to valid markers
   valid_cols <- allele_colnames[base_names_in_data %in% markers_to_use]
   
@@ -198,10 +214,6 @@ import_data <- function(
   late_failures_df <- late_failures_df[, c(colnames(late_failures_df)[1:2], valid_cols)]
   marker_info <- marker_info[marker_info$marker_id %in% markers_to_use, ]
   
-  if (verbose) {
-    message("INFO: Using ", length(markers_to_use), " markers: ", paste(markers_to_use, collapse = ", "))
-  }
-
   return(list(
     late_failures = late_failures_df,
     additional = additional_df,

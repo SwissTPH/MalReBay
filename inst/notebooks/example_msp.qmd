@@ -84,7 +84,7 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example TES dataset
-example_file   <- "Amplicon sequencing data.csv"
+example_file   <- "example_msp_glurp.xlsx"
 marker_file    <- "makers_details.xlsx"
 
 imported_data <- import_data(
@@ -158,7 +158,7 @@ The main package function `MalReBay()` runs data import, MCMC classification, re
 ```{r}
 quick_config <- list(
   n_chains     = 2,
-  iter         = 1000,
+  iter         = 2000,
   burn_in_frac = 0.5,
   adapt_delta  = 0.8,
   random_seed  = 42
