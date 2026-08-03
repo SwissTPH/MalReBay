@@ -6,6 +6,8 @@
 #' @param filepath The full path to the input Excel file.
 #' @param verbose Logical. If TRUE, prints progress and data-cleaning messages.
 #' @param marker_filepath Path to Excel file containing marker metadata 
+#' @param additional_filepath Optional path to a separate additional/background
+#'   data file (csv or xlsx). Ignored if the main file already has 2 sheets.
 #' (optional if marker_info sheet is present)
 #' @return A list containing the imported data.
 #'
@@ -25,6 +27,7 @@ import_data <- function(
     filepath = system.file("extdata", 
                            "Angola_2021_TES_7NMS.xlsx", 
                            package = "MalReBay"),
+    additional_filepath = NULL,
     marker_filepath = system.file("extdata", 
                                   "makers_details.xlsx", 
                                   package = "MalReBay"),
@@ -123,16 +126,21 @@ import_data <- function(
   
   late_failures_df <- clean_data(late_failures_df)
 
-  # Process the additional sheet (Sheet 2). Background population data is
-  # useful for allele-frequency estimation regardless of marker type, so this
-  # is not gated on data_type.
+  # Process additional/background data. Two possible sources:
+  #  1. An embedded second sheet in the main xlsx file (existing behaviour).
+  #  2. A separately supplied additional_filepath (csv or xlsx).
+  # If both are present, the embedded sheet wins -- merging two independently
+  # prepared background sources automatically risks double-counting overlapping
+  # samples, which would bias freq[] estimation, so we pick one deterministically
+  # and tell the user which, rather than guessing at a merge.
   additional_df <- late_failures_df[0, ] # Default empty
-  if (!is.null(sheet_names) && length(sheet_names) > 1)  {
+  
+  if (!is.null(sheet_names) && length(sheet_names) > 1) {
     raw_add <- as.data.frame(readxl::read_excel(filepath, sheet = sheet_names[2]))
     if (nrow(raw_add) > 0) {
       # Apply same 3-column metadata logic to sheet 2
       if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
-        additional_df <- raw_add
+        additional_df <- clean_data(raw_add)
       } else {
         additional_clean <- data.frame(
           Sample.ID = paste0(raw_add[[1]], " Day ", ifelse(raw_add[[2]] == 0, "0", "recurrence")),
@@ -141,8 +149,64 @@ import_data <- function(
         additional_df <- clean_data(additional_clean)
       }
     }
+    
+    if (verbose) {
+      message("INFO: Detected 2 sheets in ", basename(filepath), ": ",
+              "Sheet 1 (late failures) has ", nrow(late_failures_df), " sample(s), ",
+              "Sheet 2 (additional) has ", nrow(additional_df), " sample(s).")
+      if (!is.null(additional_filepath)) {
+        message("INFO: Ignoring additional_filepath since Sheet 2 already ",
+                "supplies additional data -- combine your data into Sheet 2 ",
+                "if you need both sources included.")
+      }
+    }
+    
+  } else if (!is.null(additional_filepath)) {
+    if (!file.exists(additional_filepath)) {
+      stop("ERROR: additional_filepath does not exist: ", additional_filepath)
+    }
+    if (normalizePath(additional_filepath) == normalizePath(filepath)) {
+      stop("ERROR: additional_filepath is the same file as filepath -- ",
+           "these must be different files.")
+    }
+    
+    add_ext <- tools::file_ext(additional_filepath)
+    raw_add <- if (add_ext == "csv") {
+      as.data.frame(readr::read_csv(additional_filepath, show_col_types = FALSE))
+    } else {
+      add_sheet_names <- try(readxl::excel_sheets(additional_filepath), silent = TRUE)
+      if (inherits(add_sheet_names, "try-error")) stop("ERROR: Cannot read file: ", additional_filepath)
+      if (length(add_sheet_names) > 1 && verbose) {
+        message("INFO: additional_filepath has ", length(add_sheet_names),
+                " sheet(s) -- only using the first sheet ('", add_sheet_names[1], "').")
+      }
+      as.data.frame(readxl::read_excel(additional_filepath, sheet = add_sheet_names[1]))
+    }
+    
+    if (nrow(raw_add) > 0) {
+      if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
+        additional_df <- clean_data(raw_add)
+      } else {
+        additional_clean <- data.frame(
+          Sample.ID = paste0(raw_add[[1]], " Day ", ifelse(raw_add[[2]] == 0, "0", "recurrence")),
+          Site = raw_add[[3]], raw_add[, -c(1, 2, 3), drop = FALSE], check.names = FALSE
+        )
+        additional_df <- clean_data(additional_clean)
+      }
+      
+      if (!all(grepl(" Day 0$", additional_df$Sample.ID))) {
+        stop("ERROR: additional_filepath must contain only Day 0 samples -- ",
+             "found recurrence/non-Day-0 records. Check that you're pointing ",
+             "at background/additional data, not a late-failures file.")
+      }
+    }
+    
+    if (verbose) {
+      message("INFO: Loaded additional data from ", basename(additional_filepath),
+              ": ", nrow(additional_df), " sample(s).")
+    }
   }
-
+  
   # Remove "Failure" rows that are entirely empty (No allele data)
   allele_idx <- 3:ncol(late_failures_df)
   
@@ -193,22 +257,19 @@ import_data <- function(
 
   # Subset dataframes to only include columns belonging to valid markers
   valid_cols <- allele_colnames[base_names_in_data %in% markers_to_use]
-  
-  if (nrow(additional_df) > 0) {
-    missing_cols <- setdiff(valid_cols, colnames(additional_df))
-    if (length(missing_cols) > 0) {
-      stop("ERROR: Additional data sheet is missing marker columns found in the main sheet: ", 
-           paste(missing_cols, collapse = ", "))
-    }
-    
-    extra_cols <- setdiff(colnames(additional_df)[3:ncol(additional_df)], valid_cols)
-    if (length(extra_cols) > 0 && verbose) {
-      message("INFO: Dropping ", length(extra_cols), " extra column(s) from additional data: ", 
-              paste(extra_cols, collapse = ", "))
-    }
-    # Sync additional_df columns
-    additional_df <- additional_df[, c(colnames(additional_df)[1:2], valid_cols)]
+  missing_cols <- setdiff(valid_cols, colnames(additional_df))
+  if (length(missing_cols) > 0) {
+    stop("ERROR: Additional data sheet is missing marker columns found in the main sheet: ", 
+         paste(missing_cols, collapse = ", "))
   }
+  
+  extra_cols <- setdiff(colnames(additional_df)[3:ncol(additional_df)], valid_cols)
+  if (length(extra_cols) > 0 && verbose) {
+    message("INFO: Dropping ", length(extra_cols), " extra column(s) from additional data: ", 
+            paste(extra_cols, collapse = ", "))
+  }
+  # Sync additional_df columns
+  additional_df <- additional_df[, c(colnames(additional_df)[1:2], valid_cols)]
   
   # Subset main data and metadata to final selection
   late_failures_df <- late_failures_df[, c(colnames(late_failures_df)[1:2], valid_cols)]

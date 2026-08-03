@@ -362,6 +362,7 @@ MalReBay <- function(
                                   package = "MalReBay"),
     marker_filepath = system.file("extdata", "makers_details.xlsx",
                                   package = "MalReBay"),
+    additional_filepath = NULL,
     mcmc_config     = system.file("extdata", "default_mcmc_config.rds",
                                   package = "MalReBay"),
     output_folder   = NULL,
@@ -372,11 +373,12 @@ MalReBay <- function(
   if (verbose) message("Starting MalReBay pipeline...")
 
   imported_data <- import_data(
-    filepath        = filepath,
-    marker_filepath = marker_filepath,
-    verbose         = verbose
+    filepath             = filepath,
+    additional_filepath  = additional_filepath,
+    marker_filepath      = marker_filepath,
+    verbose              = verbose
   )
-
+  
   mcmc_results <- classify_infections(
     imported_data = imported_data,
     mcmc_config   = mcmc_config,

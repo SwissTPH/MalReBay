@@ -48,10 +48,5 @@ README.html
 inst/doc
 docs
 inst/notebooks/bayesian_algorithm_output/
-inst/extdata/input_KAFLUM_bayesian_top6_K_Nanopore.xlsx
-inst/notebooks/input_KAFLUM_bayesian_top3_K_Nanopore.xlsx
-inst/notebooks/input_KAFLUM_bayesian_top6_K_Nanopore.xlsx
-mcmc_out_K_site.rds
-mcmc_out_K_site_fixed.rds
-mcmc_out.rds
+R/quality_control.R
 tests/testthat/marker_comparibility_test.R

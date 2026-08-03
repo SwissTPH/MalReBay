@@ -51,25 +51,6 @@ data {
   array[J, max_K] int<lower=0> additional_counts;
 }
 
-transformed data {
-  int n_hidden_microsat = 0; int n_total_microsat = 0;
-  int n_hidden_msp      = 0; int n_total_msp      = 0;
-  int n_hidden_seq      = 0; int n_total_seq      = 0;
-
-  for (i in 1:N) {
-    for (j in 1:J) {
-      int off = (j - 1) * maxMOI;
-      int n_h = 0;
-      for (a0 in 1:MOI0[i]) n_h += hidden0[i, off + a0];
-      for (af in 1:MOIf[i]) n_h += hiddenf[i, off + af];
-      int n_t = MOI0[i] + MOIf[i];
-      if (method_int[j] == 1)      { n_hidden_microsat += n_h; n_total_microsat += n_t; }
-      else if (method_int[j] == 2) { n_hidden_msp      += n_h; n_total_msp      += n_t; }
-      else                         { n_hidden_seq      += n_h; n_total_seq      += n_t; }
-    }
-  }
-}
-
 parameters {
   // qq: within-family mismatch (genotyping error)
   // qq_crossfamily: cross-family similarity (rare)
@@ -79,9 +60,6 @@ parameters {
   real<lower=0,upper=1> qq_crossfamily;
   real<lower=0,upper=1> d_param;
   array[J] simplex[max_K] freq;
-  real<lower=0,upper=1> p_microsat;
-  real<lower=0,upper=1> p_msp;
-  real<lower=0,upper=1> p_seq;
 }
 transformed parameters {
   // 1. Build similarity distribution from d_param
@@ -177,9 +155,6 @@ model {
   // qq_crossfamily ~ Beta(1,1000)
   // d_param ~ Beta(2,2)
   // freq ~ Dirichlet (with additional data)
-  // p_microsat ~ beta(1, 1);
-  // p_msp      ~ beta(1, 1);
-  // p_seq      ~ beta(1, 1);
 
   // Likelihood:
   // 50/50 mixture of recrudescence vs reinfection
@@ -187,13 +162,6 @@ model {
   qq             ~ beta(1, 1000);
   qq_crossfamily ~ beta(1, 1000);
   d_param        ~ beta(2, 2);
-  p_microsat ~ beta(1, 1);
-  p_msp      ~ beta(1, 1);
-  p_seq      ~ beta(1, 100);
-
-  n_hidden_microsat ~ binomial(n_total_microsat, p_microsat);
-  n_hidden_msp      ~ binomial(n_total_msp,      p_msp);
-  n_hidden_seq      ~ binomial(n_total_seq,      p_seq);
 
   for (j in 1:J) {
     vector[max_K] alpha = rep_vector(0.1, max_K);
