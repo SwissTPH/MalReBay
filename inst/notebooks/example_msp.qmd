@@ -41,10 +41,18 @@ This notebook walks through a complete analysis of MSP/GLURP length-polymorphic 
 
 CmdStan must be installed before MalReBay, since MalReBay's Stan model is compiled during its own installation (see the package README for details).
 
+MalReBay depends on **ComplexHeatmap**, which is distributed via Bioconductor,
+not CRAN — install it first with:
+
+
 ```{r}
 #| eval: false
 # 1. Install CmdStan first (one-time, ~5 minutes)
 cmdstanr::install_cmdstan()
+
+# install the heatmap function
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("ComplexHeatmap")
 
 # 2. Install MalReBay from GitHub (development version)
 remotes::install_github("SwissTPH/MalReBay")
@@ -84,8 +92,8 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example TES dataset
-example_file   <- "input_KAFLUM_bayesian_top3_K_Nanopore.xlsx"
-marker_file    <- "makers_details.xlsx"
+example_file   <- "D:/MSP 2490_AL (1).xlsx"
+marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
 imported_data <- import_data(
   filepath        = example_file,
@@ -129,7 +137,8 @@ The MCMC behaviour is controlled by a set of parameters, supplied either as an E
 
 ```{r}
 # Read and display the default configuration
-config_file <- "default_mcmc_config.rds"
+# config_file <- "default_mcmc_config.rds"
+config_file <- system.file("extdata", "default_mcmc_config.rds", package = "MalReBay")
 cfg <- readRDS(config_file)
 cfg
 ```
@@ -277,6 +286,11 @@ p_hist <- plot_probability_histogram(results, output_folder = NULL)
 ```
 
 **MCMC convergence diagnostics**: trace plots, Gelman–Rubin plots, log-likelihood histograms, and autocorrelation plots saved under `convergence_diagnosis/<site>/` when `output_folder` is set.
+
+
+```{r}
+p_heatmap <- plot_comparison_heatmap(results, imported_data$marker_info, output_folder = NULL)
+```
 
 ------------------------------------------------------------------------
 

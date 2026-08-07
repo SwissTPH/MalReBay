@@ -161,7 +161,7 @@ model {
   // log_sum_exp(slr, 0) implements this
   qq             ~ beta(1, 1000);
   qq_crossfamily ~ beta(1, 1000);
-  d_param        ~ beta(2, 2);
+  d_param        ~ beta(950, 70);
 
   for (j in 1:J) {
     vector[max_K] alpha = rep_vector(0.1, max_K);

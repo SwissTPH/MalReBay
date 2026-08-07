@@ -281,6 +281,17 @@ save_results <- function(summary_results,
         for (p in p_moi) print(p)
       }
     }
+    
+    comparison_for_heatmap <- summary_results$comparison
+    comparison_for_heatmap$MalReBay <- comparison_for_heatmap$Probability
+    who_result <- build_who_table(comparison_for_heatmap, imported_data$marker_info)
+    
+    plot_comparison_heatmap(
+      summary_results = summary_results,
+      marker_info     = imported_data$marker_info,
+      output_folder   = output_folder,
+      verbose         = verbose
+    )
   }
   
   plot_probability_histogram(
@@ -288,6 +299,7 @@ save_results <- function(summary_results,
     output_folder = output_folder,
     verbose       = verbose
   )
+  
   
   # Stop here if no output folder — plots already shown above
   if (is.null(output_folder)) {

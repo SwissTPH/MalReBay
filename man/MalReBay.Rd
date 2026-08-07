@@ -7,6 +7,7 @@
 MalReBay(
   filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
   marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
+  additional_filepath = NULL,
   mcmc_config = system.file("extdata", "default_mcmc_config.rds", package = "MalReBay"),
   output_folder = NULL,
   n_workers = 1,

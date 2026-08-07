@@ -48,5 +48,5 @@ README.html
 inst/doc
 docs
 inst/notebooks/bayesian_algorithm_output/
-R/quality_control.R
 tests/testthat/marker_comparibility_test.R
+inst/extdata/MSP 2490_AL.xlsx

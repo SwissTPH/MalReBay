@@ -33,6 +33,25 @@ need, in every future R session.
 > CmdStan from step 1 — that’s why **the order below matters**: CmdStan
 > has to be in place *before* you install MalReBay.
 
+## Installation
+
+MalReBay depends on **ComplexHeatmap**, which is distributed via Bioconductor,
+not CRAN — install it first with:
+
+```r
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("ComplexHeatmap")
+MalReBay also requires CmdStan, since its Stan model is compiled during
+the package's own installation:
+
+
+cmdstanr::install_cmdstan()
+Once both are in place, install MalReBay itself:
+
+
+remotes::install_github("SwissTPH/MalReBay")
+```
+
 ### Prerequisites
 
 - **R version 4.1.0 or later.** Check yours by running

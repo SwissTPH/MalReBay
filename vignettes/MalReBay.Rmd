@@ -386,8 +386,6 @@ This section gives a brief overview of how MalReBay is organised for users who w
 
 + `import_data()` reads the input Excel file, detects the data type automatically, and carries out basic data cleaning.
 + For length-polymorphic markers, `define_alleles()` groups raw fragment lengths into clearly defined allele bins.
-+ `calculate_frequencies()` estimates how common each allele is in the study population. This information is used as a starting point for the model.
-+ `recode_alleles()` converts allele values into integer codes so they can be passed to the statistical engine.
 
 ### 8.2 Bayesian inference with Stan
 

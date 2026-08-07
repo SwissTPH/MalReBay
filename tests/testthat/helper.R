@@ -142,12 +142,10 @@ create_mock_xlsx <- function(data, markers = create_mock_markers()) {
 #' Used by: test_3, test_4, test_6
 fast_mcmc <- list(
   n_chains     = 2,
-  iter         = 200,      
+  iter         = 400,      
   burn_in_frac = 0.5,      
   random_seed  = 42,
-  adapt_delta  = 0.8,
-  rhat_threshold = 1.1,
-  ess_threshold  = 50
+  adapt_delta  = 0.8
 )
 
 # ------------------------------------------------------------

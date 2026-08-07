@@ -44,7 +44,7 @@ run_stan_sites <- function(late_failures,
   out_stan_fits       <- list()
 
 
-  # --- 3. Site Loop ---
+  # Site Loop
   for (site in site_names) {
     if (verbose) message("\n--- Processing Site: ", site, " ---")
 
@@ -82,35 +82,9 @@ run_stan_sites <- function(late_failures,
     maxMOI      <- if (length(marker_cols) > 0) max(as.integer(gsub(".*(_allele_|_)(\\d+)$", "\\2", marker_cols)), na.rm = TRUE) else 1L
 
     # B. Locus Comparability Matrix
-    locus_summary <- data.frame(patient_id = ids,
-                                n_available_d0 = 0L,
-                                n_available_df = 0L,
-                                n_comparable_loci = 0L)
-    is_locus_comparable <- matrix(FALSE,
-                                  nrow = length(ids),
-                                  ncol = nloci,
-                                  dimnames = list(ids, locinames))
-    
-    locus_cols <- setNames(
-      lapply(locinames, function(ln) grep(paste0("^", ln, "_"), colnames(late_site), value = TRUE)),
-      locinames
-    )
-    
-    for (i in seq_along(ids)) {
-      pid <- ids[i]
-      d0_row <- late_site[grepl(paste0("\\b", pid, " Day 0\\b"), late_site$Sample.ID), ]
-      df_row <- late_site[grepl(paste0("\\b", pid, " recurrence\\b"), late_site$Sample.ID), ]
-      if (nrow(d0_row) == 0 || nrow(df_row) == 0) next
-      for (ln in locinames) {
-        lc <- locus_cols[[ln]]
-        if (any(!is.na(d0_row[, lc]))) locus_summary$n_available_d0[i] <- locus_summary$n_available_d0[i] + 1L
-        if (any(!is.na(df_row[, lc]))) locus_summary$n_available_df[i] <- locus_summary$n_available_df[i] + 1L
-        if (any(!is.na(d0_row[, lc])) && any(!is.na(df_row[, lc]))) {
-          locus_summary$n_comparable_loci[i] <- locus_summary$n_comparable_loci[i] + 1L
-          is_locus_comparable[pid, ln] <- TRUE
-        }
-      }
-    }
+    comparability       <- compute_locus_comparability(late_site, ids, locinames)
+    locus_summary       <- comparability$locus_summary
+    is_locus_comparable <- comparability$is_locus_comparable
 
     # C. Prepare Stan Data (Now includes additional_counts)
     if (verbose) message("  Preparing Stan data...")
@@ -207,11 +181,11 @@ run_stan_sites <- function(late_failures,
 
 extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
 
-  # 1. Pull the continuous probability of recrudescence
+  # A. Pull the continuous probability of recrudescence
   # draws_matrix: rows = draws (all chains merged), cols = p_recrud[1..N]
   p_recrud_draws <- fit$draws("p_recrud", format = "draws_matrix")
 
-  # 2. Pull the log-likelihood (lp__) per chain for diagnostics
+  # B. Pull the log-likelihood (lp__) per chain for diagnostics
   # draws_array: [iterations, chains, variables] — preserves chain structure
   lp_array  <- fit$draws("lp__", format = "draws_array")
   n_iter    <- dim(lp_array)[1]
