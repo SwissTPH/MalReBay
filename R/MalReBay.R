@@ -286,12 +286,13 @@ save_results <- function(summary_results,
     comparison_for_heatmap$MalReBay <- comparison_for_heatmap$Probability
     who_result <- build_who_table(comparison_for_heatmap, imported_data$marker_info)
     
-    plot_comparison_heatmap(
+    who_comparison <- plot_comparison_heatmap(
       summary_results = summary_results,
       marker_info     = imported_data$marker_info,
       output_folder   = output_folder,
       verbose         = verbose
     )
+    
   }
   
   plot_probability_histogram(
@@ -325,6 +326,17 @@ save_results <- function(summary_results,
     utils::write.csv(summary_results$convergence,
                      cv_path, row.names = FALSE)
     saved_paths["convergence"] <- cv_path
+  }
+  
+  if (!is.null(who_comparison)) {
+    recode_who <- function(x) dplyr::case_when(x == 1 ~ "R", x == 0 ~ "NI", TRUE ~ NA_character_)
+    who_export <- who_comparison
+    who_export$WHO_loose  <- recode_who(who_export$WHO_loose)
+    who_export$WHO_strict <- recode_who(who_export$WHO_strict)
+    
+    who_path <- file.path(output_folder, "who_comparison_table.csv")
+    utils::write.csv(who_comparison, who_path)
+    saved_paths["who_comparison"] <- who_path
   }
   
   invisible(saved_paths)

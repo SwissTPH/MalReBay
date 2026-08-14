@@ -119,12 +119,19 @@ transformed parameters {
   // Per-patient summary log-likelihood ratios (SLR) computed here so the model 
   // block stays concise and generated quantities avoids redundant computation.
   vector[N] slr_vec;
+  // per locus values computed
+  matrix[N, J] locus_lrs;
+  matrix[N, J] locus_dists;
+  
   for (i in 1:N) {
     real slr = 0.0;
     for (j in 1:J) {
       if (comparable[i, j] == 1) {
         int off = (j - 1) * maxMOI;
         vector[MOI0[i] * MOIf[i]] lpr;
+        // locus computed pair distance
+        vector[MOI0[i] * MOIf[i]] pair_dist;
+        
         int p_idx = 1;
         for (a0 in 1:MOI0[i]) {
           for (af in 1:MOIf[i]) {
@@ -132,17 +139,32 @@ transformed parameters {
             int h0 = hidden0[i, off + a0];  int hf = hiddenf[i, off + af];
             if (h0 == 0 && hf == 0) {
               lpr[p_idx] = log_dist_mat[j, k0, kf] - log_freq[j, kf];
+              // locus allele distance 
+              pair_dist[p_idx] = dist_array[j, k0, kf];
             } else if (h0 == 1 && hf == 0) {
               lpr[p_idx] = log_col_sum[j][kf] - log_freq[j, kf];
+              // locus allele distance 
+              pair_dist[p_idx] = 0;
             } else if (h0 == 0 && hf == 1) {
               lpr[p_idx] = log_dist_row_sums[j, k0];
+              //locus allele distance
+              pair_dist[p_idx] = 0;
             } else {
               lpr[p_idx] = log_both_hidden[j];
+              //locus allele distance
+              pair_dist[p_idx] = 0;
             }
             p_idx += 1;
           }
         }
-        slr += log_sum_exp(lpr) - log(MOI0[i] * MOIf[i]);
+        locus_lrs[i, j]   = log_sum_exp(lpr) - log(MOI0[i] * MOIf[i]);
+        slr += locus_lrs[i, j];
+        //locus allele distance
+        locus_dists[i, j] = mean(pair_dist);
+        //locus allele distance
+      } else {
+        locus_lrs[i, j]   = 0;
+        locus_dists[i, j] = 0;
       }
     }
     slr_vec[i] = slr;
@@ -153,7 +175,7 @@ model {
   // Priors:
   // qq ~ Beta(1,1000)
   // qq_crossfamily ~ Beta(1,1000)
-  // d_param ~ Beta(2,2)
+  // d_param ~ Beta(950, 70)
   // freq ~ Dirichlet (with additional data)
 
   // Likelihood:

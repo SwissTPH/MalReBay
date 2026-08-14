@@ -809,58 +809,37 @@ combine_msp_variants <- function(match_counting_res, msp1_cols, msp2_cols) {
   match_counting_res   # original variant columns stay -- only msp1/msp2 get added
 }
 
-#' Classic WHO 2/3 / 3/3 rule for an MSP1 + MSP2 + third-marker trio
+#' WHO classification rule -- N of M markers must match
 #'
-#' @description Applies the traditional WHO rule to a 3-marker panel (MSP1,
-#'   MSP2, and a third marker -- glurp or a microsatellite). WHO_loose is 1
-#'   if at least 2 of the 3 markers match, WHO_strict requires all 3; both
-#'   are NA if too few of the trio were even scored to apply the rule.
+#' @description Applies the WHO rule to a given set of marker columns:
+#'   WHO_loose requires at least round(loose_threshold * length(marker_cols))
+#'   of them to match, WHO_strict requires all of them. Both are NA if fewer
+#'   markers were even scored (R or NI) than the loose/strict threshold
+#'   requires. Used both for full marker panels (marker_cols = every raw
+#'   marker) and MSP1/MSP2 trio panels (marker_cols = the combined
+#'   msp1/msp2/third columns, after combine_msp_variants() has already
+#'   collapsed each family's variants).
 #'
-#' @param match_counting_res Output of perform_match_counting(), after
-#'   combine_msp_variants() has already added the "msp1"/"msp2" columns.
-#' @param third_marker Column name of the third marker (glurp or a
-#'   microsatellite marker).
-#' @return A list: table (match_counting_res with WHO_loose/WHO_strict
-#'   columns added), who_loose_label ("WHO 2/3"), who_strict_label ("WHO 3/3").
-#' @noRd
-
-apply_who_trio_rule <- function(match_counting_res, third_marker) {
-  trio_cols <- c("msp1", "msp2", third_marker)
-  n_matched <- rowSums(match_counting_res[, trio_cols] == "R")
-  n_scored  <- rowSums(match_counting_res[, trio_cols] == "R" | match_counting_res[, trio_cols] == "NI")
-  
-  match_counting_res$WHO_loose  <- ifelse(n_scored < 2, NA, ifelse(n_matched >= 2, 1, 0))
-  match_counting_res$WHO_strict <- ifelse(n_scored < 3, NA, ifelse(n_matched == 3, 1, 0))
-  
-  list(table = match_counting_res, who_loose_label = "WHO 2/3", who_strict_label = "WHO 3/3")
-}
-
-#' Proportional WHO rule for a full marker panel
-#'
-#' @description For panels without an MSP1/MSP2 trio (full microsatellite or
-#'   full ampseq panels), applies a proportional rule instead of a fixed
-#'   count: WHO_loose requires at least loose_threshold (default 70%) of the
-#'   full panel to match, rounded up to the nearest whole marker; WHO_strict
-#'   requires all markers (100%). Both are NA if fewer markers were even
-#'   compared than the loose/strict threshold requires.
-#'
-#' @param match_counting_res Output of perform_match_counting().
-#' @param n_markers Total number of markers in the panel (not just the
-#'   number compared for a given patient).
+#' @param match_counting_res Output of perform_match_counting() (optionally
+#'   with combine_msp_variants() already applied).
+#' @param marker_cols Character vector of column names to apply the rule to.
 #' @param loose_threshold Minimum proportion of markers required for
 #'   WHO_loose. Default 0.70.
 #' @return A list: table (match_counting_res with WHO_loose/WHO_strict
 #'   columns added), who_loose_label (e.g. "WHO 5/7"), who_strict_label
 #'   (e.g. "WHO 7/7").
 #' @noRd
-apply_who_proportional_rule <- function(match_counting_res, n_markers, loose_threshold = 0.70) {
-  who_loose_n  <- ceiling(loose_threshold * n_markers)
+apply_who_rule <- function(match_counting_res, marker_cols, loose_threshold = 0.70) {
+  n_markers    <- length(marker_cols)
+  who_loose_n  <- round(loose_threshold * n_markers)
   who_strict_n <- n_markers
   
-  match_counting_res$WHO_loose  <- ifelse(match_counting_res$Number_Loci_Compared < who_loose_n, NA,
-                                          ifelse(match_counting_res$Number_Matches >= who_loose_n, 1, 0))
-  match_counting_res$WHO_strict <- ifelse(match_counting_res$Number_Loci_Compared < who_strict_n, NA,
-                                          ifelse(match_counting_res$Number_Matches == who_strict_n, 1, 0))
+  cols <- match_counting_res[, marker_cols, drop = FALSE]
+  n_matched <- rowSums(cols == "R")
+  n_scored  <- rowSums(cols == "R" | cols == "NI")
+  
+  match_counting_res$WHO_loose  <- ifelse(n_scored < who_loose_n, NA, ifelse(n_matched >= who_loose_n, 1, 0))
+  match_counting_res$WHO_strict <- ifelse(n_scored < who_strict_n, NA, ifelse(n_matched == who_strict_n, 1, 0))
   
   list(
     table = match_counting_res,
@@ -889,8 +868,7 @@ build_who_table <- function(match_counting_res, marker_info) {
   is_msp_trio  <- length(msp_variants$msp1) > 0 || length(msp_variants$msp2) > 0
   
   if (!is_msp_trio) {
-    n_markers <- length(unique(marker_info$marker_id))
-    return(apply_who_proportional_rule(match_counting_res, n_markers))
+    return(apply_who_rule(match_counting_res, unique(marker_info$marker_id)))
   }
   
   match_counting_res <- combine_msp_variants(match_counting_res, msp_variants$msp1, msp_variants$msp2)
@@ -905,7 +883,7 @@ build_who_table <- function(match_counting_res, marker_info) {
          length(third_candidates), ": ", paste(third_candidates, collapse = ", "))
   }
   
-  apply_who_trio_rule(match_counting_res, third_candidates)
+  apply_who_rule(match_counting_res, c("msp1", "msp2", third_candidates))
 }
 
 

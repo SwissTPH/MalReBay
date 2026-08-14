@@ -27,11 +27,12 @@ import_data <- function(
     filepath = system.file("extdata", 
                            "Angola_2021_TES_7NMS.xlsx", 
                            package = "MalReBay"),
-    additional_filepath = NULL,
     marker_filepath = system.file("extdata", 
                                   "makers_details.xlsx", 
                                   package = "MalReBay"),
-                        verbose = TRUE) {
+    additional_filepath = NULL,
+    verbose = TRUE) {
+  
   # Load Workbook and Sheets
   ext <- tools::file_ext(filepath)
   
@@ -59,19 +60,6 @@ import_data <- function(
   # If the first value is numeric, it's length_polymorphic; otherwise, it's ampseq
   data_type <- if (!is.na(suppressWarnings(as.numeric(first_val)))) "length_polymorphic" else "ampseq"
   if (verbose) message("INFO: Detected '", data_type, "' data format.")
-
-  # Load Marker Metadata
-  if (!is.null(marker_filepath) && file.exists(marker_filepath)) {
-    marker_info <- as.data.frame(readxl::read_excel(marker_filepath))
-  } else if (!is.null(sheet_names) && "marker_info" %in% sheet_names) {
-    marker_info <- as.data.frame(readxl::read_excel(filepath, sheet = "marker_info"))
-  } else {
-    stop("ERROR: Marker information not found. Provide marker_filepath or add a 'marker_info' sheet to your Excel file.")
-  }
-
-  # Ensure marker_id is always a string
-  marker_info$marker_id <- as.character(marker_info$marker_id)
-  marker_info$repeatlength <- suppressWarnings(as.numeric(as.character(marker_info$repeatlength)))
 
   # Standardize metadata for the columns (1, 2, and 3)
   # Column 1 = Sample.ID, Column 2 = Site, Columns 3+ = Alleles
@@ -125,6 +113,33 @@ import_data <- function(
   }
   
   late_failures_df <- clean_data(late_failures_df)
+  
+  # Load marker metadata -- auto-generated for ampseq (nothing to configure
+  # always "exact" binning, no repeat length), required from sheet
+  # for length-polymorphic data.
+  if (data_type == "ampseq") {
+    allele_colnames  <- colnames(late_failures_df)[3:ncol(late_failures_df)]
+    detected_markers <- unique(gsub("(_allele_|_)\\d+$", "", allele_colnames))
+    marker_info <- data.frame(
+      marker_id        = detected_markers,
+      markertype       = "ampseq",
+      binning_method   = "exact",
+      repeatlength     = NA_real_,
+      stringsAsFactors = FALSE
+    )
+    if (verbose) message("INFO: ampseq data detected -- auto-generated marker metadata for ",
+                         length(detected_markers), " marker(s); marker_filepath not required.")
+  } else {
+    if (!is.null(marker_filepath) && file.exists(marker_filepath)) {
+      marker_info <- as.data.frame(readxl::read_excel(marker_filepath))
+    } else if (!is.null(sheet_names) && "marker_info" %in% sheet_names) {
+      marker_info <- as.data.frame(readxl::read_excel(filepath, sheet = "marker_info"))
+    } else {
+      stop("ERROR: Marker information not found. Provide marker_filepath or add a 'marker_info' sheet to your Excel file.")
+    }
+    marker_info$marker_id <- as.character(marker_info$marker_id)
+    marker_info$repeatlength <- suppressWarnings(as.numeric(as.character(marker_info$repeatlength)))
+  }
 
   # Process additional/background data. Two possible sources:
   #  1. An embedded second sheet in the main xlsx file (existing behaviour).

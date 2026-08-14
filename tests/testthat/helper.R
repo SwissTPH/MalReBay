@@ -84,7 +84,6 @@ create_mock_microsat_data <- function() {
 create_mock_markers <- function() {
   data.frame(
     marker_id      = c("TA1", "POLYA", "PFPK2", "TA109"),
-    markertype     = "microsatellite",
     binning_method = "microsatellite",
     repeatlength   = c(3, 3, 3, 3),
     stringsAsFactors = FALSE
@@ -254,7 +253,6 @@ create_mock_ampseq_data <- function() {
 create_mock_ampseq_markers <- function() {
   data.frame(
     marker_id      = c("cpmp", "cpp"),
-    markertype     = "ampseq",
     binning_method = "exact",
     repeatlength   = c(NA_real_, NA_real_),
     stringsAsFactors = FALSE

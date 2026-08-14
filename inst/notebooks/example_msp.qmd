@@ -92,7 +92,7 @@ A second sheet (optional, for length-polymorphic markers only) can supply additi
 
 ```{r}
 # Preview the example TES dataset
-example_file   <- "D:/MSP 2490_AL (1).xlsx"
+example_file   <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
 marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
 imported_data <- import_data(
@@ -122,7 +122,6 @@ The marker metadata file is an Excel file with one row per marker. Required colu
 | Column | Description |
 |------------------------------------|------------------------------------|
 | `marker_id` | Marker name: must match the prefix of the allele columns in the genotyping file |
-| `marker_type` | Marker type: microsatellite,msp_glurp or ampseq |
 | `repeatlength` | Repeat unit length (bp) for microsatellites; gap threshold for MSP/GLURP |
 | `binning_method` | `"microsatellite"`, `"msp_glurp"`, or `"exact"` for each data type, respectively |
 

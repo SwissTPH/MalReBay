@@ -194,8 +194,18 @@ extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
   loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
 
   n_draws     <- nrow(p_recrud_draws)
+  
+  locus_lrs_draws   <- fit$draws("locus_lrs",   format = "draws_matrix")
+  locus_dists_draws <- fit$draws("locus_dists", format = "draws_matrix")
+  
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))
   locus_dists <- array(NA_real_, dim = c(nids, nloci, n_draws))
+  for (i in seq_len(nids)) {
+    for (j in seq_len(nloci)) {
+      locus_lrs[i, j, ]   <- locus_lrs_draws[,   paste0("locus_lrs[", i, ",", j, "]")]
+      locus_dists[i, j, ] <- locus_dists_draws[, paste0("locus_dists[", i, ",", j, "]")]
+    }
+  }
 
   return(list(
     p_recrud_draws = p_recrud_draws,
