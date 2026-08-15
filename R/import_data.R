@@ -155,6 +155,14 @@ import_data <- function(
     if (nrow(raw_add) > 0) {
       # Apply same 3-column metadata logic to sheet 2
       if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
+        
+        colnames(raw_add)[1:2] <- c("Sample.ID", "Site")
+        raw_add$Sample.ID <- gsub("_?D0$| D0$| Day 0$", " Day 0", raw_add$Sample.ID)
+        is_day0 <- grepl(" Day 0$", raw_add$Sample.ID)
+        raw_add$Sample.ID[!is_day0] <- gsub("(_D[0-9A-Za-z]+|D[0-9]+)$| recurrence$| Day Failure$", " recurrence", raw_add$Sample.ID[!is_day0])
+        unlabelled <- !grepl(" Day 0$| recurrence$", raw_add$Sample.ID)
+        raw_add$Sample.ID[unlabelled] <- paste(raw_add$Sample.ID[unlabelled], "Day 0")
+        
         additional_df <- clean_data(raw_add)
       } else {
         additional_clean <- data.frame(
@@ -200,6 +208,14 @@ import_data <- function(
     
     if (nrow(raw_add) > 0) {
       if (all(c("sample.id", "site") %in% tolower(colnames(raw_add)[1:2]))) {
+        
+        colnames(raw_add)[1:2] <- c("Sample.ID", "Site")
+        raw_add$Sample.ID <- gsub("_?D0$| D0$| Day 0$", " Day 0", raw_add$Sample.ID)
+        is_day0 <- grepl(" Day 0$", raw_add$Sample.ID)
+        raw_add$Sample.ID[!is_day0] <- gsub("(_D[0-9A-Za-z]+|D[0-9]+)$| recurrence$| Day Failure$", " recurrence", raw_add$Sample.ID[!is_day0])
+        unlabelled <- !grepl(" Day 0$| recurrence$", raw_add$Sample.ID)
+        raw_add$Sample.ID[unlabelled] <- paste(raw_add$Sample.ID[unlabelled], "Day 0")
+        
         additional_df <- clean_data(raw_add)
       } else {
         additional_clean <- data.frame(
