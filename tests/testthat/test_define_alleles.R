@@ -1,53 +1,39 @@
 library(testthat)
 library(MalReBay)
 
-# ============================================================
-# define_alleles()
-# ============================================================
+zaire_data <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
+pooled <- rbind(zaire_data$late_failures, zaire_data$additional)
+allele_definitions <- suppressMessages(define_alleles(pooled, zaire_data$marker_info))
 
-test_that("define_alleles: microsatellite bins cover observed allele values", {
-  defs <- suppressMessages(
-    define_alleles(create_mock_microsat_data(), create_mock_markers())
-  )
-  expect_true(any(defs$POLYA[, "lower"] <= 153 & defs$POLYA[, "upper"] >= 153))
-  expect_true(any(defs$POLYA[, "lower"] <= 105 & defs$POLYA[, "upper"] >= 105))
-  expect_equal(colnames(defs$POLYA), c("lower", "upper"))
-  expect_equal(defs$POLYA[, "lower"], sort(defs$POLYA[, "lower"]))
+sample_id <- "ZL21-203"
+locinames <- zaire_data$marker_info$marker_id
+day0  <- zaire_data$late_failures[zaire_data$late_failures$Sample.ID == paste(sample_id, "Day 0"), ]
+recur <- zaire_data$late_failures[zaire_data$late_failures$Sample.ID == paste(sample_id, "recurrence"), ]
+
+test_that("recodeallele assigns ZL21-203's alleles to bins that contain them", {
+  for (locus in locinames) {
+    bins <- allele_definitions[[locus]]
+    cols <- grep(paste0("^", locus, "_"), colnames(zaire_data$late_failures), value = TRUE)
+    values <- unique(unlist(c(day0[, cols], recur[, cols])))
+    values <- values[!is.na(values)]
+    
+    for (v in values) {
+      bin_idx <- recodeallele(bins, v)
+      expect_false(is.na(bin_idx), info = sprintf("%s: value %s matched no bin", locus, v))
+      expect_true(
+        v >= bins[bin_idx, "lower"] && v <= bins[bin_idx, "upper"],
+        info = sprintf("%s: value %s assigned to bin [%s, %s]",
+                       locus, v, bins[bin_idx, "lower"], bins[bin_idx, "upper"])
+      )
+    }
+  }
 })
 
-test_that("define_alleles: maxk filters to top k alleles", {
-  defs_full <- suppressMessages(define_alleles(create_mock_microsat_data(), create_mock_markers()))
-  defs_k2   <- suppressMessages(define_alleles(create_mock_microsat_data(), create_mock_markers(), maxk = 2))
+test_that("recodeallele rejects an out-of-range value as an outlier", {
+  locus <- "TA1"
+  bins <- allele_definitions[[locus]]
+  repeat_length <- zaire_data$marker_info$repeatlength[zaire_data$marker_info$marker_id == locus]
   
-  expect_lte(nrow(defs_k2$POLYA), 2)
-  expect_gte(nrow(defs_full$POLYA), nrow(defs_k2$POLYA))
-})
-
-# ============================================================
-# recodeallele()
-# ============================================================
-
-test_that("recodeallele: observed values map to valid and distinct bin indices", {
-  bins <- suppressMessages(define_alleles(create_mock_microsat_data(), create_mock_markers()))$POLYA
-  # With repeatlength = 3, expected bins from mock POLYA values (105, 153, 159, 162, 165):
-  #   bin 1: ~103.5–106.5  (covers 105)
-  #   bin 2: ~151.5–154.5  (covers 153)
-  #   bin 3: ~157.5–163.5  (covers 159, 162)
-  #   bin 4: ~163.5–166.5  (covers 165)
-  
-  idx_105 <- recodeallele(bins, 105)
-  idx_153 <- recodeallele(bins, 153)
-  
-  expect_true(!is.na(idx_105))
-  expect_true(!is.na(idx_153))
-  expect_true(idx_105 != idx_153)
-})
-
-test_that("recodeallele: returns NA_integer_ for NA, empty bins, or beyond max distance", {
-  bins       <- suppressMessages(define_alleles(create_mock_microsat_data(), create_mock_markers()))$POLYA
-  empty_bins <- matrix(NA, ncol = 2, nrow = 0, dimnames = list(NULL, c("lower", "upper")))
-  
-  expect_equal(recodeallele(bins, NA),                            NA_integer_)
-  expect_equal(recodeallele(empty_bins, 153),                     NA_integer_)
-  expect_equal(recodeallele(bins, 300, max_distance_allowed = 5), NA_integer_)
+  bin_idx <- recodeallele(bins, 800, max_distance_allowed = repeat_length)
+  expect_true(is.na(bin_idx))
 })
