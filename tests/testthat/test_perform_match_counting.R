@@ -1,10 +1,10 @@
 library(testthat)
 library(MalReBay)
 
-zaire_imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
+imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
 
-late      <- zaire_imported$late_failures
-markers   <- zaire_imported$marker_info
+late      <- imported$late_failures
+markers   <- imported$marker_info
 locinames <- markers$marker_id
 ids       <- unique(gsub(" Day 0$| recurrence$", "", late$Sample.ID))
 
@@ -16,7 +16,7 @@ test_that("perform_match_counting returns correct columns and one row per patien
   expect_true(all(ids %in% result$Sample.ID))
 })
 
-test_that("perform_match_counting matches independently-derived expectations for every Zaire patient and locus", {
+test_that("perform_match_counting matches independently-derived expectations for every patient and locus", {
   for (id in ids) {
     day0  <- late[late$Sample.ID == paste(id, "Day 0"), ]
     recur <- late[late$Sample.ID == paste(id, "recurrence"), ]
@@ -51,3 +51,19 @@ test_that("perform_match_counting returns known outcomes for ZL21-218", {
   }
 })
 
+who <- build_who_table(result, markers)
+
+test_that("build_who_table applies the 70%/100% WHO rule correctly for Zaire", {
+  who_loose_n  <- round(0.70 * length(locinames))
+  who_strict_n <- length(locinames)
+  
+  expected_loose  <- ifelse(result$Number_Loci_Compared < who_loose_n, NA,
+                            ifelse(result$Number_Matches >= who_loose_n, 1, 0))
+  expected_strict <- ifelse(result$Number_Loci_Compared < who_strict_n, NA,
+                            ifelse(result$Number_Matches == who_strict_n, 1, 0))
+  
+  expect_equal(who$table$WHO_loose, expected_loose)
+  expect_equal(who$table$WHO_strict, expected_strict)
+  expect_equal(who$who_loose_label, "WHO 5/7")
+  expect_equal(who$who_strict_label, "WHO 7/7")
+})

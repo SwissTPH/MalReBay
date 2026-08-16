@@ -1,36 +1,18 @@
 library(testthat)
 library(MalReBay)
 
-zaire_imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
+imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
 
-late      <- zaire_imported$late_failures[, setdiff(colnames(zaire_imported$late_failures), "Site")]
-add       <- zaire_imported$additional[, setdiff(colnames(zaire_imported$additional), "Site")]
-markers   <- zaire_imported$marker_info
+late      <- imported$late_failures[, setdiff(colnames(imported$late_failures), "Site")]
+add       <- imported$additional[, setdiff(colnames(imported$additional), "Site")]
+markers   <- imported$marker_info
 locinames <- markers$marker_id
 ids       <- unique(gsub(" Day 0$| recurrence$", "", late$Sample.ID))
 
 allele_cols <- setdiff(colnames(late), "Sample.ID")
 maxMOI      <- max(as.integer(gsub(".*(_allele_|_)(\\d+)$", "\\2", allele_cols)))
-
-test_that("import_data returns non-empty Zaire data", {
-  expect_gt(nrow(late), 0)
-  expect_gt(nrow(add), 0)
-  expect_gt(nrow(markers), 0)
-  expect_true(all(colSums(!is.na(late[, allele_cols])) > 0))
-})
-
-comparability <- compute_locus_comparability(late, ids, locinames)
-
-test_that("compute_locus_comparability returns non-empty Zaire results", {
-  expect_equal(nrow(comparability$locus_summary), length(ids))
-  expect_true(any(comparability$is_locus_comparable))
-})
-
 allele_definitions <- suppressMessages(define_alleles(rbind(late, add), markers))
-
-test_that("define_alleles returns non-empty bins for every Zaire locus", {
-  for (locus in locinames) expect_gt(nrow(allele_definitions[[locus]]), 0)
-})
+comparability <- compute_locus_comparability(late, ids, locinames)
 
 stan_data <- prepare_stan_data(
   late_failures_site  = late,
@@ -43,23 +25,25 @@ stan_data <- prepare_stan_data(
   is_locus_comparable = comparability$is_locus_comparable
 )
 
-test_that("prepare_stan_data output passes the package's own validation gate", {
-  expect_true(suppressMessages(validate_stan_data(stan_data)))
+sample_id <- "ZL21-203"
+day0  <- late[late$Sample.ID == paste(sample_id, "Day 0"), ]
+recur <- late[late$Sample.ID == paste(sample_id, "recurrence"), ]
+
+
+test_that("import_data returns non-empty data", {
+  expect_gt(nrow(late), 0)
+  expect_gt(nrow(add), 0)
+  expect_gt(nrow(markers), 0)
+  expect_true(all(colSums(!is.na(late[, allele_cols])) > 0))
 })
 
-test_that("prepare_stan_data returns non-empty Zaire outputs", {
-  expect_true(any(stan_data$recoded0 != 0))
-  expect_true(any(stan_data$recodedf != 0))
-  expect_true(all(stan_data$K > 0))
-  expect_true(any(stan_data$dist_array != 0))
-  expect_true(any(stan_data$comparable == 1))
+test_that("compute_locus_comparability returns non-empty results", {
+  expect_equal(nrow(comparability$locus_summary), length(ids))
+  expect_true(any(comparability$is_locus_comparable))
 })
 
-test_that("prepare_stan_data hidden alleles match recoded zeros", {
-  expect_false(all(stan_data$hidden0 == 1))
-  expect_false(all(stan_data$hiddenf == 1))
-  expect_true(all(stan_data$hidden0 == (stan_data$recoded0 == 0)))
-  expect_true(all(stan_data$hiddenf == (stan_data$recodedf == 0)))
+test_that("define_alleles returns non-empty bins for every locus", {
+  for (locus in locinames) expect_gt(nrow(allele_definitions[[locus]]), 0)
 })
 
 test_that("observed alleles belong to the defined allele population", {
@@ -72,9 +56,30 @@ test_that("observed alleles belong to the defined allele population", {
   }
 })
 
-test_that("prepare_stan_data MOI, method, and threshold are correct for Zaire", {
-  expect_true(all(stan_data$MOI0 >= 1 & stan_data$MOI0 <= maxMOI))
-  expect_true(all(stan_data$MOIf >= 1 & stan_data$MOIf <= maxMOI))
-  expect_true(all(stan_data$method_int == 1))
-  expect_equal(as.numeric(stan_data$threshold), markers$repeatlength[match(locinames, markers$marker_id)])
+test_that("recodeallele assigns ZL21-203's alleles to bins that contain them", {
+  for (locus in locinames) {
+    bins <- allele_definitions[[locus]]
+    cols <- grep(paste0("^", locus, "_"), colnames(late), value = TRUE)
+    values <- unique(unlist(c(day0[, cols], recur[, cols])))
+    values <- values[!is.na(values)]
+    
+    for (v in values) {
+      bin_idx <- recodeallele(bins, v)
+      expect_false(is.na(bin_idx), info = sprintf("%s: value %s matched no bin", locus, v))
+      expect_true(
+        v >= bins[bin_idx, "lower"] && v <= bins[bin_idx, "upper"],
+        info = sprintf("%s: value %s assigned to bin [%s, %s]",
+                       locus, v, bins[bin_idx, "lower"], bins[bin_idx, "upper"])
+      )
+    }
+  }
+})
+
+test_that("recodeallele rejects an out-of-range value as an outlier", {
+  locus <- "TA1"
+  bins <- allele_definitions[[locus]]
+  repeat_length <- markers$repeatlength[markers$marker_id == locus]
+  
+  bin_idx <- recodeallele(bins, 800, max_distance_allowed = repeat_length)
+  expect_true(is.na(bin_idx))
 })

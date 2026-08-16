@@ -121,9 +121,9 @@ Here is an example of the expected layout:
 
 ## 5. Step-by-step example: length-polymorphic markers
 
-This section walks through a complete analysis using an example dataset that comes with the package. The data are from a Therapeutic Efficacy Study carried out in Angola in 2021. It includes 7 microsatellite markers (`313`, `383`, `TA1`, `POLYA`, `PFPK2`, `2490`, `TA109`) from 70 patients across three study sites: Benguela, Lunda Sul and Zaire.
+This section walks through a complete analysis using an example dataset that comes with the package. The data are from a Therapeutic Efficacy Study carried out in Angola in 2021. It includes 7 microsatellite markers (`313`, `383`, `TA1`, `POLYA`, `PFPK2`, `2490`, `TA109`) from 70 patients across three study sites: Zaire, Lunda Sul and Zaire.
 
-The example focuses on the Benguela site.
+The example focuses on the Zaire site.
 
 ```{r required packages, message=FALSE, warning=FALSE}
 library(MalReBay)
@@ -212,9 +212,9 @@ For a real analysis, use at least 2000 iterations. The quick settings below are 
 ```{r run-analysis-length, cache=TRUE}
 quick_config <- list(
   n_chains     = 2,
-  iter         = 1000,
+  iter         = 2000,
   burn_in_frac = 0.5,
-  adapt_delta  = 0.8,
+  adapt_delta  = 0.9,
   random_seed  = 42
 )
 
@@ -251,11 +251,11 @@ The most important output is `posterior_probabilities`. The key columns are:
 ```{r view-summary-length}
 summary_df <- results$posterior_probabilities
 
-benguela_df <- dplyr::filter(summary_df, Site == "Benguela")
+Zaire_df <- dplyr::filter(summary_df, Site == "Zaire")
 
 knitr::kable(
-  benguela_df,
-  caption = "Classification results for Benguela showing posterior probabilities.",
+  Zaire_df,
+  caption = "Classification results for Zaire showing posterior probabilities.",
   digits  = 3
 )
 ```
@@ -281,7 +281,7 @@ Good convergence is shown by:
 + **Trace plots that look like fuzzy caterpillars:** chains should overlap and move up and down without any clear trend or drift.
 + **Autocorrelation that drops to zero quickly:** this means each sample is contributing new information.
 
-```{r convergence-diagnostics-LP, fig.width=10, fig.height=8, out.width='100%', fig.alt="Four convergence diagnostic plots arranged in a 2 by 2 grid for the Benguela site."}
+```{r convergence-diagnostics-LP, fig.width=10, fig.height=8, out.width='100%', fig.alt="Four convergence diagnostic plots arranged in a 2 by 2 grid for the Zaire site."}
 site_to_plot <- names(results$mcmc_loglikelihoods)[1]
 loglik_data  <- results$mcmc_loglikelihoods[[site_to_plot]]
 
@@ -324,7 +324,7 @@ bad_mcmc_config <- list(
   n_chains     = 2,
   iter         = 200,
   burn_in_frac = 0.5,
-  random_seed  = 1
+  random_seed  = 55
 )
 
 results_nonconverge <- MalReBay::MalReBay(
@@ -354,6 +354,28 @@ Signs to watch for in the plots:
 + **R-hat stays well above 1.1:** the chains have not agreed on a stable answer.
 + **Chains in the trace plot sit at different levels or drift apart:** the sampling is not exploring the same area of the parameter space.
 + **Autocorrelation stays high for many lags:** the sampler is moving slowly and each sample carries little new information.
+
+```{r}
+classification_counts <- function(results, label) {
+  probs <- results$posterior_probabilities$Probability
+  data.frame(
+    Scenario      = label,
+    Recrudescence = sum(probs > 0.5, na.rm = TRUE),
+    Reinfection   = sum(probs <= 0.5, na.rm = TRUE)
+  )
+}
+
+comparison_counts <- dplyr::bind_rows(
+  classification_counts(results, "Converged (2000 iterations)"),
+  classification_counts(results_nonconverge, "Non-converged (200 iterations)")
+)
+
+knitr::kable(
+  comparison_counts,
+  caption = "Recrudescence vs. reinfection counts under converged and non-converged models."
+)
+```
+
 
 ### 6.2 How to improve convergence
 

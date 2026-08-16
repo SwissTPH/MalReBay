@@ -285,8 +285,9 @@ save_results <- function(summary_results,
     comparison_for_heatmap <- summary_results$comparison
     comparison_for_heatmap$MalReBay <- comparison_for_heatmap$Probability
     who_result <- build_who_table(comparison_for_heatmap, imported_data$marker_info)
+    who_comparison <- who_result$table
     
-    who_comparison <- plot_comparison_heatmap(
+    plot_comparison_heatmap(
       summary_results = summary_results,
       marker_info     = imported_data$marker_info,
       output_folder   = output_folder,
@@ -335,7 +336,7 @@ save_results <- function(summary_results,
     who_export$WHO_strict <- recode_who(who_export$WHO_strict)
     
     who_path <- file.path(output_folder, "who_comparison_table.csv")
-    utils::write.csv(who_comparison, who_path)
+    utils::write.csv(who_export, who_path)
     saved_paths["who_comparison"] <- who_path
   }
   

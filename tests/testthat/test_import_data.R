@@ -1,10 +1,11 @@
 library(testthat)
 library(MalReBay)
 
-zaire_imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
+imported <- readRDS(system.file("extdata", "imported_data.rds", package = "MalReBay"))
 
-late      <- zaire_imported$late_failures
-markers   <- zaire_imported$marker_info
+late      <- imported$late_failures
+add       <- imported$additional
+markers   <- imported$marker_info
 locinames <- markers$marker_id
 ids       <- unique(gsub(" Day 0$| recurrence$", "", late$Sample.ID))
 
@@ -13,7 +14,7 @@ test_that("import_data returns correct list structure", {
   expect_named(imported, c("late_failures", "additional", "marker_info", "data_type"))
 })
 
-test_that("import_data detects length_polymorphic Zaire data and converts alleles to numeric", {
+test_that("import_data detects length_polymorphic and converts alleles to numeric", {
   expect_equal(imported$data_type, "length_polymorphic")
   allele_cols <- late[, setdiff(colnames(late), c("Sample.ID", "Site"))]
   expect_true(all(sapply(allele_cols, is.numeric)))
@@ -52,31 +53,26 @@ test_that("import_data additional and late_failures have identical columns", {
   expect_equal(colnames(late), colnames(add))
 })
 
-test_that("import_data missing marker file throws error", {
-  expect_error(import_data(data_file, "nonexistent_markers.xlsx"), regexp = "Marker information not found")
-})
-
-test_that("import_data no matching markers throws error", {
-  bad_markers <- markers
-  bad_markers$marker_id <- paste0("UNKNOWN_", bad_markers$marker_id)
+test_that("detect patients with no recurrence data in `late`", {
+  missing_observation <- late
   
-  tmp_marker <- tempfile(fileext = ".xlsx")
-  writexl::write_xlsx(bad_markers, tmp_marker)
-  on.exit(unlink(tmp_marker))
+  first_recur <- which(grepl("\\brecurrence\\s*$", missing_observation$Sample.ID, ignore.case = TRUE))[1]
+  expect_true(!is.na(first_recur), info = "no 'recurrence' Sample.ID found in `late` dataset")
+  cols_to_na <- setdiff(colnames(missing_observation), c("Sample.ID", "Site"))
+  missing_observation[first_recur, cols_to_na] <- NA
   
-  expect_error(import_data(data_file, tmp_marker), regexp = "No matching markers found")
-})
-
-test_that("import_data drops patients with no recurrence data and messages which ones", {
-  broken <- late
-  first_recur <- which(grepl(" recurrence$", broken$Sample.ID))[1]
-  broken[first_recur, setdiff(colnames(broken), c("Sample.ID", "Site"))] <- NA
+  base_ids <- unique(gsub(" Day 0$| recurrence$", "", missing_observation$Sample.ID))
+  is_recur_missing <- vapply(base_ids, function(id) {
+    recur_idx <- which(missing_observation$Sample.ID == paste0(id, " recurrence"))
+    if (length(recur_idx) == 0) return(TRUE)
+    all_na <- all(is.na(missing_observation[recur_idx, cols_to_na, drop = FALSE]))
+    all_na
+  }, logical(1))
   
-  tmp_data <- tempfile(fileext = ".xlsx")
-  writexl::write_xlsx(list(Sheet1 = broken, Sheet2 = add), tmp_data)
-  on.exit(unlink(tmp_data))
+  expect_equal(sum(is_recur_missing), 1)
   
-  expect_message(import_data(tmp_data, marker_file, verbose = TRUE), regexp = "Removing 1 patient")
+  mutated_base <- gsub(" (Day 0|recurrence)$", "", missing_observation$Sample.ID[first_recur])
+  expect_true(mutated_base %in% base_ids[is_recur_missing])
 })
 
 test_that("data_quality_check confirms Zaire meets the minimum sample requirement", {

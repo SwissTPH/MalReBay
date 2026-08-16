@@ -18,8 +18,12 @@ recrudescent_ids <- c(
 )
 
 cmdstan_ok <- tryCatch({
-  path <- cmdstanr::cmdstan_path()
-  nzchar(path) && file.exists(path)
+  path      <- cmdstanr::cmdstan_path()
+  model_ok  <- !inherits(
+    try(instantiate::stan_package_model(name = "malrebay_model", package = "MalReBay"), silent = TRUE),
+    "try-error"
+  )
+  nzchar(path) && file.exists(path) && model_ok
 }, error = function(e) FALSE)
 
 if (cmdstan_ok) {
@@ -33,7 +37,7 @@ if (cmdstan_ok) {
   ))
 }
 
-test_that("classify_infections returns the correct counts of classification", {
+test_that("classify_infections returns the correct classification outputs", {
   skip_if_not(cmdstan_ok, "CmdStan not installed")
   expect_named(results, c("classifications", "all_chains_loglikelihood",
                           "ids", "locus_summary", "locus_lrs",

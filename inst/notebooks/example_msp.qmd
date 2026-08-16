@@ -55,7 +55,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocMana
 BiocManager::install("ComplexHeatmap")
 
 # 2. Install MalReBay from GitHub (development version)
-remotes::install_github("SwissTPH/MalReBay")
+remotes::install_github("SwissTPH/MalReBay", ref = "stan_update", force = TRUE)
 ```
 
 ```{r}
