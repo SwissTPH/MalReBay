@@ -114,32 +114,18 @@ import_data <- function(
   
   late_failures_df <- clean_data(late_failures_df)
   
-  # Load marker metadata -- auto-generated for ampseq (nothing to configure
-  # always "exact" binning, no repeat length), required from sheet
-  # for length-polymorphic data.
-  if (data_type == "ampseq") {
-    allele_colnames  <- colnames(late_failures_df)[3:ncol(late_failures_df)]
-    detected_markers <- unique(gsub("(_allele_|_)\\d+$", "", allele_colnames))
-    marker_info <- data.frame(
-      marker_id        = detected_markers,
-      markertype       = "ampseq",
-      binning_method   = "exact",
-      repeatlength     = NA_real_,
-      stringsAsFactors = FALSE
-    )
-    if (verbose) message("INFO: ampseq data detected -- auto-generated marker metadata for ",
-                         length(detected_markers), " marker(s); marker_filepath not required.")
+  # Load Marker Metadata
+  if (!is.null(marker_filepath) && file.exists(marker_filepath)) {
+    marker_info <- as.data.frame(readxl::read_excel(marker_filepath))
+  } else if (!is.null(sheet_names) && "marker_info" %in% sheet_names) {
+    marker_info <- as.data.frame(readxl::read_excel(filepath, sheet = "marker_info"))
   } else {
-    if (!is.null(marker_filepath) && file.exists(marker_filepath)) {
-      marker_info <- as.data.frame(readxl::read_excel(marker_filepath))
-    } else if (!is.null(sheet_names) && "marker_info" %in% sheet_names) {
-      marker_info <- as.data.frame(readxl::read_excel(filepath, sheet = "marker_info"))
-    } else {
-      stop("ERROR: Marker information not found. Provide marker_filepath or add a 'marker_info' sheet to your Excel file.")
-    }
-    marker_info$marker_id <- as.character(marker_info$marker_id)
-    marker_info$repeatlength <- suppressWarnings(as.numeric(as.character(marker_info$repeatlength)))
+    stop("ERROR: Marker information not found. Provide marker_filepath or add a 'marker_info' sheet to your Excel file.")
   }
+  
+  marker_info$marker_id <- as.character(marker_info$marker_id)
+  marker_info$repeatlength <- suppressWarnings(as.numeric(as.character(marker_info$repeatlength)))
+  
 
   # Process additional/background data. Two possible sources:
   #  1. An embedded second sheet in the main xlsx file (existing behaviour).

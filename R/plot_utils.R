@@ -918,7 +918,7 @@ plot_comparison_heatmap <- function(summary_results,
   who_strict_label <- who_result$who_strict_label
   
   col_fun <- circlize::colorRamp2(c(0, 0.25, 0.5, 0.75, 1),
-                                  c("#EFF6FB", "#9ECAE1", "#2171B5", "#FC9272", "#CB181D"))
+                                  c("#67A9CF", "#ade8f4", "#F7F7F7", "#F4A582", "#D6604D"))
   
   block_defaults <- list(
     col = col_fun, na_col = "grey80",
