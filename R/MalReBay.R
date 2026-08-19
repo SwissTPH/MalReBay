@@ -336,7 +336,7 @@ save_results <- function(summary_results,
     who_export$WHO_strict <- recode_who(who_export$WHO_strict)
     
     who_path <- file.path(output_folder, "who_comparison_table.csv")
-    utils::write.csv(who_export, who_path)
+    utils::write.csv(who_export, who_path, row.names = FALSE)
     saved_paths["who_comparison"] <- who_path
   }
   
