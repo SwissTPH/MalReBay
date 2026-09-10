@@ -224,6 +224,15 @@ import_data <- function(
     }
   }
   
+  # Site is an identifier, not a quantity -- some source files store it as a
+  # bare number (e.g. a numeric site code) rather than a name. Downstream
+  # code (e.g. posterior_probabilities$Site, built from site names used as
+  # list keys, which R always coerces to character) always treats Site as
+  # character, so keep it consistent here too or joins on Site fail with a
+  # type mismatch.
+  late_failures_df$Site <- as.character(late_failures_df$Site)
+  additional_df$Site    <- as.character(additional_df$Site)
+
   # Remove "Failure" rows that are entirely empty (No allele data)
   allele_idx <- 3:ncol(late_failures_df)
   

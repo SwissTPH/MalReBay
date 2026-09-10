@@ -41,9 +41,7 @@ This notebook walks through a complete analysis of MSP/GLURP length-polymorphic 
 
 CmdStan must be installed before MalReBay, since MalReBay's Stan model is compiled during its own installation (see the package README for details).
 
-MalReBay depends on **ComplexHeatmap**, which is distributed via Bioconductor,
-not CRAN — install it first with:
-
+MalReBay depends on **ComplexHeatmap**, which is distributed via Bioconductor, not CRAN — install it first with:
 
 ```{r}
 #| eval: false
@@ -120,7 +118,7 @@ imported_data$data_type
 The marker metadata file is an Excel file with one row per marker. Required columns:
 
 | Column | Description |
-|------------------------------------|------------------------------------|
+|----|----|
 | `marker_id` | Marker name: must match the prefix of the allele columns in the genotyping file |
 | `repeatlength` | Repeat unit length (bp) for microsatellites; gap threshold for MSP/GLURP |
 | `binning_method` | `"microsatellite"`, `"msp_glurp"`, or `"exact"` for each data type, respectively |
@@ -143,7 +141,7 @@ cfg
 ```
 
 | Parameter | Description |
-|------------------------------------|------------------------------------|
+|----|----|
 | `n_chains` | Number of independent MCMC chains. More chains improve convergence diagnostics. |
 | `chunk_size` | Number of MCMC iterations run per convergence-check cycle. |
 | `max_iterations` | Hard upper limit on total MCMC iterations per site. |
@@ -184,7 +182,7 @@ results <- MalReBay(
 ### Parameters
 
 | Parameter | Description |
-|------------------------------------|------------------------------------|
+|----|----|
 | `filepath` | Path to the genotyping Excel file. |
 | `marker_filepath` | Path to the marker metadata Excel file. |
 | `mcmc_config` | Path to the MCMC configuration Excel file, or a named list. |
@@ -246,7 +244,7 @@ names(results$mcmc_loglikelihoods)
 When `output_folder` is provided, the following files are written:
 
 | File | Contents |
-|------------------------------------|------------------------------------|
+|----|----|
 | `posterior_probabilities.csv` | Posterior probability of recrudescence per patient, with locus counts. |
 | `bayesian_match_counting_comparison.csv` | Bayesian results alongside traditional match counting. |
 | `mcmc_convergence_summary.csv` | R-hat and ESS per site. |
@@ -285,7 +283,6 @@ p_hist <- plot_probability_histogram(results, output_folder = NULL)
 ```
 
 **MCMC convergence diagnostics**: trace plots, Gelman–Rubin plots, log-likelihood histograms, and autocorrelation plots saved under `convergence_diagnosis/<site>/` when `output_folder` is set.
-
 
 ```{r}
 p_heatmap <- plot_comparison_heatmap(results, imported_data$marker_info, output_folder = NULL)
