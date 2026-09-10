@@ -41,11 +41,28 @@ fs::dir_copy(path = "stan", new_path = bin_stan)
 #   instantiate::stan_package_compile(
 #     models = instantiate::stan_package_model_files(path = bin_stan)
 #   )
+#
+# PATCHED (2026-09-10): skip recompilation for any model that already
+# ships a precompiled executable in src/stan/ (checked into the repo).
+# CmdStan/a C++ toolchain aren't available on managed deploy targets like
+# shinyapps.io, so those models must already be built and portable
+# (relative $ORIGIN rpath, bundled .so deps) before install ever runs.
+# Models with no shipped executable still compile normally here, so local
+# development on a machine with CmdStan installed is unaffected.
 # -----------------------------------------------------------------------
 callr::r(
   func = function(bin_stan) {
     models <- instantiate::stan_package_model_files(path = bin_stan)
-    for (model in models) {
+    to_compile <- Filter(function(model) {
+      exe <- tools::file_path_sans_ext(model)
+      if (.Platform$OS.type == "windows") exe <- paste0(exe, ".exe")
+      precompiled <- file.exists(exe) && file.access(exe, mode = 1) == 0
+      if (precompiled) {
+        message("Using precompiled Stan model: ", exe)
+      }
+      !precompiled
+    }, models)
+    for (model in to_compile) {
       cmdstanr::cmdstan_model(stan_file = model, compile = TRUE)
     }
   },
