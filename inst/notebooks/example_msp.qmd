@@ -41,13 +41,19 @@ This notebook walks through a complete analysis of MSP/GLURP length-polymorphic 
 
 CmdStan must be installed before MalReBay, since MalReBay's Stan model is compiled during its own installation (see the package README for details).
 
+MalReBay depends on **ComplexHeatmap**, which is distributed via Bioconductor, not CRAN — install it first with:
+
 ```{r}
 #| eval: false
 # 1. Install CmdStan first (one-time, ~5 minutes)
 cmdstanr::install_cmdstan()
 
+# install the heatmap function
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("ComplexHeatmap")
+
 # 2. Install MalReBay from GitHub (development version)
-remotes::install_github("SwissTPH/MalReBay")
+remotes::install_github("SwissTPH/MalReBay", ref = "stan_update", force = TRUE)
 ```
 
 ```{r}
@@ -83,9 +89,9 @@ Missing values are recognised and set to `NA` automatically for: `N/A`, `-`, `NA
 A second sheet (optional, for length-polymorphic markers only) can supply additional Day 0 samples.
 
 ```{r}
-# Preview the example MSP/GLURP dataset
-example_file   <- "Angola_2021_TES_7NMS.xlsx"
-marker_file    <- "makers_details.xlsx"
+# Preview the example TES dataset
+example_file   <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
 imported_data <- import_data(
   filepath        = example_file,
@@ -114,7 +120,6 @@ The marker metadata file is an Excel file with one row per marker. Required colu
 | Column | Description |
 |----|----|
 | `marker_id` | Marker name: must match the prefix of the allele columns in the genotyping file |
-| `marker_type` | Marker type: microsatellite,msp_glurp or ampseq |
 | `repeatlength` | Repeat unit length (bp) for microsatellites; gap threshold for MSP/GLURP |
 | `binning_method` | `"microsatellite"`, `"msp_glurp"`, or `"exact"` for each data type, respectively |
 
@@ -129,8 +134,9 @@ The MCMC behaviour is controlled by a set of parameters, supplied either as an E
 
 ```{r}
 # Read and display the default configuration
-config_file <- "default_mcmc_config.xlsx"
-cfg <- as.data.frame(readxl::read_excel(config_file))
+# config_file <- "default_mcmc_config.rds"
+config_file <- system.file("extdata", "default_mcmc_config.rds", package = "MalReBay")
+cfg <- readRDS(config_file)
 cfg
 ```
 
@@ -158,7 +164,7 @@ The main package function `MalReBay()` runs data import, MCMC classification, re
 ```{r}
 quick_config <- list(
   n_chains     = 2,
-  iter         = 1000,
+  iter         = 2000,
   burn_in_frac = 0.5,
   adapt_delta  = 0.8,
   random_seed  = 42
@@ -278,6 +284,10 @@ p_hist <- plot_probability_histogram(results, output_folder = NULL)
 
 **MCMC convergence diagnostics**: trace plots, Gelman–Rubin plots, log-likelihood histograms, and autocorrelation plots saved under `convergence_diagnosis/<site>/` when `output_folder` is set.
 
+```{r}
+p_heatmap <- plot_comparison_heatmap(results, imported_data$marker_info, output_folder = NULL)
+```
+
 ------------------------------------------------------------------------
 
 ## Interpreting the results
@@ -303,4 +313,4 @@ pp[pp$N_Comparable_Loci <= 1, c("Sample.ID", "Site", "Probability",
                                   "N_Comparable_Loci", "Classification")]
 ```
 
-If the convergence summary shows high R-hat values or low ESS for a site, consider increasing `max_iterations` or `chunk_size` in the MCMC configuration.
+If the convergence summary shows high R-hat (`>1.1`) values or low ESS (`<400`) for a site, consider increasing `iteration` in the MCMC configuration.

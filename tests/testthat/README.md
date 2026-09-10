@@ -5,7 +5,7 @@ Test files for the MalReBay package.
 ## Structure
 - `helper.R`          — shared fixtures loaded automatically by testthat
 - `test_1_import_data.R`           — import_data() tests
-- `test_2_define_alleles.R`        — define_alleles(), recodeallele(), calculate_frequencies()
+- `test_2_define_alleles.R`        — define_alleles(), recodeallele()
 - `test_3_classify_infections.R`   — classify_infections() tests
 - `test_4_summarise_and_save.R`    — summarise_results() and save_results()
 - `test_5_perform_match_counting.R`— perform_match_counting() tests

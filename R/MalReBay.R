@@ -27,7 +27,7 @@
 classify_infections <- function(imported_data,
                                 mcmc_config = system.file(
                                                   "extdata", 
-                                                  "default_mcmc_config.xlsx",
+                                                  "default_mcmc_config.rds",
                                                   package = "MalReBay"),
                                 n_workers = 1,
                                 verbose   = TRUE) {
@@ -42,7 +42,7 @@ classify_infections <- function(imported_data,
   if (is.list(mcmc_config)) {
     config <- mcmc_config
   } else {
-    cfg_df           <- as.data.frame(readxl::read_excel(mcmc_config))
+    cfg_df           <- as.data.frame(readRDS(mcmc_config))
     cfg_df$parameter <- trimws(cfg_df$parameter)
     config           <- stats::setNames(as.list(cfg_df$value), cfg_df$parameter)
   }
@@ -281,6 +281,19 @@ save_results <- function(summary_results,
         for (p in p_moi) print(p)
       }
     }
+    
+    comparison_for_heatmap <- summary_results$comparison
+    comparison_for_heatmap$MalReBay <- comparison_for_heatmap$Probability
+    who_result <- build_who_table(comparison_for_heatmap, imported_data$marker_info)
+    who_comparison <- who_result$table
+    
+    plot_comparison_heatmap(
+      summary_results = summary_results,
+      marker_info     = imported_data$marker_info,
+      output_folder   = output_folder,
+      verbose         = verbose
+    )
+    
   }
   
   plot_probability_histogram(
@@ -288,6 +301,7 @@ save_results <- function(summary_results,
     output_folder = output_folder,
     verbose       = verbose
   )
+  
   
   # Stop here if no output folder — plots already shown above
   if (is.null(output_folder)) {
@@ -313,6 +327,17 @@ save_results <- function(summary_results,
     utils::write.csv(summary_results$convergence,
                      cv_path, row.names = FALSE)
     saved_paths["convergence"] <- cv_path
+  }
+  
+  if (!is.null(who_comparison)) {
+    recode_who <- function(x) dplyr::case_when(x == 1 ~ "R", x == 0 ~ "NI", TRUE ~ NA_character_)
+    who_export <- who_comparison
+    who_export$WHO_loose  <- recode_who(who_export$WHO_loose)
+    who_export$WHO_strict <- recode_who(who_export$WHO_strict)
+    
+    who_path <- file.path(output_folder, "who_comparison_table.csv")
+    utils::write.csv(who_export, who_path, row.names = FALSE)
+    saved_paths["who_comparison"] <- who_path
   }
   
   invisible(saved_paths)
@@ -362,7 +387,8 @@ MalReBay <- function(
                                   package = "MalReBay"),
     marker_filepath = system.file("extdata", "makers_details.xlsx",
                                   package = "MalReBay"),
-    mcmc_config     = system.file("extdata", "default_mcmc_config.xlsx",
+    additional_filepath = NULL,
+    mcmc_config     = system.file("extdata", "default_mcmc_config.rds",
                                   package = "MalReBay"),
     output_folder   = NULL,
     n_workers       = 1,
@@ -372,11 +398,12 @@ MalReBay <- function(
   if (verbose) message("Starting MalReBay pipeline...")
 
   imported_data <- import_data(
-    filepath        = filepath,
-    marker_filepath = marker_filepath,
-    verbose         = verbose
+    filepath             = filepath,
+    additional_filepath  = additional_filepath,
+    marker_filepath      = marker_filepath,
+    verbose              = verbose
   )
-
+  
   mcmc_results <- classify_infections(
     imported_data = imported_data,
     mcmc_config   = mcmc_config,

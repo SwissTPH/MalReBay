@@ -8,8 +8,16 @@ src/*.a
 # Stan model executables — {instantiate} compiles these into the installed
 # package's bin/stan/ directory, never into src/stan/ in the source tree, but
 # ignore anything non-.stan here as a safety net for local ad hoc compiles.
+#
+# Exception: malrebay_model (+ its bundled libtbb.so.2) is a deliberately
+# committed precompiled binary for deploy targets with no CmdStan/compiler
+# (e.g. shinyapps.io) — see src/install.libs.R, which skips recompilation
+# when it's present. Built in a portable Ubuntu 20.04 container with a
+# relative ($ORIGIN) rpath; not just a leftover local build.
 src/stan/*
 !src/stan/*.stan
+!src/stan/malrebay_model
+!src/stan/libtbb.so.2
 
 # macOS files ----
 .DS_Store
@@ -48,3 +56,5 @@ README.html
 inst/doc
 docs
 inst/notebooks/bayesian_algorithm_output/
+tests/testthat/marker_comparibility_test.R
+inst/extdata/MSP 2490_AL.xlsx

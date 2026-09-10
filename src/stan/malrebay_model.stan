@@ -19,15 +19,17 @@ functions {
   // 2 = MSP/GLURP (same vs different family)
   // 3 = exact match only
   real dist_log_prob_logic(data real dist, vector log_dvect, data int method,
-                           real l_q_cf, real l1m_q_cf, data real threshold) {
+                           real l_q_cf, real l1m_q_cf, 
+                           real l_q_seq, real l1m_q_seq,
+                           data real threshold, data int K_j) {
     if (method == 1) {
-      int d = to_int(round(dist));
-      if (d < 0 || d >= num_elements(log_dvect)) return -23.0;
+      int d = to_int(round(dist / threshold));
+      if (threshold <= 0 || d < 0 || d >= num_elements(log_dvect)) return -23.0;
       return log_dvect[d + 1];
     } else if (method == 2) {
-      return dist <= threshold ? l1m_q_cf : l_q_cf;
+      return dist < 0.5 ? l1m_q_cf : l_q_cf - log(K_j - 1);
     } else {
-      return dist < 0.5 ? l1m_q_cf : l_q_cf;
+      return dist < 0.5 ? l1m_q_seq : l_q_seq - log(K_j - 1);
     }
   }
 }
@@ -48,6 +50,7 @@ data {
   array[N, J] int<lower=0,upper=1> comparable;
   array[J, max_K] int<lower=0> additional_counts;
 }
+
 parameters {
   // qq: within-family mismatch (genotyping error)
   // qq_crossfamily: cross-family similarity (rare)
@@ -77,6 +80,9 @@ transformed parameters {
   real l_q_cf   = log(qq_crossfamily + 1e-10);
   real l1m_q_cf = log1m(qq_crossfamily);
 
+  real l_q_seq   = log(qq + 1e-10);
+  real l1m_q_seq = log1m(qq);
+
   // Per-locus precomputed matrices
   array[J] vector[max_K]        log_freq;
   array[J] matrix[max_K, max_K] log_dist_mat;
@@ -98,7 +104,7 @@ transformed parameters {
       for (k2 in 1:K[j]) {
         log_dist_mat[j][k1, k2] = dist_log_prob_logic(
           dist_array[j, k1, k2], log_dvect, method_int[j],
-          l_q_cf, l1m_q_cf, threshold[j]
+          l_q_cf, l1m_q_cf, l_q_seq, l1m_q_seq, threshold[j], K[j]
         );
       }
       log_dist_row_sums[j][k1] = log_sum_exp(log_dist_mat[j][k1, 1:K[j]]);
@@ -113,12 +119,19 @@ transformed parameters {
   // Per-patient summary log-likelihood ratios (SLR) computed here so the model 
   // block stays concise and generated quantities avoids redundant computation.
   vector[N] slr_vec;
+  // per locus values computed
+  matrix[N, J] locus_lrs;
+  matrix[N, J] locus_dists;
+  
   for (i in 1:N) {
     real slr = 0.0;
     for (j in 1:J) {
       if (comparable[i, j] == 1) {
         int off = (j - 1) * maxMOI;
         vector[MOI0[i] * MOIf[i]] lpr;
+        // locus computed pair distance
+        vector[MOI0[i] * MOIf[i]] pair_dist;
+        
         int p_idx = 1;
         for (a0 in 1:MOI0[i]) {
           for (af in 1:MOIf[i]) {
@@ -126,17 +139,32 @@ transformed parameters {
             int h0 = hidden0[i, off + a0];  int hf = hiddenf[i, off + af];
             if (h0 == 0 && hf == 0) {
               lpr[p_idx] = log_dist_mat[j, k0, kf] - log_freq[j, kf];
+              // locus allele distance 
+              pair_dist[p_idx] = dist_array[j, k0, kf];
             } else if (h0 == 1 && hf == 0) {
               lpr[p_idx] = log_col_sum[j][kf] - log_freq[j, kf];
+              // locus allele distance 
+              pair_dist[p_idx] = 0;
             } else if (h0 == 0 && hf == 1) {
               lpr[p_idx] = log_dist_row_sums[j, k0];
+              //locus allele distance
+              pair_dist[p_idx] = 0;
             } else {
               lpr[p_idx] = log_both_hidden[j];
+              //locus allele distance
+              pair_dist[p_idx] = 0;
             }
             p_idx += 1;
           }
         }
-        slr += log_sum_exp(lpr) - log(MOI0[i] * MOIf[i]);
+        locus_lrs[i, j]   = log_sum_exp(lpr) - log(MOI0[i] * MOIf[i]);
+        slr += locus_lrs[i, j];
+        //locus allele distance
+        locus_dists[i, j] = mean(pair_dist);
+        //locus allele distance
+      } else {
+        locus_lrs[i, j]   = 0;
+        locus_dists[i, j] = 0;
       }
     }
     slr_vec[i] = slr;
@@ -145,17 +173,18 @@ transformed parameters {
 
 model {
   // Priors:
-  // qq ~ Beta(1,1)
+  // qq ~ Beta(1,1000)
   // qq_crossfamily ~ Beta(1,1000)
-  // d_param ~ Beta(2,2)
+  // d_param ~ Beta(950, 70)
   // freq ~ Dirichlet (with additional data)
 
   // Likelihood:
   // 50/50 mixture of recrudescence vs reinfection
   // log_sum_exp(slr, 0) implements this
-  qq             ~ beta(1, 1);
+  qq             ~ beta(1, 1000);
   qq_crossfamily ~ beta(1, 1000);
-  d_param        ~ beta(2, 2);
+  d_param        ~ beta(950, 70);
+
   for (j in 1:J) {
     vector[max_K] alpha = rep_vector(0.1, max_K);
     for (k in 1:K[j]) alpha[k] = 1.0;
