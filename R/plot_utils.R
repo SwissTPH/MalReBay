@@ -777,3 +777,217 @@ plot_markers_diversity <- function(genotypedata,
 
   invisible(final_figure)
 }
+
+
+
+#' Combine MSP1/MSP2 family-variant results into one call per marker
+#'
+#' @description MSP1 and MSP2 are each genotyped across multiple family
+#'   variants (e.g. K1/MAD20/RO33 for MSP1, 3D7/FC27/IC for MSP2). A patient
+#'   counts as matching at "MSP1" (or "MSP2") if at least one of that
+#'   marker's variants shows a match ("R") -- otherwise "NI", unless every
+#'   variant is missing/errored (IND/ERR), in which case the combined call
+#'   stays "IND" rather than being called a false "NI". The original
+#'   per-variant columns are kept in the output alongside the new combined
+#'   columns.
+#'
+#' @param match_counting_res Output of perform_match_counting().
+#' @param msp1_cols Character vector of the MSP1 variant column names.
+#' @param msp2_cols Character vector of the MSP2 variant column names.
+#' @return match_counting_res with "msp1" and "msp2" columns added.
+#' @noRd
+combine_msp_variants <- function(match_counting_res, msp1_cols, msp2_cols) {
+  collapse_variants <- function(row_vals) {
+    if (any(row_vals == "R")) return("R")
+    if (all(row_vals %in% c("IND", "ERR"))) return("IND")
+    "NI"
+  }
+  
+  match_counting_res$msp1 <- apply(match_counting_res[, msp1_cols, drop = FALSE], 1, collapse_variants)
+  match_counting_res$msp2 <- apply(match_counting_res[, msp2_cols, drop = FALSE], 1, collapse_variants)
+  
+  match_counting_res   # original variant columns stay -- only msp1/msp2 get added
+}
+
+#' WHO classification rule -- N of M markers must match
+#'
+#' @description Applies the WHO rule to a given set of marker columns:
+#'   WHO_loose requires at least round(loose_threshold * length(marker_cols))
+#'   of them to match, WHO_strict requires all of them. Both are NA if fewer
+#'   markers were even scored (R or NI) than the loose/strict threshold
+#'   requires. Used both for full marker panels (marker_cols = every raw
+#'   marker) and MSP1/MSP2 trio panels (marker_cols = the combined
+#'   msp1/msp2/third columns, after combine_msp_variants() has already
+#'   collapsed each family's variants).
+#'
+#' @param match_counting_res Output of perform_match_counting() (optionally
+#'   with combine_msp_variants() already applied).
+#' @param marker_cols Character vector of column names to apply the rule to.
+#' @param loose_threshold Minimum proportion of markers required for
+#'   WHO_loose. Default 0.70.
+#' @return A list: table (match_counting_res with WHO_loose/WHO_strict
+#'   columns added), who_loose_label (e.g. "WHO 5/7"), who_strict_label
+#'   (e.g. "WHO 7/7").
+#' @noRd
+apply_who_rule <- function(match_counting_res, marker_cols, loose_threshold = 0.70) {
+  n_markers    <- length(marker_cols)
+  who_loose_n  <- round(loose_threshold * n_markers)
+  who_strict_n <- n_markers
+  
+  cols <- match_counting_res[, marker_cols, drop = FALSE]
+  n_matched <- rowSums(cols == "R")
+  n_scored  <- rowSums(cols == "R" | cols == "NI")
+  
+  match_counting_res$WHO_loose  <- ifelse(n_scored < who_loose_n, NA, ifelse(n_matched >= who_loose_n, 1, 0))
+  match_counting_res$WHO_strict <- ifelse(n_scored < who_strict_n, NA, ifelse(n_matched == who_strict_n, 1, 0))
+  
+  list(
+    table = match_counting_res,
+    who_loose_label  = paste0("WHO ", who_loose_n, "/", n_markers),
+    who_strict_label = paste0("WHO ", who_strict_n, "/", n_markers)
+  )
+}
+
+#' Build WHO classification columns using the appropriate rule for this panel
+#'
+#' @description Dispatches to the correct WHO rule based on panel
+#'   composition: if MSP1/MSP2 family variants are detected (an MSP-trio
+#'   panel, paired with either glurp or a single microsatellite marker),
+#'   applies the classic 2/3 / 3/3 rule to the combined MSP1 + MSP2 + third
+#'   marker. Otherwise (full microsatellite or full ampseq panel), applies
+#'   the proportional 70%/100% rule to the whole panel.
+#'
+#' @param match_counting_res Output of perform_match_counting().
+#' @param marker_info Marker metadata from import_data(), with binning_method.
+#' @return A list: table, who_loose_label, who_strict_label -- see
+#'   apply_who_trio_rule()/apply_who_proportional_rule() for details, since
+#'   this just dispatches to one of the two.
+#' @noRd
+build_who_table <- function(match_counting_res, marker_info) {
+  msp_variants <- detect_msp_variants(marker_info$marker_id)
+  is_msp_trio  <- length(msp_variants$msp1) > 0 || length(msp_variants$msp2) > 0
+  
+  if (!is_msp_trio) {
+    return(apply_who_rule(match_counting_res, unique(marker_info$marker_id)))
+  }
+  
+  match_counting_res <- combine_msp_variants(match_counting_res, msp_variants$msp1, msp_variants$msp2)
+  
+  msp_glurp_leftover <- setdiff(marker_info$marker_id[marker_info$binning_method == "msp_glurp"],
+                                c(msp_variants$msp1, msp_variants$msp2))
+  microsat_markers   <- marker_info$marker_id[marker_info$binning_method == "microsatellite"]
+  third_candidates   <- c(msp_glurp_leftover, microsat_markers)
+  
+  if (length(third_candidates) != 1) {
+    stop("ERROR: Expected exactly one third marker (glurp or microsatellite) alongside MSP1/MSP2, found ",
+         length(third_candidates), ": ", paste(third_candidates, collapse = ", "))
+  }
+  
+  apply_who_rule(match_counting_res, c("msp1", "msp2", third_candidates))
+}
+
+
+#' Plot Match-Counting vs MalReBay Comparison Heatmap
+#'
+#' @description Visualizes the WHO match-counting rules (loose and strict)
+#'   alongside MalReBay's posterior probability, one heatmap per site, from
+#'   the bayesian_match_counting_comparison table after it's been passed
+#'   through build_who_table().
+#'
+#' @param comparison The comparison table (e.g. summary_results$comparison,
+#'   after build_who_table() has added WHO_loose/WHO_strict, and with a
+#'   "MalReBay" column -- rename from "Probability" if needed).
+#' @param who_loose_label Column title for the WHO_loose block, from
+#'   build_who_table()'s who_loose_label.
+#' @param who_strict_label Column title for the WHO_strict block, from
+#'   build_who_table()'s who_strict_label.
+#' @param title_prefix Optional prefix before the site name in each plot's title.
+#' @return Invisibly NULL; draws one heatmap per site as a side effect.
+#' @export
+plot_comparison_heatmap <- function(summary_results, 
+                                    marker_info, 
+                                    output_folder = NULL,    
+                                    title_prefix = "",
+                                    verbose = TRUE) {
+  comparison <- summary_results$comparison
+  comparison$MalReBay <- comparison$Probability
+  who_result <- build_who_table(comparison, marker_info)
+  
+  comparison       <- who_result$table
+  who_loose_label  <- who_result$who_loose_label
+  who_strict_label <- who_result$who_strict_label
+  
+  col_fun <- circlize::colorRamp2(c(0, 0.25, 0.5, 0.75, 1),
+                                  c("#67A9CF", "#ade8f4", "#F7F7F7", "#F4A582", "#D6604D"))
+  
+  block_defaults <- list(
+    col = col_fun, na_col = "grey80",
+    cluster_rows = FALSE, cluster_columns = FALSE,
+    show_column_names = FALSE,
+    column_title_gp = grid::gpar(fontsize = 10, fontface = "bold"),
+    rect_gp = grid::gpar(col = "grey70", lwd = 0.4)
+  )
+  
+  build_site_heatmap <- function(site_data) {
+    mat_who_loose  <- as.matrix(site_data[, "WHO_loose", drop = FALSE])
+    mat_who_strict <- as.matrix(site_data[, "WHO_strict", drop = FALSE])
+    mat_mr         <- as.matrix(site_data[, "MalReBay", drop = FALSE])
+    rownames(mat_who_loose) <- rownames(mat_who_strict) <- rownames(mat_mr) <- site_data$Sample.ID
+    
+    ht_who_loose <- do.call(ComplexHeatmap::Heatmap, c(list(
+      matrix = mat_who_loose, name = "Probability", column_title = who_loose_label,
+      show_row_names = FALSE, row_names_gp = grid::gpar(fontsize = 7), row_names_side = "left",
+      heatmap_legend_param = list(
+        title = "Outcome",
+        at = c(0, 0.25, 0.5, 0.75, 1),
+        labels = c("0 (NI)", "0.25", "0.5", "0.75", "1 (R)")
+      )
+    ), block_defaults))
+    
+    ht_who_strict <- do.call(ComplexHeatmap::Heatmap, c(list(
+      matrix = mat_who_strict, name = "WHO_strict_leg", column_title = who_strict_label,
+      show_row_names = FALSE, show_heatmap_legend = FALSE
+    ), block_defaults))
+    
+    ht_mr <- do.call(ComplexHeatmap::Heatmap, c(list(
+      matrix = mat_mr, name = "MalReBay_leg", column_title = "MalReBay",
+      show_row_names = FALSE, show_heatmap_legend = FALSE
+    ), block_defaults))
+    
+    ht_who_loose + ht_who_strict + ht_mr
+  }
+  
+  heatmap_data <- comparison[grepl(" Day 0$", comparison$Sample.ID), ]
+  heatmap_data$Sample.ID <- trimws(gsub(" Day 0$", "", heatmap_data$Sample.ID))
+  
+  for (s in unique(heatmap_data$Site)) {
+    site_data <- heatmap_data[heatmap_data$Site == s, ]
+    ht        <- build_site_heatmap(site_data)
+    
+    if (!is.null(output_folder)) {
+      if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
+      safe_site <- gsub("[^A-Za-z0-9_-]", "_", s)
+      grDevices::png(
+        file.path(output_folder, paste0("comparison_heatmap_", safe_site, ".png")),
+        width = 1800, height = 2200, res = 300
+      )
+      ComplexHeatmap::draw(
+        ht, column_title = paste0(title_prefix, s),
+        column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
+        column_title_side = "bottom", row_title = "Samples",
+        row_title_side = "left", gap = grid::unit(5, "mm")
+      )
+      grDevices::dev.off()
+      if (verbose) message("INFO: Comparison heatmap saved for site: ", s)
+    } else {
+      ComplexHeatmap::draw(
+        ht, column_title = paste0(title_prefix, s),
+        column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
+        column_title_side = "bottom", row_title = "Samples",
+        row_title_side = "left", gap = grid::unit(5, "mm")
+      )
+    }
+  }
+  
+  invisible(NULL)
+}

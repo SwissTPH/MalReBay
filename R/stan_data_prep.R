@@ -237,18 +237,28 @@ prepare_stan_data <- function(late_failures_site,
     if(is.na(m)) return(3L)
     switch(as.character(m), "microsatellite" = 1L, "msp_glurp" = 2L, "exact" = 3L, 3L)
   })
-
+  
   threshold_vec <- sapply(seq_len(nloci), function(j) {
-    if (method_int[j] == 2L) {
-      val <- marker_info$repeatlength[match(locinames[j], marker_info$marker_id)]
-      return(if(is.na(val)) 0 else val)
-    } else return(0)
+  if (method_int[j] %in% c(1L, 2L)) {
+    val <- marker_info$repeatlength[match(locinames[j], marker_info$marker_id)]
+    return(if(is.na(val)) 0 else val)
+  } else return(0)
   })
 
   # 5. Assemble and return
   # max_dist is derived from the actual largest allele distance observed,
   # not a hardcoded constant. This keeps log_dvect as small as needed.
-  computed_max_dist <- max(1L, ceiling(max(dist_array)))
+  microsat_j <- which(method_int == 1L)
+  if (length(microsat_j) > 0) {
+    microsat_max <- sapply(microsat_j, function(j) {
+      rl <- threshold_vec[j]
+      if (rl <= 0) return(0)
+      max(dist_array[j, , ]) / rl
+    })
+    computed_max_dist <- max(1L, ceiling(max(microsat_max)))
+  } else {
+    computed_max_dist <- 1L
+  }
 
   return(list(
     N        = nids,

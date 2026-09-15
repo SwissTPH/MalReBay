@@ -13,22 +13,20 @@ run_stan_sites <- function(late_failures,
                            mcmc_config,
                            verbose = TRUE) {
 
-  # --- 1. Extract Config ---
+  # Extract MCMC configuration
   n_chains     <- as.integer(mcmc_config$n_chains)
   iter_total   <- as.integer(mcmc_config$iter)
   burn_in_frac <- as.numeric(mcmc_config$burn_in_frac)
   base_seed    <- as.integer(mcmc_config$random_seed)
   adapt_delta  <- as.numeric(if(!is.null(mcmc_config$adapt_delta)) mcmc_config$adapt_delta else 0.85)
-
   iter_warmup   <- max(200L, as.integer(floor(burn_in_frac * iter_total)))
   iter_sampling <- max(200L, iter_total - iter_warmup)
 
-  # --- 2. Stan Global Setup ---
+  # 2. Stan Global Setup
   # The model is pre-compiled at package install time via {instantiate}
-  # (see src/stan/malrebay_model.stan, src/install.libs.R); no compilation
-  # happens here, just loading the executable already shipped with the
-  # installed package.
-  # parallel_chains runs each chain as a separate OS process — reliable on Windows.
+  # (src/stan/malrebay_model.stan,src/install.libs.R). 
+  # This just loads the shipped executable.
+  # parallel_chains uses separate OS processes -- reliable on operating system.
   stan_model_obj <- instantiate::stan_package_model(
     name    = "malrebay_model",
     package = "MalReBay"
@@ -46,7 +44,7 @@ run_stan_sites <- function(late_failures,
   out_stan_fits       <- list()
 
 
-  # --- 3. Site Loop ---
+  # Site Loop
   for (site in site_names) {
     if (verbose) message("\n--- Processing Site: ", site, " ---")
 
@@ -61,9 +59,10 @@ run_stan_sites <- function(late_failures,
     ids <- unique(gsub(" Day 0", "",
                        late_site$Sample.ID[grepl("Day 0",
                                                  late_site$Sample.ID)]))
-
-    #TO DO: add error and stop in no sample IDs could be found
-    if (length(ids) == 0) next
+    if (length(ids) == 0) {
+      warning("WARNING: Site '", site, "' has no Day 0 samples. Skipping this site.", call. = FALSE)
+      next
+    }
 
     # A. Define Alleles (Site-specific). define_alleles() already dispatches
     # per locus on marker_info$binning_method, skipping numeric binning for
@@ -71,8 +70,11 @@ run_stan_sites <- function(late_failures,
     allele_definitions <- suppressMessages(define_alleles(rbind(late_site, add_site), marker_info))
     locinames <- names(allele_definitions)
     nloci     <- length(locinames)
-    #TO DO: add error and stop in no alleles could be found
-    if (nloci == 0) next
+   
+    if (nloci == 0) {
+      warning("WARNING: Site '", site, "' has no valid loci/alleles. Skipping this site.", call. = FALSE)
+      next
+    }
 
     # Calculate maximum MOI per site. Matches both length-polymorphic
     # ("locus_1") and ampseq ("locus_allele_1") column-naming conventions.
@@ -80,37 +82,13 @@ run_stan_sites <- function(late_failures,
     maxMOI      <- if (length(marker_cols) > 0) max(as.integer(gsub(".*(_allele_|_)(\\d+)$", "\\2", marker_cols)), na.rm = TRUE) else 1L
 
     # B. Locus Comparability Matrix
-    # TO DO: to improve this code as it is currently not efficient and slow
-    locus_summary <- data.frame(patient_id = ids,
-                                n_available_d0 = 0L,
-                                n_available_df = 0L,
-                                n_comparable_loci = 0L)
-    is_locus_comparable <- matrix(FALSE,
-                                  nrow = length(ids),
-                                  ncol = nloci,
-                                  dimnames = list(ids, locinames))
-
-    for (i in seq_along(ids)) {
-      pid <- ids[i]
-      d0_row <- late_site[grepl(paste0("\\b", pid, " Day 0\\b"), late_site$Sample.ID), ]
-      df_row <- late_site[grepl(paste0("\\b", pid, " recurrence\\b"), late_site$Sample.ID), ]
-      if (nrow(d0_row) == 0 || nrow(df_row) == 0) next
-      for (ln in locinames) {
-        lc <- grep(paste0("^", ln, "_"), colnames(late_site), value = TRUE)
-        if (any(!is.na(d0_row[, lc]))) locus_summary$n_available_d0[i] <- locus_summary$n_available_d0[i] + 1L
-        if (any(!is.na(df_row[, lc]))) locus_summary$n_available_df[i] <- locus_summary$n_available_df[i] + 1L
-        if (any(!is.na(d0_row[, lc])) && any(!is.na(df_row[, lc]))) {
-          locus_summary$n_comparable_loci[i] <- locus_summary$n_comparable_loci[i] + 1L
-          is_locus_comparable[pid, ln] <- TRUE
-        }
-      }
-    }
+    comparability       <- compute_locus_comparability(late_site, ids, locinames)
+    locus_summary       <- comparability$locus_summary
+    is_locus_comparable <- comparability$is_locus_comparable
 
     # C. Prepare Stan Data (Now includes additional_counts)
     if (verbose) message("  Preparing Stan data...")
-
-    # TO DO: rename sd into something else, sd is usually standard deviation
-    sd <- prepare_stan_data(
+    stan_data <- prepare_stan_data(
       late_failures_site  = late_site,
       additional_site     = add_site,
       allele_definitions  = allele_definitions,
@@ -121,34 +99,36 @@ run_stan_sites <- function(late_failures,
       is_locus_comparable = is_locus_comparable
     )
 
-    # TO DO: add error message and stop
-    if (!validate_stan_data(sd)) next
+    if (!validate_stan_data(stan_data)) {
+      warning("WARNING: Site '", site, "' failed Stan data validation. Skipping this site.", call. = FALSE)
+      next
+    }
 
     # Define starting values for the stan sampler
     init_fun <- local({
-      sd_local <- sd
+      stan_data_local <- stan_data
       function() {
         list(
           qq             = 0.1,
           qq_crossfamily = 0.001,
           d_param        = 0.5,
-          freq           = lapply(seq_len(sd_local$J), function(j) {
-            x <- rep(0.1 / sd_local$max_K, sd_local$max_K)
-            x[1:sd_local$K[j]] <- 1.0 / sd_local$K[j]
+          freq           = lapply(seq_len(stan_data_local$J), function(j) {
+            x <- rep(0.1 / stan_data_local$max_K, stan_data_local$max_K)
+            x[1:stan_data_local$K[j]] <- 1.0 / stan_data_local$K[j]
             x / sum(x)
           })
         )
       }
     })
 
-    # D. Run Stan Sampling (CALLED ONCE)
+    # D. Run Stan Sampling
     if (verbose) message("  Running Stan (",
                          n_chains, " chains, ",
                          iter_sampling, " samples)...")
 
     fit <- tryCatch({
       stan_model_obj$sample(
-        data            = stan_data_only(sd),
+        data            = stan_data_only(stan_data),
         chains          = n_chains,
         parallel_chains = min(n_chains, parallel::detectCores(logical = FALSE)),
         iter_warmup     = iter_warmup,
@@ -201,11 +181,11 @@ run_stan_sites <- function(late_failures,
 
 extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
 
-  # 1. Pull the continuous probability of recrudescence
+  # A. Pull the continuous probability of recrudescence
   # draws_matrix: rows = draws (all chains merged), cols = p_recrud[1..N]
   p_recrud_draws <- fit$draws("p_recrud", format = "draws_matrix")
 
-  # 2. Pull the log-likelihood (lp__) per chain for diagnostics
+  # B. Pull the log-likelihood (lp__) per chain for diagnostics
   # draws_array: [iterations, chains, variables] — preserves chain structure
   lp_array  <- fit$draws("lp__", format = "draws_array")
   n_iter    <- dim(lp_array)[1]
@@ -214,8 +194,18 @@ extract_stan_results <- function(fit, ids, locinames, nloci, nids) {
   loglik_chains <- lapply(seq_len(n_chains), function(ch) lp_matrix[, ch])
 
   n_draws     <- nrow(p_recrud_draws)
+  
+  locus_lrs_draws   <- fit$draws("locus_lrs",   format = "draws_matrix")
+  locus_dists_draws <- fit$draws("locus_dists", format = "draws_matrix")
+  
   locus_lrs   <- array(NA_real_, dim = c(nids, nloci, n_draws))
   locus_dists <- array(NA_real_, dim = c(nids, nloci, n_draws))
+  for (i in seq_len(nids)) {
+    for (j in seq_len(nloci)) {
+      locus_lrs[i, j, ]   <- locus_lrs_draws[,   paste0("locus_lrs[", i, ",", j, "]")]
+      locus_dists[i, j, ] <- locus_dists_draws[, paste0("locus_dists[", i, ",", j, "]")]
+    }
+  }
 
   return(list(
     p_recrud_draws = p_recrud_draws,

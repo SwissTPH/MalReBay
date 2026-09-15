@@ -7,13 +7,18 @@
 import_data(
   filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
   marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
+  additional_filepath = NULL,
   verbose = TRUE
 )
 }
 \arguments{
 \item{filepath}{The full path to the input Excel file.}
 
-\item{marker_filepath}{Path to Excel file containing marker metadata (optional if marker_info sheet is present)}
+\item{marker_filepath}{Path to Excel file containing marker metadata}
+
+\item{additional_filepath}{Optional path to a separate additional/background
+data file (csv or xlsx). Ignored if the main file already has 2 sheets.
+(optional if marker_info sheet is present)}
 
 \item{verbose}{Logical. If TRUE, prints progress and data-cleaning messages.}
 }
@@ -26,8 +31,13 @@ the data type and separating sheets into a structured list.
 }
 \examples{
 \dontrun{
-  data_file   <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
-  marker_file <- system.file("extdata", "makers_details.xlsx",       package = "MalReBay")
-  imported    <- import_data(filepath = data_file, marker_filepath = marker_file)
+  data_file <- system.file("extdata", 
+                           "Angola_2021_TES_7NMS.xlsx", 
+                           package = "MalReBay")
+  marker_file <- system.file("extdata", 
+                             "makers_details.xlsx", 
+                             package = "MalReBay")
+  imported    <- import_data(filepath = data_file, 
+                             marker_filepath = marker_file)
 }
 }
