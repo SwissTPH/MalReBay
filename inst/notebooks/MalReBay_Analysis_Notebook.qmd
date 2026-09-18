@@ -1,0 +1,519 @@
+---
+title: "Classification of P. falciparum infection recurrences with MalReBay"
+author: "Monica Golumbeanu, Veronica Adhiambo Ochieng"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    code-line-numbers: true
+    theme: cosmo
+    highlight-style: github
+    df-print: paged
+    fig-width: 9
+    fig-height: 5
+execute:
+  warning: false
+  message: false
+---
+
+## Overview
+
+**MalReBay** is an R package for classifying recurrent *Plasmodium falciparum* infections in Therapeutic Efficacy Studies (TES). For each patient, it estimates the **probability that a recurrent infection is a recrudescence** (i.e. a treatment failure) rather than a **reinfection** (a new infection acquired after treatment).
+
+MalReBay uses a **Bayesian approach**, which combines the available genotyping data with prior information to estimate this probability. The model uses **Markov Chain Monte Carlo (MCMC)** sampling to obtain the estimates.
+
+Key advantages of MalReBay include:
+
+-   Handles **polyclonal infections**, where a patient can carry multiple parasite strains
+
+-   **Imputes missing genotypes** as part of the MCMC analysis, handling missing data
+
+-   Works with the **three main genotyping approaches** used in TES: microsatellites, MSP1/MSP2/GLURP length-polymorphic markers, and amplicon sequencing (AmpSeq)
+
+------------------------------------------------------------------------
+
+## Installation
+
+**CmdStan** must be installed **before installing MalReBay**, as MalReBay contains an embedded Stan representation of the statistical model that is compiled during the MalReBay installation (see the package README for more details).
+
+You only need to install **CmdStan and MalReBay once**. Once they are installed, you can use MalReBay directly in your R sessions.
+
+```{r}
+#| eval: false
+# 1. Install CmdStan first (one-time, ~5 minutes)
+cmdstanr::install_cmdstan()
+```
+
+```{r}
+# 2. Install MalReBay from GitHub (development version)
+remotes::install_github("SwissTPH/MalReBay")
+```
+
+Once the installation has completed successfully, or if the packages are already installed, the MalReBay package can be loaded.
+
+```{r}
+library(MalReBay)
+```
+
+------------------------------------------------------------------------
+
+## Input data
+
+MalReBay requires up to three inputs: a **genotyping data file**, a **marker metadata file**, and an **MCMC configuration**.
+
+### Genotyping data file
+
+The main input is an Excel workbook (or CSV). The first sheet of the Excel file must contain one row per sample with the following column layout:
+
+| Column 1 | Column 2 | Column 3 | Columns 4+ |
+|-------------|-------------|-------------|-----------------------------------|
+| PatientID | Day | Site | Allele columns (`marker_1`, `marker_2`, …) where marker encodes the marker name |
+
+Each patient must have exactly two rows:
+
+-   A **Day 0** row
+-   A **recurrence** row
+
+The **site** corresponds to the place/health facility where the samples were collected. A data file can contain samples from multiple sites, however the analysis is perfomed individually per each site.
+
+**Allele column naming.** Columns are named `<marker_id>_1`, `<marker_id>_2`, … (or `<marker_id>_allele_1`, `<marker_id>_allele_2`, … both suffixes work for any data type) up to the maximum multiplicity of infection (MOI) seen in the study. For example, three columns `msp1_1`, `msp1_2`, `msp1_3` encode up to three distinct alleles per sample at that marker, this is how polyclonal infections are represented.
+
+Missing values are recognized and set to `NA` automatically for: `N/A`, `-`, `NA`, `na`, `""`, `" "`.
+
+A second sheet (optional) can supply additional **Day-0-only background samples**, used to estimate population allele frequencies more precisely (see @sec-interpretation-model). It can be a separate CSV file too, via the argument `additional_filepath`.
+
+::: callout-tip
+**More background samples = more reliable results.** MalReBay estimates how common each allele/family is in the local parasite population from the Day-0 samples it sees (the late-failure patients' own Day-0 rows, plus any background sheet). The more Day-0 samples you provide, the more precisely those frequencies are estimated which directly affects how much weight a "match" carries. A handful of patients is enough to try the package out, but for a real analysis, include as much background Day-0 data as you have.
+:::
+
+A single study can combine several length-polymorphic marker types, for example a panel of 7 neutral microsatellites, or MSP1/MSP2/GLURP, or MSP1-2 and microsatellites together, as long as every marker has a matching row in the marker metadata file with the right `binning_method` (see next subsection). AmpSeq markers can't be mixed with numeric markers in the same file, because the whole file is classified as one data type. Below are the three data types side by side, each shown as it would look on disk.
+
+**Microsatellites** (numeric allele sizes, `binning_method = "microsatellite"`):
+
+```{r}
+#| echo: false
+data.frame(
+  Sample.ID = c("P1 Day 0", "P1 D42", "P2 Day 0", "P2 D28"),
+  Site      = "SiteA",
+  TA1_1     = c(174, 177, 162, 162),
+  TA1_2     = c(177,  NA, 171,  NA)
+)
+```
+
+**MSP1 / MSP2 / GLURP** (numeric allele sizes, `binning_method = "msp_glurp"`; note the family-variant naming for MSP1/MSP2):
+
+```{r}
+#| echo: false
+data.frame(
+  Sample.ID = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+  Site      = "SiteA",
+  K1_1      = c(150, 152, 190, 230),
+  FC27_1    = c(450, 452, 490, 530),
+  glurp_1   = c(650, 652, 690, 730)
+)
+```
+
+**AmpSeq** (haplotype strings, `binning_method = "exact"`):
+
+```{r}
+#| echo: false
+data.frame(
+  Sample.ID     = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+  Site          = "SiteA",
+  cpmp_allele_1 = c("cpmp-1", "cpmp-1", "cpmp-24", "cpmp-9"),
+  cpmp_allele_2 = c(NA, NA, NA, NA)
+)
+```
+
+### Marker metadata file
+
+The marker metadata file is an Excel file with one row per marker (you can also embed it as a sheet named `marker_info` in the main workbook instead of passing `marker_filepath` separately). Required columns:
+
+| Column | Description |
+|------------------------------------|------------------------------------|
+| `marker_id` | Marker name: must match the prefix of the allele columns in the genotyping file |
+| `repeatlength` | Repeat unit length (bp) for microsatellites; cluster/gap threshold (bp) for MSP/GLURP; ignored for AmpSeq |
+| `binning_method` | `"microsatellite"`, `"msp_glurp"`, or `"exact"` (AmpSeq), per @sec-data-types |
+
+Only markers present in *both* the genotyping file and the marker metadata are used. Everything else is reported and skipped, so you can keep one metadata file listing every marker your lab ever genotypes and reuse it across studies with different subsets of markers. One marker info file is provided within MalReBay:
+
+```{r}
+marker_file <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
+marker_info <- as.data.frame(readxl::read_excel(marker_file))
+head(marker_info)
+```
+
+The function `import_data()` auto-detects which type of data you have by looking at the first allele value in your data: a number means **length-polymorphic** data (microsatellites and/or MSP1/MSP2/GLURP) while text means **AmpSeq** data.
+
+| Data type | What the allele values look like | `binning_method` in the marker file | Typical markers |
+|------------------|------------------|------------------|------------------|
+| **Microsatellites** | Numeric fragment sizes, e.g. `174`, `230.5` | `microsatellite` | `TA1`, `POLYA`, `PfPK2`, `2490`, `TA109`, ... |
+| **MSP1 / MSP2 / GLURP** | Numeric fragment sizes, e.g. `450`, `652` | `msp_glurp` | `K1`, `MAD20`, `RO33` (MSP1 family variants); `3D7`, `FC27`, `IC` (MSP2 family variants); `glurp` |
+| **AmpSeq** | Haplotype names/strings, e.g. `"cpmp-1"`, `"Hap_A"` | `exact` | Amplicon panels such as `cpmp`, `cpp`, `ama1` |
+
+### MCMC configuration
+
+The MCMC behaviour is controlled by a small set of parameters, supplied either as a named R list or an `.rds` file (not an Excel file).
+
+```{r}
+# Read and display the default configuration
+config_file <- system.file("extdata", "default_mcmc_config.rds", package = "MalReBay")
+cfg <- readRDS(config_file)
+cfg
+```
+
+| Parameter | Description |
+|------------------------------------|------------------------------------|
+| `n_chains` | Number of independent MCMC chains. More chains improve convergence diagnostics. |
+| `iter` | Total MCMC iterations per chain (warm-up + sampling combined). |
+| `burn_in_frac` | Fraction of `iter` used as warm-up/burn-in (e.g. `0.5` → first 50% is warm-up, discarded). |
+| `random_seed` | Seed for reproducibility. |
+| `adapt_delta` | Stan's target acceptance rate for step-size adaptation (0-1). Raise it (e.g. to `0.95`) if you see "divergent transitions" warnings. |
+
+If you don't pass `mcmc_config` at all, `MalReBay()` uses this bundled default. You can override any subset of it with a plain list:
+
+```{r}
+#| eval: false
+quick_config <- list(n_chains = 2, iter = 2000, burn_in_frac = 0.5, adapt_delta = 0.8, random_seed = 42)
+```
+
+::: callout-important
+**There is no automatic convergence-based early stopping.** MalReBay runs exactly `iter` iterations per chain, once, for every site, it does not check convergence mid-run and extend automatically. After the run, inspect `results$convergence` (see @sec-interpretation-convergence); if a site hasn't converged, increase `iter` and/or `n_chains` in `mcmc_config` and rerun.
+:::
+
+------------------------------------------------------------------------
+
+## Running the pipeline
+
+The main package function `MalReBay()` runs data import, MCMC classification, result summarization, and output saving regardless of which of the three data types you are using.
+
+### Parameters
+
+| Parameter | Description |
+|------------------------------------|------------------------------------|
+| `filepath` | Path to the genotyping Excel/CSV file with the TES data. |
+| `marker_filepath` | Path to the marker metadata Excel file. |
+| `additional_filepath` | Optional path to a separate background-data file (ignored if the main file already has a second sheet). |
+| `mcmc_config` | A named list, or a path to an `.rds` file. |
+| `output_folder` | Directory where all output files and plots are written. Set to `NULL` to suppress file saving. |
+| `n_workers` | Number of parallel workers for multi-chain MCMC. |
+| `verbose` | If `TRUE`, prints progress and convergence messages to the console. |
+
+### Example 1: Microsatellite data
+
+This walkthrough uses the bundled example dataset: a real Angola 2021 TES with a panel of 7 neutral microsatellites, across three sites. Let's first load the data:
+
+```{r}
+example_file <- system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay")
+
+imported_data <- import_data(
+  filepath        = example_file,
+  marker_filepath = marker_file,
+  verbose         = TRUE
+)
+
+# The imported object is a list with four elements
+names(imported_data)
+```
+
+```{r}
+# Main data: one row per sample (Day 0 and recurrence)
+head(imported_data$late_failures)
+```
+
+```{r}
+# Detected data type
+imported_data$data_type
+```
+
+```{r}
+quick_config <- list(
+  n_chains     = 2,
+  iter         = 2000,
+  burn_in_frac = 0.5,
+  adapt_delta  = 0.8,
+  random_seed  = 42
+)
+
+results <- MalReBay(
+  filepath        = example_file,
+  marker_filepath = marker_file,
+  mcmc_config     = quick_config,
+  output_folder   = "bayesian_algorithm_output",
+  verbose         = TRUE
+)
+```
+
+### Example 2: AmpSeq
+
+Same function, same `marker_filepath` (it already lists the AmpSeq markers too), just a different genotyping file. MalReBay detects the AmpSeq format automatically from the haplotype strings.
+
+```{r}
+ampseq_file <- system.file("extdata", "Dataset_amplicon_sequencing.xlsx", package = "MalReBay")
+
+ampseq_imported <- import_data(filepath = ampseq_file, marker_filepath = marker_file, verbose = TRUE)
+head(ampseq_imported$late_failures[, 1:5])
+```
+
+```{r}
+ampseq_results <- MalReBay(
+  filepath        = ampseq_file,
+  marker_filepath = marker_file,
+  mcmc_config     = quick_config,
+  output_folder   = NULL,
+  verbose         = TRUE
+)
+head(ampseq_results$posterior_probabilities)
+```
+
+### Example 3: MSP1 / MSP2 / GLURP
+
+This walkthrough uses a real MSP1/MSP2/GLURP panel from a Ugandan TES (UGTES2019): 54 patients across three sites (`A`, `B`, `C`), genotyped at the MSP1 family variants (`K1`, `MAD20`, `R033`), the MSP2 family variants (`3D7`, `FC27`), and `glurp`.
+
+```{r}
+msp_file <- system.file("extdata", "Dataset_msp_glurp.xlsx", package = "MalReBay")
+
+msp_imported <- import_data(filepath = msp_file, marker_filepath = marker_file, verbose = TRUE)
+head(msp_imported$late_failures[, 1:8])
+```
+
+::: callout-note
+Notice `R033` in the column names above: this dataset spells the MSP1 family variant RO33 with a zero instead of a letter O, a common transcription slip in lab spreadsheets. `detect_msp_variants()` (@sec-data-types) normalises `0`/`O` before matching, so it's still recognised as RO33 and folded into the `msp1` call — you don't need to rename anything.
+:::
+
+Genotyping in the field is rarely complete for every marker at every visit, so it's normal to see fewer comparable loci per patient here than in the microsatellite panel above:
+
+```{r}
+msp_results <- MalReBay(
+  filepath        = msp_file,
+  marker_filepath = marker_file,
+  mcmc_config     = list(n_chains = 2, iter = 1500, burn_in_frac = 0.5, random_seed = 42),
+  output_folder   = NULL,
+  verbose         = TRUE
+)
+head(msp_results$posterior_probabilities[, c("Site", "Sample.ID", "Probability", "N_Comparable_Loci")], 10)
+```
+
+```{r}
+msp_results$convergence
+```
+
+Keep an eye on cases with very few comparable loci (`N_Comparable_Loci` of 1 or 2 above) — as @sec-interpretation-probability explains, there just isn't much genetic evidence to work with for those patients, so the probability sits closer to 0.5 regardless of what the WHO rule says. If `ESS_Bulk` above comes out under 400 for a site, that's this dataset's own convergence borderline showing up live — see @sec-interpretation-convergence for what to do about it (in short: raise `iter`).
+
+### Using CSV files instead of Excel
+
+`filepath` and `additional_filepath` both also accept `.csv` files — `import_data()` picks the reader based on the file extension. The one exception is `marker_filepath`, which must stay Excel for now.
+
+Each of the three example datasets above also ships as CSV in `extdata/`, so you can try this without preparing your own files:
+
+| Dataset | Excel | CSV |
+|------------------------|------------------------|------------------------|
+| Microsatellites | `Dataset_microsatellite_panel.xlsx` | `Dataset_microsatellite_panel.csv` + `Dataset_microsatellite_panel_additional.csv` |
+| AmpSeq | `Dataset_amplicon_sequencing.xlsx` | `Dataset_amplicon_sequencing.csv` |
+| MSP1 / MSP2 / GLURP | `Dataset_msp_glurp.xlsx` | `Dataset_msp_glurp.csv` |
+
+::: callout-note
+A CSV file can only hold one sheet, so where the Excel version bundles late-failure and background samples together as two sheets in one workbook (like the microsatellite panel above), the CSV version is split into two files instead — the main one for `filepath`, and a `_additional` one for `additional_filepath`.
+:::
+
+The microsatellite example from CSV gives identical results to the Excel version used above:
+
+```{r}
+microsat_csv       <- system.file("extdata", "Dataset_microsatellite_panel.csv", package = "MalReBay")
+microsat_csv_extra <- system.file("extdata", "Dataset_microsatellite_panel_additional.csv", package = "MalReBay")
+
+imported_from_csv <- import_data(
+  filepath             = microsat_csv,
+  marker_filepath      = marker_file,
+  additional_filepath  = microsat_csv_extra,
+  verbose              = TRUE
+)
+identical(imported_from_csv$late_failures, imported_data$late_failures)
+```
+
+And the full pipeline, MCMC and all, runs the same way from a CSV `filepath` as from Excel — reusing the AmpSeq example here since it's the fastest of the three to rerun:
+
+```{r}
+ampseq_csv <- system.file("extdata", "Dataset_amplicon_sequencing.csv", package = "MalReBay")
+
+ampseq_results_csv <- MalReBay(
+  filepath        = ampseq_csv,
+  marker_filepath = marker_file,
+  mcmc_config     = quick_config,
+  output_folder   = NULL,
+  verbose         = TRUE
+)
+head(ampseq_results_csv$posterior_probabilities)
+```
+
+------------------------------------------------------------------------
+
+## Output
+
+`MalReBay()` returns a named list with four elements and, when `output_folder` is set, saves the CSV files and diagnostic plots. The structure of this list is identical whichever data type you used.
+
+### Return value
+
+```{r}
+names(results)
+```
+
+#### `posterior_probabilities`
+
+One row per patient. The key column is `Probability`: the posterior probability that the recurrence is a **recrudescence**. Also includes per-patient locus availability counts (`N_Available_D0`, `N_Available_DF`, `N_Comparable_Loci`).
+
+```{r}
+head(results$posterior_probabilities)
+```
+
+A probability close to **1** indicates recrudescence; close to **0** indicates reinfection. Values near **0.5** reflect uncertainty, often due to limited or missing genotyping data — see @sec-interpretation-probability.
+
+#### `comparison`
+
+Combines the Bayesian posterior probabilities with the traditional **allele match-counting** result for each patient (one column per marker, coded `R`/`NI`/`IND`/`ERR` — see @sec-interpretation-who), enabling side-by-side comparison of both approaches.
+
+```{r}
+head(results$comparison)
+```
+
+#### `convergence`
+
+Per-site MCMC convergence diagnostics.
+
+```{r}
+results$convergence
+```
+
+See @sec-interpretation-convergence for how to read this table.
+
+#### `mcmc_loglikelihoods`
+
+Raw per-chain log-likelihood traces, one list element per site. Useful for manual convergence inspection.
+
+```{r}
+# Sites present in the data
+names(results$mcmc_loglikelihoods)
+```
+
+### Output files
+
+When `output_folder` is provided, the following files are written:
+
+| File | Contents |
+|------------------------------------|------------------------------------|
+| `posterior_probabilities.csv` | Posterior probability of recrudescence per patient, with locus counts. |
+| `bayesian_match_counting_comparison.csv` | Bayesian results alongside traditional match counting. |
+| `mcmc_convergence_summary.csv` | R-hat and ESS per site. |
+| `recrudescence_probability_histogram.png` | Distribution of posterior probabilities across all patients. |
+| `diversity_<data_type>_comparison.png` | Allele/haplotype diversity pie charts per marker. |
+| `moi_per_marker_by_site.png` | Violin plots of multiplicity of infection per marker and site. |
+| `convergence_diagnosis/<site>/` | Per-site MCMC trace plots, Gelman–Rubin plot, log-likelihood histogram, and autocorrelation plots. |
+| `comparison_heatmap_<site>.png` | WHO vs. MalReBay comparison heatmap, one per site. |
+
+### Plots
+
+The pipeline automatically generates the following plots. All of them work the same way regardless of data type.
+
+**Allele diversity**: pie charts showing the frequency distribution of each allele (or haplotype) across all samples, per marker. Useful as a sanity check on your data — a marker with only one slice everywhere carries little discriminating information.
+
+```{r}
+p_div <- plot_markers_diversity(
+  genotypedata  = imported_data$late_failures,
+  data_type     = imported_data$data_type,
+  marker_info   = imported_data$marker_info,
+  output_folder = NULL
+)
+print(p_div)
+```
+
+**Multiplicity of infection (MOI)**: violin plots showing the number of distinct alleles per marker per sample, split by site. Higher MOI means more polyclonal infections at that site/marker, which generally makes individual comparisons less informative (more possible allele pairings to explain away).
+
+```{r}
+p_moi <- plot_moi(imported_data$late_failures, output_folder = NULL)
+print(p_moi)
+```
+
+**Posterior probability histogram**: distribution of recrudescence probabilities across all classified patients. A histogram with most mass near 0 and 1 (few patients near 0.5) indicates the markers were informative for most patients.
+
+```{r}
+p_hist <- plot_probability_histogram(results, output_folder = NULL)
+```
+
+**MCMC convergence diagnostics**: trace plots, Gelman–Rubin plots, log-likelihood histograms, and autocorrelation plots, one set per site, saved under `convergence_diagnosis/<site>/` when `output_folder` is set (they're generated during the `MalReBay()` call above; see @sec-interpretation-convergence for how to read them).
+
+**WHO vs. MalReBay comparison heatmap**: one heatmap per site, three columns per patient — the WHO loose rule, the WHO strict rule, and MalReBay's probability — all on the same red/blue colour scale so agreement and disagreement are easy to spot at a glance.
+
+```{r}
+p_heatmap <- plot_comparison_heatmap(results, imported_data$marker_info, output_folder = NULL)
+```
+
+------------------------------------------------------------------------
+
+## Interpreting the results {#sec-interpretation}
+
+### What the probability actually measures {#sec-interpretation-model}
+
+For each patient, MalReBay compares the Day-0 and recurrence genotypes marker by marker and asks: how much more likely is this particular pattern of alleles under "same infection persisting" (recrudescence) than under "new, unrelated infection" (reinfection)? Three things drive the answer:
+
+-   **How common the matching allele is.** Allele/family frequencies are estimated from the Day-0 samples in your data (the patients' own Day-0 rows, plus any background sheet — @sec-interpretation-tips). Matching on a *rare* allele is strong evidence of a shared origin, because it's an unlikely coincidence for two unrelated infections to share it. Matching on a *common* allele is much weaker evidence, because plenty of unrelated infections would share it anyway.
+-   **How the marker type defines a "match".** Microsatellites use a distance-based decay (alleles a few repeat units apart under `repeatlength` are treated as more likely to be the same lineage with stutter/genotyping noise than as truly different); MSP1/MSP2/GLURP markers use family membership (same cluster vs. different cluster, per `repeatlength` as a gap threshold); AmpSeq uses exact haplotype identity.
+-   **Missing or hidden alleles are imputed**, not ignored — if a patient is polyclonal and only some clones are observed, the model marginalises over the plausible hidden ones rather than dropping the marker.
+
+Evidence from each comparable marker is combined across markers (assuming markers are independent, which is standard for the neutral marker panels used in TES), and converted to a probability under an equal 50/50 prior — i.e. before seeing the genotyping data, recrudescence and reinfection are considered equally likely.
+
+### Reading the `Probability` column {#sec-interpretation-probability}
+
+| Probability | Classification |
+|-------------|----------------|
+| ≥ 0.5       | Recrudescence  |
+| \< 0.5      | Reinfection    |
+
+```{r}
+pp <- results$posterior_probabilities
+pp$Classification <- ifelse(pp$Probability >= 0.5, "Recrudescence", "Reinfection")
+table(pp$Classification)
+```
+
+Patients with few comparable loci (`N_Comparable_Loci`) should be interpreted with caution: with less genetic evidence, the posterior stays closer to the 0.5 prior rather than being pulled confidently toward 0 or 1.
+
+```{r}
+# Flag low-information classifications
+pp[pp$N_Comparable_Loci <= 1, c("Sample.ID", "Site", "Probability",
+                                  "N_Comparable_Loci", "Classification")]
+```
+
+### MalReBay vs. the WHO rules {#sec-interpretation-who}
+
+`results$comparison` also reports the traditional match-counting result per marker (`R` = match/recrudescence-supporting, `NI` = mismatch/new-infection-supporting, `IND` = indeterminate/missing data, `ERR` = no valid Day-0/recurrence pair), plus two summary calls built from those:
+
+-   **WHO loose**: a simple threshold rule (see @sec-data-types for which variant applies to your panel).
+-   **WHO strict**: the same rule, but requiring every marker to match.
+
+These are blunt, deterministic rules: a marker either counts as a full match or it doesn't, with no notion of how common that matching allele is or how much genotyping noise to expect. MalReBay's `Probability` is the more informative of the two, but the WHO columns are useful precisely *because* they're simple and widely used — the comparison heatmap (`plot_comparison_heatmap()`) puts all three side by side per site so you can see where MalReBay agrees with convention and where it draws on evidence the WHO rules can't use (rare vs. common alleles, partial/polyclonal data).
+
+### MCMC convergence {#sec-interpretation-convergence}
+
+`results$convergence` reports, per site:
+
+| Column | What it means | Rule of thumb used internally |
+|------------------------|------------------------|------------------------|
+| `Gelman_Rubin_Rhat` | Classical Gelman–Rubin R-hat across chains | ≈ 1.0 is good; the classic threshold is 1.1 |
+| `Rank_Rhat` | Rank-normalised R-hat (Vehtari et al. 2021), more robust | `< 1.01` is treated as passing |
+| `ESS_Bulk` / `ESS_Tail` | Effective sample size for the bulk/tails of the posterior | `> 400` is treated as passing |
+| `Effective_Sample_Size` | Classical effective sample size (coda) | Higher is better |
+
+If R-hat is high or ESS is low for a site, the chains haven't mixed well enough to trust the reported probabilities for that site — increase `iter` and/or `n_chains` in `mcmc_config` and rerun just that step (`classify_infections()` → `summarise_results()`), rather than the whole `MalReBay()` call, if you want to avoid recomputing sites that already converged.
+
+### Practical tips {#sec-interpretation-tips}
+
+-   **Give it as much background data as you have.** More Day-0 samples → better-estimated allele frequencies → sharper, more trustworthy probabilities. This matters more for smaller studies and rarer marker panels.
+-   **Check the diversity and MOI plots before trusting the results.** A marker that's monomorphic in your data (one slice in the pie chart) or has very high missingness contributes little to the classification.
+-   **Don't over-interpret a single low-`N_Comparable_Loci` patient.** A probability close to 0.5 there usually reflects genuinely limited information, not model failure.
+-   **A tiny demo dataset (like Example 3 above) will not give textbook-clean numbers** — allele frequencies estimated from a handful of samples are noisy, which can make the model's probability disagree with intuition in ways a well-powered study wouldn't.
+
+If the convergence summary shows high R-hat (`> 1.1`) or low ESS (`< 400`) for a site, increase `iter` in the MCMC configuration and rerun.

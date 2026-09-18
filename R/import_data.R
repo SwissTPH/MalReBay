@@ -14,7 +14,7 @@
 #' @examples
 #' \dontrun{
 #'   data_file <- system.file("extdata", 
-#'                            "Angola_2021_TES_7NMS.xlsx", 
+#'                            "Dataset_microsatellite_panel.xlsx",
 #'                            package = "MalReBay")
 #'   marker_file <- system.file("extdata", 
 #'                              "makers_details.xlsx", 
@@ -25,7 +25,7 @@
 #' @export
 import_data <- function(
     filepath = system.file("extdata", 
-                           "Angola_2021_TES_7NMS.xlsx", 
+                           "Dataset_microsatellite_panel.xlsx",
                            package = "MalReBay"),
     marker_filepath = system.file("extdata", 
                                   "makers_details.xlsx", 
@@ -37,7 +37,15 @@ import_data <- function(
   ext <- tools::file_ext(filepath)
   
   if (ext == "csv") {
-    temp_df <- as.data.frame(readr::read_csv(filepath, show_col_types = FALSE))
+    # Read every column as character: readr's automatic type-guessing parses
+    # IDs like "1D19" (patient 1, Day 19 -- exactly this package's own ID
+    # convention) as the Fortran-style double literal 1D19 = 1e19, silently
+    # corrupting Sample.ID. Numeric allele columns are cast back to numeric
+    # explicitly below in clean_data(), same as for the Excel path.
+    temp_df <- as.data.frame(readr::read_csv(
+      filepath, show_col_types = FALSE,
+      col_types = readr::cols(.default = readr::col_character())
+    ))
     sheet_names <- NULL
   } else {
     sheet_names <- try(readxl::excel_sheets(filepath), silent = TRUE)
@@ -181,7 +189,10 @@ import_data <- function(
     
     add_ext <- tools::file_ext(additional_filepath)
     raw_add <- if (add_ext == "csv") {
-      as.data.frame(readr::read_csv(additional_filepath, show_col_types = FALSE))
+      as.data.frame(readr::read_csv(
+        additional_filepath, show_col_types = FALSE,
+        col_types = readr::cols(.default = readr::col_character())
+      ))
     } else {
       add_sheet_names <- try(readxl::excel_sheets(additional_filepath), silent = TRUE)
       if (inherits(add_sheet_names, "try-error")) stop("ERROR: Cannot read file: ", additional_filepath)

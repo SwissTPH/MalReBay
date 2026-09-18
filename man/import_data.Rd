@@ -5,7 +5,7 @@
 \title{Import Genotyping Data from Excel}
 \usage{
 import_data(
-  filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
+  filepath = system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay"),
   marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
   additional_filepath = NULL,
   verbose = TRUE
@@ -32,7 +32,7 @@ the data type and separating sheets into a structured list.
 \examples{
 \dontrun{
   data_file <- system.file("extdata", 
-                           "Angola_2021_TES_7NMS.xlsx", 
+                           "Dataset_microsatellite_panel.xlsx", 
                            package = "MalReBay")
   marker_file <- system.file("extdata", 
                              "makers_details.xlsx", 

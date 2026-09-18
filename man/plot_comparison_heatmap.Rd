@@ -13,17 +13,20 @@ plot_comparison_heatmap(
 )
 }
 \arguments{
+\item{summary_results}{A list returned by \code{\link{summarise_results}},
+containing a \code{comparison} data frame (Bayesian probabilities plus
+traditional match-counting results).}
+
+\item{marker_info}{Marker metadata from \code{\link{import_data}}, passed
+on to \code{build_who_table()} to derive the WHO_loose/WHO_strict columns.}
+
+\item{output_folder}{A string specifying the directory where one PNG per
+site will be saved. If \code{NULL}, heatmaps are drawn on the current
+graphics device instead.}
+
 \item{title_prefix}{Optional prefix before the site name in each plot's title.}
 
-\item{comparison}{The comparison table (e.g. summary_results$comparison,
-after build_who_table() has added WHO_loose/WHO_strict, and with a
-"MalReBay" column -- rename from "Probability" if needed).}
-
-\item{who_loose_label}{Column title for the WHO_loose block, from
-build_who_table()'s who_loose_label.}
-
-\item{who_strict_label}{Column title for the WHO_strict block, from
-build_who_table()'s who_strict_label.}
+\item{verbose}{Logical. If \code{TRUE}, prints a message when each file is saved.}
 }
 \value{
 Invisibly NULL; draws one heatmap per site as a side effect.

@@ -27,10 +27,8 @@ Biarch: true
 Depends:
     R (>= 4.1.0)
 Imports:
-    circlize,
     cmdstanr (>= 0.7.0),
     coda,
-    ComplexHeatmap,
     dplyr,
     forcats,
     ggplot2,

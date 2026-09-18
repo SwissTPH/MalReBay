@@ -140,7 +140,7 @@ library(kableExtra)
 We read the example files using `import_data()`. This function reads both the genotyping file and the marker information file, checks the data, and prepares it for analysis.
 
 ```{r get-data-path-length}
-input_file_lp <- system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay")
+input_file_lp <- system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay")
 marker_file   <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
 
 imported_data <- MalReBay::import_data(

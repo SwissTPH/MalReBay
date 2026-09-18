@@ -383,7 +383,7 @@ save_results <- function(summary_results,
 #'
 #' @export
 MalReBay <- function(
-    filepath        = system.file("extdata", "Angola_2021_TES_7NMS.xlsx",
+    filepath        = system.file("extdata", "Dataset_microsatellite_panel.xlsx",
                                   package = "MalReBay"),
     marker_filepath = system.file("extdata", "makers_details.xlsx",
                                   package = "MalReBay"),

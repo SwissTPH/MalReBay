@@ -72,8 +72,8 @@ compute_locus_comparability <- function(late_site, ids, locinames) {
 #' @return A data frame: Site, n_paired, n_viable_pairs, viable.
 #' @examples
 #' \dontrun{
-#'   data_file <- system.file("extdata", 
-#'                            "Angola_2021_TES_7NMS.xlsx", 
+#'   data_file <- system.file("extdata",
+#'                            "Dataset_microsatellite_panel.xlsx",
 #'                            package = "MalReBay")
 #'   marker_file <- system.file("extdata", 
 #'                              "makers_details.xlsx", 

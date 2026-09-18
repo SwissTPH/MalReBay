@@ -894,100 +894,89 @@ build_who_table <- function(match_counting_res, marker_info) {
 #'   the bayesian_match_counting_comparison table after it's been passed
 #'   through build_who_table().
 #'
-#' @param comparison The comparison table (e.g. summary_results$comparison,
-#'   after build_who_table() has added WHO_loose/WHO_strict, and with a
-#'   "MalReBay" column -- rename from "Probability" if needed).
-#' @param who_loose_label Column title for the WHO_loose block, from
-#'   build_who_table()'s who_loose_label.
-#' @param who_strict_label Column title for the WHO_strict block, from
-#'   build_who_table()'s who_strict_label.
+#' @param summary_results A list returned by \code{\link{summarise_results}},
+#'   containing a \code{comparison} data frame (Bayesian probabilities plus
+#'   traditional match-counting results).
+#' @param marker_info Marker metadata from \code{\link{import_data}}, passed
+#'   on to \code{build_who_table()} to derive the WHO_loose/WHO_strict columns.
+#' @param output_folder A string specifying the directory where one PNG per
+#'   site will be saved. If \code{NULL}, heatmaps are drawn on the current
+#'   graphics device instead.
 #' @param title_prefix Optional prefix before the site name in each plot's title.
+#' @param verbose Logical. If \code{TRUE}, prints a message when each file is saved.
 #' @return Invisibly NULL; draws one heatmap per site as a side effect.
+#'
+#' @importFrom ggplot2 ggplot aes geom_tile facet_grid scale_fill_gradientn
+#'   scale_y_discrete labs theme element_text element_blank element_rect margin
 #' @export
-plot_comparison_heatmap <- function(summary_results, 
-                                    marker_info, 
-                                    output_folder = NULL,    
+plot_comparison_heatmap <- function(summary_results,
+                                    marker_info,
+                                    output_folder = NULL,
                                     title_prefix = "",
                                     verbose = TRUE) {
   comparison <- summary_results$comparison
   comparison$MalReBay <- comparison$Probability
   who_result <- build_who_table(comparison, marker_info)
-  
+
   comparison       <- who_result$table
   who_loose_label  <- who_result$who_loose_label
   who_strict_label <- who_result$who_strict_label
-  
-  col_fun <- circlize::colorRamp2(c(0, 0.25, 0.5, 0.75, 1),
-                                  c("#67A9CF", "#ade8f4", "#F7F7F7", "#F4A582", "#D6604D"))
-  
-  block_defaults <- list(
-    col = col_fun, na_col = "grey80",
-    cluster_rows = FALSE, cluster_columns = FALSE,
-    show_column_names = FALSE,
-    column_title_gp = grid::gpar(fontsize = 10, fontface = "bold"),
-    rect_gp = grid::gpar(col = "grey70", lwd = 0.4)
-  )
-  
-  build_site_heatmap <- function(site_data) {
-    mat_who_loose  <- as.matrix(site_data[, "WHO_loose", drop = FALSE])
-    mat_who_strict <- as.matrix(site_data[, "WHO_strict", drop = FALSE])
-    mat_mr         <- as.matrix(site_data[, "MalReBay", drop = FALSE])
-    rownames(mat_who_loose) <- rownames(mat_who_strict) <- rownames(mat_mr) <- site_data$Sample.ID
-    
-    ht_who_loose <- do.call(ComplexHeatmap::Heatmap, c(list(
-      matrix = mat_who_loose, name = "Probability", column_title = who_loose_label,
-      show_row_names = FALSE, row_names_gp = grid::gpar(fontsize = 7), row_names_side = "left",
-      heatmap_legend_param = list(
-        title = "Outcome",
-        at = c(0, 0.25, 0.5, 0.75, 1),
-        labels = c("0 (NI)", "0.25", "0.5", "0.75", "1 (R)")
+
+  block_levels <- c(who_loose_label, who_strict_label, "MalReBay")
+
+  build_site_heatmap <- function(site_data, site_title) {
+    plot_data <- data.frame(
+      Sample.ID = rep(site_data$Sample.ID, times = 3),
+      block     = factor(rep(block_levels, each = nrow(site_data)), levels = block_levels),
+      value     = c(site_data$WHO_loose, site_data$WHO_strict, site_data$MalReBay)
+    )
+    plot_data$Sample.ID <- factor(plot_data$Sample.ID, levels = rev(site_data$Sample.ID))
+
+    ggplot2::ggplot(plot_data, ggplot2::aes(x = 1, y = .data$Sample.ID, fill = .data$value)) +
+      ggplot2::geom_tile(color = "grey70", linewidth = 0.4) +
+      ggplot2::facet_grid(~block) +
+      ggplot2::scale_fill_gradientn(
+        name    = "Outcome",
+        colours = c("#67A9CF", "#ade8f4", "#F7F7F7", "#F4A582", "#D6604D"),
+        values  = scales::rescale(c(0, 0.25, 0.5, 0.75, 1)),
+        limits  = c(0, 1), na.value = "grey80",
+        breaks  = c(0, 0.25, 0.5, 0.75, 1),
+        labels  = c("0 (NI)", "0.25", "0.5", "0.75", "1 (R)")
+      ) +
+      ggplot2::labs(x = NULL, y = "Samples", caption = paste0(title_prefix, site_title)) +
+      ggplot2::theme(
+        axis.text.x     = ggplot2::element_blank(),
+        axis.ticks.x    = ggplot2::element_blank(),
+        axis.text.y     = ggplot2::element_blank(),
+        axis.ticks.y    = ggplot2::element_blank(),
+        panel.background = ggplot2::element_blank(),
+        panel.spacing   = grid::unit(5, "mm"),
+        strip.background = ggplot2::element_rect(fill = "white", color = NA),
+        strip.text      = ggplot2::element_text(size = 10, face = "bold"),
+        plot.caption    = ggplot2::element_text(hjust = 0.5, face = "bold", size = 12,
+                                                 margin = ggplot2::margin(t = 8))
       )
-    ), block_defaults))
-    
-    ht_who_strict <- do.call(ComplexHeatmap::Heatmap, c(list(
-      matrix = mat_who_strict, name = "WHO_strict_leg", column_title = who_strict_label,
-      show_row_names = FALSE, show_heatmap_legend = FALSE
-    ), block_defaults))
-    
-    ht_mr <- do.call(ComplexHeatmap::Heatmap, c(list(
-      matrix = mat_mr, name = "MalReBay_leg", column_title = "MalReBay",
-      show_row_names = FALSE, show_heatmap_legend = FALSE
-    ), block_defaults))
-    
-    ht_who_loose + ht_who_strict + ht_mr
   }
-  
+
   heatmap_data <- comparison[grepl(" Day 0$", comparison$Sample.ID), ]
   heatmap_data$Sample.ID <- trimws(gsub(" Day 0$", "", heatmap_data$Sample.ID))
-  
+
   for (s in unique(heatmap_data$Site)) {
     site_data <- heatmap_data[heatmap_data$Site == s, ]
-    ht        <- build_site_heatmap(site_data)
-    
+    p         <- build_site_heatmap(site_data, s)
+
     if (!is.null(output_folder)) {
       if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
       safe_site <- gsub("[^A-Za-z0-9_-]", "_", s)
-      grDevices::png(
+      ggplot2::ggsave(
         file.path(output_folder, paste0("comparison_heatmap_", safe_site, ".png")),
-        width = 1800, height = 2200, res = 300
+        plot = p, width = 1800 / 300, height = 2200 / 300, units = "in", dpi = 300
       )
-      ComplexHeatmap::draw(
-        ht, column_title = paste0(title_prefix, s),
-        column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
-        column_title_side = "bottom", row_title = "Samples",
-        row_title_side = "left", gap = grid::unit(5, "mm")
-      )
-      grDevices::dev.off()
       if (verbose) message("INFO: Comparison heatmap saved for site: ", s)
     } else {
-      ComplexHeatmap::draw(
-        ht, column_title = paste0(title_prefix, s),
-        column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
-        column_title_side = "bottom", row_title = "Samples",
-        row_title_side = "left", gap = grid::unit(5, "mm")
-      )
+      print(p)
     }
   }
-  
+
   invisible(NULL)
 }

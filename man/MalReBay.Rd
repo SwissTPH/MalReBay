@@ -5,7 +5,7 @@
 \title{Run the MalReBay malaria recrudescence classification pipeline}
 \usage{
 MalReBay(
-  filepath = system.file("extdata", "Angola_2021_TES_7NMS.xlsx", package = "MalReBay"),
+  filepath = system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay"),
   marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
   additional_filepath = NULL,
   mcmc_config = system.file("extdata", "default_mcmc_config.rds", package = "MalReBay"),
