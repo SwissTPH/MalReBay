@@ -10,6 +10,15 @@
 #'   list of parameters. Defaults to the bundled configuration.
 #' @param n_workers     Number of parallel workers. Defaults to \code{1}.
 #' @param verbose       Logical. Print progress messages. Defaults to \code{TRUE}.
+#' @param suppress_warnings Logical. If \code{TRUE} (default), silences the
+#'   MCMC sampler's own console warnings about divergent transitions,
+#'   treedepth, and E-BFMI (the "N of M transitions ended with a divergence"
+#'   messages cmdstanr prints as soon as sampling finishes, independently of
+#'   \code{verbose}). Set to \code{FALSE} to see them -- e.g. while tuning
+#'   \code{adapt_delta} in \code{mcmc_config} for a problematic site. This
+#'   only affects what gets printed; the same diagnostics are always
+#'   available afterwards via \code{\link{summarise_results}}'s
+#'   \code{convergence} table.
 #'
 #' @return A named list of raw MCMC results per site, or \code{NULL} if no
 #'   valid results are produced. Pass this to \code{\link{summarise_results}}.
@@ -26,19 +35,20 @@
 #' @export
 classify_infections <- function(imported_data,
                                 mcmc_config = system.file(
-                                                  "extdata", 
+                                                  "extdata",
                                                   "default_mcmc_config.rds",
                                                   package = "MalReBay"),
-                                n_workers = 1,
-                                verbose   = TRUE) {
-  
+                                n_workers         = 1,
+                                verbose           = TRUE,
+                                suppress_warnings = TRUE) {
+
   required_elements <- c("late_failures", "additional", "marker_info", "data_type")
   if (!is.list(imported_data) ||
       !all(required_elements %in% names(imported_data))) {
     stop("'imported_data' must be a valid list returned by import_data().",
          call. = FALSE)
   }
-  
+
   if (is.list(mcmc_config)) {
     config <- mcmc_config
   } else {
@@ -46,17 +56,18 @@ classify_infections <- function(imported_data,
     cfg_df$parameter <- trimws(cfg_df$parameter)
     config           <- stats::setNames(as.list(cfg_df$value), cfg_df$parameter)
   }
-  
+
   late_failures <- imported_data$late_failures
   additional    <- imported_data$additional
   marker_info   <- imported_data$marker_info
 
   results <- run_stan_sites(
-    late_failures = late_failures,
-    additional    = additional,
-    marker_info   = marker_info,
-    mcmc_config   = config,
-    verbose       = verbose
+    late_failures     = late_failures,
+    additional        = additional,
+    marker_info       = marker_info,
+    mcmc_config       = config,
+    verbose           = verbose,
+    suppress_warnings = suppress_warnings
   )
 
   if (is.null(results) || length(results$ids) == 0) {
@@ -80,9 +91,23 @@ classify_infections <- function(imported_data,
 #' @param output_folder Path for saving convergence diagnostic plots.
 #'   \code{NULL} skips saving.
 #' @param verbose Logical. Print progress messages.
+#' @param prob_threshold Numeric in \verb{[0, 1]}. The posterior probability
+#'   at or above which a recurrence is classified as \code{"Recrudescence"}
+#'   (below it, \code{"New infection"}); used to add the \code{Classification}
+#'   column to \code{posterior_probabilities} (and \code{comparison}).
+#'   Defaults to \code{0.5}, the natural cutoff under this model's equal
+#'   50/50 prior (see @sec-interpretation-probability in the analysis
+#'   notebook).
 #'
 #' @return A named list with \code{posterior_probabilities}, \code{comparison},
-#'   \code{convergence}, and \code{mcmc_loglikelihoods}.
+#'   \code{convergence}, \code{mcmc_loglikelihoods}, and the
+#'   \code{prob_threshold} used. \code{posterior_probabilities} includes a
+#'   \code{Classification} column derived from \code{prob_threshold}.
+#'   \code{comparison} has one row per patient: the per-marker match-counting
+#'   calls, the two overall match-counting calls (e.g.
+#'   \code{Match_counting_2of3}/\code{Match_counting_3of3} for MSP panels,
+#'   \code{Match_counting_5of7}/\code{Match_counting_7of7} for a 7-marker
+#'   panel), \code{MalReBay_probability} and \code{MalReBay_classification}.
 #'
 #' @seealso \code{\link{classify_infections}}, \code{\link{save_results}},
 #'   \code{\link{MalReBay}}
@@ -97,8 +122,14 @@ classify_infections <- function(imported_data,
 #' @export
 summarise_results <- function(mcmc_results,
                               imported_data,
-                              output_folder = NULL,
-                              verbose       = TRUE) {
+                              output_folder  = NULL,
+                              verbose        = TRUE,
+                              prob_threshold = 0.5) {
+
+  if (!is.numeric(prob_threshold) || length(prob_threshold) != 1 ||
+      is.na(prob_threshold) || prob_threshold < 0 || prob_threshold > 1) {
+    stop("'prob_threshold' must be a single number between 0 and 1.", call. = FALSE)
+  }
   
   if (is.null(mcmc_results) || length(mcmc_results$ids) == 0)
     stop("'mcmc_results' is empty. Check classify_infections() ran successfully.",
@@ -185,27 +216,51 @@ summarise_results <- function(mcmc_results,
     dplyr::left_join(
       dplyr::bind_rows(mcmc_results$locus_summary, .id = "Site") %>%
         dplyr::rename(
-          Sample.ID         = patient_id,
-          N_Available_D0    = n_available_d0,
-          N_Available_DF    = n_available_df,
-          N_Comparable_Loci = n_comparable_loci
+          Sample.ID            = patient_id,
+          N_Markers_Day0       = n_available_d0,
+          N_Markers_Recurrence = n_available_df,
+          N_Markers_Compared   = n_comparable_loci
         ),
       by = c("Sample.ID", "Site")
-    )
-  
-  match_results    <- perform_match_counting(late_failures, marker_info)
-  comparison_table <- late_failures %>%
+    ) %>%
     dplyr::mutate(
-      Base.ID = trimws(gsub(" Day 0| recurrence", "", Sample.ID))
-    ) %>%
-    dplyr::left_join(match_results,
-                     by = c("Base.ID" = "Sample.ID")) %>%
+      Classification = ifelse(Probability >= prob_threshold, "Recrudescence", "New infection")
+    )
+
+  # One row per patient: the per-marker match-counting calls (R/NI/IND/ERR),
+  # the overall match-counting calls (2/3 & 3/3 for MSP panels, else ~70% &
+  # 100% of markers, e.g. 5/7 & 7/7), then MalReBay's probability and
+  # classification -- no raw alleles
+  match_results    <- perform_match_counting(late_failures, marker_info)
+  marker_result_cols <- setdiff(colnames(match_results),
+                                c("Sample.ID", "Number_Matches", "Number_Loci_Compared"))
+  patient_sites    <- late_failures %>%
+    dplyr::transmute(Sample.ID = trimws(gsub(" Day 0| recurrence", "", Sample.ID)), Site) %>%
+    dplyr::distinct()
+  comparison_table <- patient_sites %>%
+    dplyr::inner_join(match_results, by = "Sample.ID") %>%
     dplyr::left_join(
-      dplyr::select(posterior_probabilities,
-                    Sample.ID, Probability, N_Comparable_Loci),
-      by = c("Base.ID" = "Sample.ID")
+      dplyr::select(posterior_probabilities, Site, Sample.ID, Probability, Classification),
+      by = c("Site", "Sample.ID")
     ) %>%
-    dplyr::select(-Base.ID)
+    dplyr::select(Site, Sample.ID, dplyr::all_of(marker_result_cols), Probability, Classification)
+
+  # WHO_loose/WHO_strict are 1/0/NA (NA = too few markers scored to apply the rule)
+  who_result   <- build_who_table(comparison_table, marker_info)
+  call_label   <- function(x) dplyr::case_when(x == 1 ~ "Recrudescence", x == 0 ~ "New infection",
+                                                TRUE ~ NA_character_)
+  # "Match counting 5/7" -> "Match_counting_5of7"
+  col_name     <- function(label) gsub("/", "of", gsub(" ", "_", label))
+  loose_col    <- col_name(who_result$who_loose_label)
+  strict_col   <- col_name(who_result$who_strict_label)
+  # MSP panels also get the combined msp1/msp2 family calls the 2/3 rule is applied to
+  family_cols  <- intersect(c("msp1", "msp2"), setdiff(colnames(who_result$table), marker_result_cols))
+  comparison_table <- who_result$table
+  comparison_table[[loose_col]]  <- call_label(comparison_table$WHO_loose)
+  comparison_table[[strict_col]] <- call_label(comparison_table$WHO_strict)
+  comparison_table <- comparison_table %>%
+    dplyr::select(Site, Sample.ID, dplyr::all_of(c(marker_result_cols, family_cols, loose_col, strict_col)),
+                  MalReBay_probability = Probability, MalReBay_classification = Classification)
   
   convergence_summary <- if (length(convergence_list) > 0)
     dplyr::bind_rows(convergence_list) else NULL
@@ -214,7 +269,8 @@ summarise_results <- function(mcmc_results,
     posterior_probabilities = posterior_probabilities,
     comparison              = comparison_table,
     convergence             = convergence_summary,
-    mcmc_loglikelihoods     = mcmc_results$all_chains_loglikelihood
+    mcmc_loglikelihoods     = mcmc_results$all_chains_loglikelihood,
+    prob_threshold          = prob_threshold
   )
 }
 
@@ -282,11 +338,6 @@ save_results <- function(summary_results,
       }
     }
     
-    comparison_for_heatmap <- summary_results$comparison
-    comparison_for_heatmap$MalReBay <- comparison_for_heatmap$Probability
-    who_result <- build_who_table(comparison_for_heatmap, imported_data$marker_info)
-    who_comparison <- who_result$table
-    
     plot_comparison_heatmap(
       summary_results = summary_results,
       marker_info     = imported_data$marker_info,
@@ -329,17 +380,6 @@ save_results <- function(summary_results,
     saved_paths["convergence"] <- cv_path
   }
   
-  if (!is.null(who_comparison)) {
-    recode_who <- function(x) dplyr::case_when(x == 1 ~ "R", x == 0 ~ "NI", TRUE ~ NA_character_)
-    who_export <- who_comparison
-    who_export$WHO_loose  <- recode_who(who_export$WHO_loose)
-    who_export$WHO_strict <- recode_who(who_export$WHO_strict)
-    
-    who_path <- file.path(output_folder, "who_comparison_table.csv")
-    utils::write.csv(who_export, who_path, row.names = FALSE)
-    saved_paths["who_comparison"] <- who_path
-  }
-  
   invisible(saved_paths)
 }
 
@@ -365,6 +405,16 @@ save_results <- function(summary_results,
 #'                        data.
 #' @param verbose         If \code{TRUE}, print progress messages to the
 #'                        console.
+#' @param suppress_warnings Logical. If \code{TRUE} (default), silences the
+#'   MCMC sampler's own console warnings about divergent transitions,
+#'   treedepth, and E-BFMI. See \code{\link{classify_infections}} for
+#'   details -- these diagnostics remain available afterwards via
+#'   \code{summary_results$convergence} regardless of this setting.
+#' @param prob_threshold  Numeric in \verb{[0, 1]}. The posterior probability
+#'   at or above which a recurrence is classified as \code{"Recrudescence"}
+#'   (below it, \code{"New infection"}). Defaults to \code{0.5}, the natural
+#'   cutoff under this model's equal 50/50 prior. See
+#'   \code{\link{summarise_results}} for where this is applied.
 #'
 #' @return A list of per-site summary results (invisibly). See
 #'   \code{summarise_results()} for details of the list structure.
@@ -392,7 +442,9 @@ MalReBay <- function(
                                   package = "MalReBay"),
     output_folder   = NULL,
     n_workers       = 1,
-    verbose         = TRUE
+    verbose         = TRUE,
+    suppress_warnings = TRUE,
+    prob_threshold  = 0.5
 ) {
 
   if (verbose) message("Starting MalReBay pipeline...")
@@ -403,11 +455,12 @@ MalReBay <- function(
     marker_filepath      = marker_filepath,
     verbose              = verbose
   )
-  
+
   mcmc_results <- classify_infections(
-    imported_data = imported_data,
-    mcmc_config   = mcmc_config,
-    verbose       = verbose
+    imported_data     = imported_data,
+    mcmc_config       = mcmc_config,
+    verbose           = verbose,
+    suppress_warnings = suppress_warnings
   )
 
   if (is.null(mcmc_results)) {
@@ -416,10 +469,11 @@ MalReBay <- function(
   }
 
   summary_results <- summarise_results(
-    mcmc_results  = mcmc_results,
-    imported_data = imported_data,
-    output_folder = output_folder,
-    verbose       = verbose
+    mcmc_results   = mcmc_results,
+    imported_data  = imported_data,
+    output_folder  = output_folder,
+    verbose        = verbose,
+    prob_threshold = prob_threshold
   )
 
   save_results(

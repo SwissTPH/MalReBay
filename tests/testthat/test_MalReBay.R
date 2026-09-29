@@ -43,7 +43,8 @@ if (cmdstan_ok) {
 
 test_that("MalReBay returns correct list structure for Zaire", {
   skip_if_not(cmdstan_ok, "CmdStan not installed")
-  expect_named(result, c("posterior_probabilities", "comparison", "convergence", "mcmc_loglikelihoods"))
+  expect_named(result, c("posterior_probabilities", "comparison", "convergence", "mcmc_loglikelihoods",
+                       "prob_threshold"))
 })
 
 test_that("MalReBay probabilities are between 0 and 1", {
@@ -59,6 +60,7 @@ test_that("MalReBay saves all expected output files", {
   expect_true(file.exists(file.path(tmp_out, "diversity_length_polymorphic_comparison.png")))
   expect_gt(length(list.files(tmp_out, pattern = "^moi_per_marker_.*\\.png$")), 0)
   expect_true(file.exists(file.path(tmp_out, "recrudescence_probability_histogram.png")))
+  expect_true(file.exists(file.path(tmp_out, "recrudescence_probability_histogram_by_site.png")))
   expect_true(dir.exists(file.path(tmp_out, "convergence_diagnosis")))
 })
 
@@ -93,17 +95,16 @@ test_that("MalReBay convergence is NULL or a data.frame", {
   expect_true(is.null(result$convergence) || is.data.frame(result$convergence))
 })
 
-test_that("MalReBay saves the WHO comparison table", {
-  skip_if_not(cmdstan_ok, "CmdStan not installed")
-  expect_true(file.exists(file.path(tmp_out, "who_comparison_table.csv")))
-})
-
 test_that("saved CSVs contain correct columns", {
   skip_if_not(cmdstan_ok, "CmdStan not installed")
   pp <- utils::read.csv(file.path(tmp_out, "posterior_probabilities.csv"))
   ct <- utils::read.csv(file.path(tmp_out, "bayesian_match_counting_comparison.csv"))
   expect_true(all(c("Sample.ID", "Probability") %in% colnames(pp)))
-  expect_true("Probability" %in% colnames(ct))
+  expect_true(all(c("Site", "Sample.ID", "MalReBay_probability", "MalReBay_classification") %in% colnames(ct)))
+  expect_equal(sum(grepl("^Match_counting_\\d+of\\d+$", colnames(ct))), 2)
+  # One row per patient, no raw allele columns
+  expect_false(any(duplicated(ct[, c("Site", "Sample.ID")])))
+  expect_false(any(grepl("_allele_\\d+$|_\\d+$", colnames(ct))))
 })
 
 test_that("save_results returns named paths and creates a missing output folder", {

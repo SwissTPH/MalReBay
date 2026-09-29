@@ -22,24 +22,33 @@ representing the log-likelihood history of one MCMC chain.}
 
 \item{stan_fit}{An optional \code{CmdStanMCMC} object (from cmdstanr) for additional diagnostics.}
 
-\item{save_plot}{A logical. If \code{TRUE}, plots are saved as PNG files.}
+\item{save_plot}{A logical. If \code{TRUE}, panels are also saved as PNG files.}
 
 \item{output_folder}{A character string specifying the path to save plots.}
 
 \item{verbose}{A logical. If \code{TRUE}, prints diagnostic summaries.}
 
-\item{combine_plots}{A logical. If \code{TRUE}, all four panels are drawn in a
-single 2x2 grid on the current graphics device. Defaults to \code{TRUE} when
-\code{save_plot = FALSE}. Ignored when \code{save_plot = TRUE}.}
+\item{combine_plots}{A logical. If \code{TRUE}, the returned list also
+includes \code{$combined}: all four panels arranged in a single 2x2
+\code{ggpubr::ggarrange()} grid.}
 }
 \value{
-An invisible list containing the calculated diagnostic results.
+An invisible list with the numeric diagnostics (\code{gelman},
+\code{ess}, \code{rhat_rank}, \code{ess_bulk}, \code{ess_tail},
+\code{geweke}) and the ggplot2 panels (\code{traceplot},
+\code{gelman_rubin} -- \code{NULL} with a single chain,
+\code{log_posterior}, \code{autocorrelation}, and \code{combined} when
+\code{combine_plots = TRUE}).
 }
 \description{
-Calculates standard MCMC convergence diagnostics and generates four diagnostic
-plots: Gelman-Rubin, Traceplot, Log-Posterior Histogram, and Autocorrelation.
-When \code{save_plot = FALSE} (interactive use), all four panels are arranged
-in a single 2x2 grid by default.
+Calculates standard MCMC convergence diagnostics and builds four ggplot2
+diagnostic panels: Gelman-Rubin shrink factor, Traceplot, Log-Posterior
+Histogram, and Autocorrelation. The panels are returned as ggplot objects
+(\code{$traceplot}, \code{$gelman_rubin}, \code{$log_posterior},
+\code{$autocorrelation}) alongside the numeric diagnostics, so they can be
+printed, saved, or recombined like any other plot in this package --
+there's no need to save to PNG and reload just to view them (e.g. in a
+notebook).
 }
 \examples{
 \dontrun{
@@ -47,12 +56,13 @@ in a single 2x2 grid by default.
     c(-10.2, -9.8, -10.5, -9.9, -10.1),
     c(-9.9,  -10.3, -10.0, -9.7, -10.4)
   )
-  plot_likelihood_diagnostics(
+  diag <- plot_likelihood_diagnostics(
     all_chains_loglikelihood = chains,
     site_name  = "TestSite",
     save_plot  = FALSE,
     verbose    = FALSE
   )
+  diag$traceplot
 }
 
 }

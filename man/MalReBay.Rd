@@ -11,7 +11,9 @@ MalReBay(
   mcmc_config = system.file("extdata", "default_mcmc_config.rds", package = "MalReBay"),
   output_folder = NULL,
   n_workers = 1,
-  verbose = TRUE
+  verbose = TRUE,
+  suppress_warnings = TRUE,
+  prob_threshold = 0.5
 )
 }
 \arguments{
@@ -36,6 +38,18 @@ data.}
 
 \item{verbose}{If \code{TRUE}, print progress messages to the
 console.}
+
+\item{suppress_warnings}{Logical. If \code{TRUE} (default), silences the
+MCMC sampler's own console warnings about divergent transitions,
+treedepth, and E-BFMI. See \code{\link{classify_infections}} for
+details -- these diagnostics remain available afterwards via
+\code{summary_results$convergence} regardless of this setting.}
+
+\item{prob_threshold}{Numeric in \verb{[0, 1]}. The posterior probability
+at or above which a recurrence is classified as \code{"Recrudescence"}
+(below it, \code{"Reinfection"}). Defaults to \code{0.5}, the natural
+cutoff under this model's equal 50/50 prior. See
+\code{\link{summarise_results}} for where this is applied.}
 }
 \value{
 A list of per-site summary results (invisibly). See

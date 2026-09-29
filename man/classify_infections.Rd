@@ -8,7 +8,8 @@ classify_infections(
   imported_data,
   mcmc_config = system.file("extdata", "default_mcmc_config.rds", package = "MalReBay"),
   n_workers = 1,
-  verbose = TRUE
+  verbose = TRUE,
+  suppress_warnings = TRUE
 )
 }
 \arguments{
@@ -20,6 +21,16 @@ list of parameters. Defaults to the bundled configuration.}
 \item{n_workers}{Number of parallel workers. Defaults to \code{1}.}
 
 \item{verbose}{Logical. Print progress messages. Defaults to \code{TRUE}.}
+
+\item{suppress_warnings}{Logical. If \code{TRUE} (default), silences the
+MCMC sampler's own console warnings about divergent transitions,
+treedepth, and E-BFMI (the "N of M transitions ended with a divergence"
+messages cmdstanr prints as soon as sampling finishes, independently of
+\code{verbose}). Set to \code{FALSE} to see them -- e.g. while tuning
+\code{adapt_delta} in \code{mcmc_config} for a problematic site. This
+only affects what gets printed; the same diagnostics are always
+available afterwards via \code{\link{summarise_results}}'s
+\code{convergence} table.}
 }
 \value{
 A named list of raw MCMC results per site, or \code{NULL} if no

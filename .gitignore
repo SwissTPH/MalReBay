@@ -55,6 +55,7 @@ README.html
 /doc/
 inst/doc
 docs
-inst/notebooks/bayesian_algorithm_output/
+vignettes/bayesian_algorithm_output/
+inst/notebooks/malrebay_results/
 tests/testthat/marker_comparibility_test.R
 inst/extdata/MSP 2490_AL.xlsx

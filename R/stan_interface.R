@@ -11,7 +11,8 @@ run_stan_sites <- function(late_failures,
                            additional,
                            marker_info,
                            mcmc_config,
-                           verbose = TRUE) {
+                           verbose           = TRUE,
+                           suppress_warnings = TRUE) {
 
   # Extract MCMC configuration
   n_chains     <- as.integer(mcmc_config$n_chains)
@@ -126,7 +127,16 @@ run_stan_sites <- function(late_failures,
                          n_chains, " chains, ",
                          iter_sampling, " samples)...")
 
-    fit <- tryCatch({
+    # cmdstanr prints its own "N of M transitions ended with a divergence"
+    # (and treedepth/E-BFMI) message the moment $sample() returns, straight
+    # from the fit object's constructor -- independent of `verbose`/`refresh`
+    # above, so there's no way to quiet it from those. suppress_warnings
+    # wraps the call in suppressMessages() to silence just that; it doesn't
+    # touch the actual sampling, and check_mcmc_diagnostics() below can still
+    # compute (and, if requested, print) the same numbers from the fit object
+    # afterwards, since it re-reads them straight from the sampler output
+    # rather than depending on this initial auto-print.
+    run_sample <- function() {
       stan_model_obj$sample(
         data            = stan_data_only(stan_data),
         chains          = n_chains,
@@ -137,9 +147,13 @@ run_stan_sites <- function(late_failures,
         adapt_delta     = adapt_delta,
         max_treedepth   = 12L,
         seed            = base_seed,
-        refresh         = if (verbose) 100L else 0L,
+        refresh         = if (verbose) 500L else 0L,
         output_dir      = tempdir()
       )
+    }
+
+    fit <- tryCatch({
+      if (suppress_warnings) suppressMessages(run_sample()) else run_sample()
     }, error = function(e) {
       warning("Stan sampling failed for site '", site, "': ", e$message)
       NULL
@@ -153,6 +167,9 @@ run_stan_sites <- function(late_failures,
       warning("All chains failed for site '", site, "'. Skipping.")
       next
     }
+
+    check_mcmc_diagnostics(fit, site_name = site, adapt_delta = adapt_delta,
+                           verbose = verbose && !suppress_warnings)
 
     # E. Extract and Store Results
     extracted <- extract_stan_results(fit, ids, locinames, nloci, length(ids))

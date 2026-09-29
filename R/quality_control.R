@@ -123,6 +123,99 @@ data_quality_check <- function(imported_data,
   do.call(rbind, site_results)
 }
 
+#' Check MCMC sampler diagnostics and report plain-language guidance
+#'
+#' @description After Stan sampling completes for a site, inspects the raw
+#'   HMC/NUTS sampler diagnostics (divergent transitions, max-treedepth hits,
+#'   E-BFMI) and, for any that look problematic, prints a plain-language
+#'   explanation of what it means and what to change in `mcmc_config` to fix
+#'   it. This is a supplement to cmdstanr's own diagnostic messages (already
+#'   printed automatically during `$sample()`), not a replacement -- those
+#'   are more technical but this translates them into a concrete next step.
+#'
+#' @details
+#' \itemize{
+#'   \item **Divergent transitions** mean the sampler lost numerical accuracy
+#'     while exploring some region of the posterior; results for that site
+#'     may be biased until this is resolved. The fix is to increase
+#'     `adapt_delta` in `mcmc_config` (e.g. to `0.95` or `0.99`), which forces
+#'     smaller, more careful sampling steps at the cost of speed.
+#'   \item **Hitting the maximum tree depth** is an efficiency issue, not a
+#'     bias one -- sampling was simply less thorough in those iterations. On
+#'     its own (no divergences, good R-hat/ESS) it can usually be tolerated;
+#'     alongside divergences, fix `adapt_delta` first.
+#'   \item **Low or undefined E-BFMI** means a chain explored the tails of
+#'     the posterior poorly, which can make the resulting probabilities too
+#'     overconfident. The fix is to increase `iter` and/or `n_chains` in
+#'     `mcmc_config` and rerun.
+#' }
+#'
+#' @param fit A `CmdStanMCMC` fit object, as returned by `$sample()`.
+#' @param site_name A character string used to label messages.
+#' @param adapt_delta The `adapt_delta` value used for this fit (echoed back
+#'   in the divergence message so the suggested next value is relative to
+#'   what was actually tried).
+#' @param verbose Logical. If `FALSE`, no messages are printed and the
+#'   diagnostics are only returned invisibly.
+#' @return Invisibly, the list returned by `fit$diagnostic_summary()`
+#'   (`num_divergent`, `num_max_treedepth`, `ebfmi`; one value per chain), or
+#'   `NULL` if diagnostics could not be computed.
+#' @export
+check_mcmc_diagnostics <- function(fit, site_name, adapt_delta, verbose = TRUE) {
+  diag <- tryCatch(
+    fit$diagnostic_summary(diagnostics = c("divergences", "treedepth", "ebfmi"), quiet = TRUE),
+    error = function(e) NULL
+  )
+  if (is.null(diag)) return(invisible(NULL))
+  if (!verbose) return(invisible(diag))
+
+  meta    <- fit$metadata()
+  n_draws <- meta$iter_sampling * meta$num_chains
+
+  n_divergent <- sum(diag$num_divergent)
+  if (isTRUE(n_divergent > 0)) {
+    pct <- round(100 * n_divergent / n_draws)
+    suggested <- if (adapt_delta < 0.9) 0.95 else if (adapt_delta < 0.95) 0.99 else 0.999
+    message(
+      "\nMCMC guidance for site '", site_name, "':\n",
+      "  ", n_divergent, " of ", n_draws, " draws (", pct, "%) were divergent transitions.\n",
+      "  This means the sampler lost accuracy in some region of the posterior, and the\n",
+      "  reported probabilities for this site may be unreliable until this is addressed.\n",
+      "  Try raising adapt_delta in mcmc_config from ", adapt_delta, " to ", suggested,
+      " (slower but more\n  careful sampling) and rerun this site."
+    )
+  }
+
+  n_treedepth <- sum(diag$num_max_treedepth)
+  if (isTRUE(n_treedepth > 0)) {
+    pct <- round(100 * n_treedepth / n_draws)
+    message(
+      "\nMCMC guidance for site '", site_name, "':\n",
+      "  ", n_treedepth, " of ", n_draws, " draws (", pct, "%) hit the maximum tree depth (",
+      meta$max_treedepth, ").\n",
+      "  This is an efficiency issue, not necessarily a bias one -- those iterations\n",
+      "  explored the posterior less thoroughly. If it comes with divergences or with\n",
+      "  poor R-hat/ESS (see plot_likelihood_diagnostics()), fix adapt_delta first;\n",
+      "  on its own, it can usually be tolerated."
+    )
+  }
+
+  ebfmi     <- diag$ebfmi
+  low_ebfmi <- which(is.nan(ebfmi) | ebfmi < 0.3)
+  if (length(low_ebfmi) > 0) {
+    message(
+      "\nMCMC guidance for site '", site_name, "':\n",
+      "  Chain(s) ", paste(low_ebfmi, collapse = ", "),
+      " had a low or undefined E-BFMI (energy diagnostic).\n",
+      "  This means that chain explored the tails of the posterior poorly, which can\n",
+      "  make the estimated probabilities too narrow/overconfident. Try increasing\n",
+      "  iter and/or n_chains in mcmc_config and rerun."
+    )
+  }
+
+  invisible(diag)
+}
+
 #' Identify which locinames belong to the MSP1/MSP2 families
 #'
 #' @description Cross-checks locinames against the standard MSP1 (K1, MAD20,

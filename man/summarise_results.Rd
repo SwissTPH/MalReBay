@@ -8,7 +8,8 @@ summarise_results(
   mcmc_results,
   imported_data,
   output_folder = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  prob_threshold = 0.5
 )
 }
 \arguments{
@@ -20,10 +21,20 @@ summarise_results(
 \code{NULL} skips saving.}
 
 \item{verbose}{Logical. Print progress messages.}
+
+\item{prob_threshold}{Numeric in \verb{[0, 1]}. The posterior probability
+at or above which a recurrence is classified as \code{"Recrudescence"}
+(below it, \code{"Reinfection"}); used to add the \code{Classification}
+column to \code{posterior_probabilities} (and \code{comparison}).
+Defaults to \code{0.5}, the natural cutoff under this model's equal
+50/50 prior (see @sec-interpretation-probability in the analysis
+notebook).}
 }
 \value{
 A named list with \code{posterior_probabilities}, \code{comparison},
-\code{convergence}, and \code{mcmc_loglikelihoods}.
+\code{convergence}, and \code{mcmc_loglikelihoods}. Both
+\code{posterior_probabilities} and \code{comparison} include a
+\code{Classification} column derived from \code{prob_threshold}.
 }
 \description{
 Post-processes raw MCMC output from \code{\link{classify_infections}} into

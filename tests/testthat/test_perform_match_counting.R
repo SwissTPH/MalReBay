@@ -64,6 +64,6 @@ test_that("build_who_table applies the 70%/100% WHO rule correctly for Zaire", {
   
   expect_equal(who$table$WHO_loose, expected_loose)
   expect_equal(who$table$WHO_strict, expected_strict)
-  expect_equal(who$who_loose_label, "WHO 5/7")
-  expect_equal(who$who_strict_label, "WHO 7/7")
+  expect_equal(who$who_loose_label, "Match counting 5/7")
+  expect_equal(who$who_strict_label, "Match counting 7/7")
 })

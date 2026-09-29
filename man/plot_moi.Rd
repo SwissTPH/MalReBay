@@ -29,7 +29,9 @@ data is attached to each plot as the attribute \code{"moi_data"}.
 }
 \description{
 This function calculates the MOI (number of distinct alleles per marker per
-sample) and generates one violin plot per site for improved readability.
+sample) and generates one violin plot per site for improved readability,
+with a narrow boxplot (median/IQR) overlaid inside each violin and jittered
+points for the individual samples.
 }
 \examples{
 \dontrun{

@@ -16,6 +16,7 @@
 ^docs$
 ^vignettes/malrebay_vignette_outputs$
 ^vignettes/MalReBay_cache$
+^vignettes/MalReBay_OLD_reference\.Rmd\.bak$
 ^_pkgdown\.yml$
 ^vignettes/figure$
 ^pkgdown$

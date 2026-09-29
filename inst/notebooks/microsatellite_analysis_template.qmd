@@ -1,0 +1,136 @@
+---
+title: "MalReBay analysis template: microsatellites"
+author: "Monica Golumbeanu"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+::: callout-note
+Lightweight starting template for a microsatellite panel. For explanations of every step, see the [full tutorial](https://swisstph.github.io/MalReBay/articles/MalReBay.html). This example uses the example datasets provided with the MalReBay package. Replace the file paths in **Setup** with your own data.
+:::
+
+## Setup
+
+```{r}
+library(MalReBay)
+
+# --- edit these for your own data -------------------------------------
+filepath        <- system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay")
+marker_filepath <- system.file("extdata", "makers_details.xlsx", package = "MalReBay")
+output_folder   <- "malrebay_results"
+# ------------------------------------------------------------------------
+```
+
+## 1. Load data
+
+```{r}
+imported_data <- import_data(
+  filepath        = filepath,
+  marker_filepath = marker_filepath,
+  verbose          = TRUE
+)
+
+head(imported_data$late_failures)
+```
+
+## 2. Descriptive analysis
+
+```{r}
+# Plot the MOI distributions for each site
+moi_plots <- plot_moi(imported_data$late_failures, output_folder = NULL)
+moi_plots$Benguela
+```
+
+```{r}
+# Plot the diversity of each marker
+diversity_plot <- plot_markers_diversity(
+  genotypedata  = imported_data$late_failures,
+  data_type     = imported_data$data_type,
+  marker_info   = imported_data$marker_info,
+  output_folder = NULL
+)
+diversity_plot
+```
+
+```{r}
+#| fig-width: 13
+#| fig-height: 6
+#| out-width: 80%
+
+# Plot the distributions of alleles
+allele_plot <- plot_allele_distribution(
+  genotypedata  = imported_data$late_failures,
+  marker_info   = imported_data$marker_info,
+  output_folder = NULL
+)
+allele_plot
+```
+
+## 3. Run infection recurrence classification
+
+Uses the package's bundled default MCMC settings. If convergence looks poor in the next section, pass a stronger `mcmc_config` (e.g., `list(n_chains = 4, iter = 3000, adapt_delta = 0.95)`) and rerun.
+
+**This step might take a while depending on your dataset size, number of chains and iterations.**
+
+```{r}
+# Classify recurrent infections
+results <- MalReBay(
+  filepath        = filepath,
+  marker_filepath = marker_filepath,
+  output_folder   = output_folder,
+  verbose         = TRUE
+)
+```
+
+## 4. Inspect convergence
+
+```{r}
+# Raw convergence metrics:
+results$convergence
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 8
+
+# Plotting convergence diagnostics for the first site. Replace the site name for visualising the diagnostics from other sites.
+site_name <- names(results$mcmc_loglikelihoods)[1]
+
+plot_likelihood_diagnostics(
+  all_chains_loglikelihood = results$mcmc_loglikelihoods[[site_name]],
+  site_name                = site_name,
+  save_plot                = FALSE,
+  verbose                  = FALSE,
+  combine_plots            = TRUE
+)$combined
+```
+
+## 5. Visualize results
+
+```{r}
+#| fig-width: 12
+#| fig-height: 8
+plot_probability_histogram(results, output_folder = NULL)
+```
+
+```{r}
+plot_comparison_heatmap(results, imported_data$marker_info, output_folder = NULL)
+```
+
+## 6. Explore results
+
+```{r}
+results$posterior_probabilities
+```
+
+```{r}
+results$comparison
+```
+
+All tables and plots are also saved under `output_folder` (set `output_folder = NULL` above to skip saving and only view results here).
