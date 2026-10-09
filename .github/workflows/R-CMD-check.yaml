@@ -87,7 +87,19 @@ jobs:
         run: echo "CMDSTAN=${RUNNER_TEMP}/cmdstan/cmdstan-${CMDSTAN_VERSION}" >> "$GITHUB_ENV"
         shell: bash
 
+      # Windows only: quarto.exe renders the vignette in a separate R session
+      # that doesn't see R CMD build's temporary library, so MalReBay must
+      # also be installed in the regular library
+      - name: Install MalReBay for vignette rendering (Windows)
+        if: runner.os == 'Windows'
+        run: install.packages(".", repos = NULL, type = "source")
+        shell: Rscript {0}
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+          # Only fail on errors: the shipped precompiled Stan binary
+          # (src/stan/malrebay_model) always triggers the "executable file"
+          # WARNING, by design
+          error-on: '"error"'
