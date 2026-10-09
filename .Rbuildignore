@@ -25,3 +25,5 @@
 ^inst/stan/.*\.exe$
 ^inst/stan/.*\.o$
 ^Rplots\.pdf$
+^vignettes/\.quarto$
+^vignettes/bayesian_algorithm_output$

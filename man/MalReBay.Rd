@@ -25,6 +25,12 @@ Defaults to the package example dataset.}
 \item{marker_filepath}{Path to the marker metadata Excel file.
 Defaults to the package example marker file.}
 
+\item{additional_filepath}{Optional path to a separate file (csv or xlsx)
+with additional Day 0 samples, used only to
+estimate background allele frequencies. Ignored if
+the main file already has a second sheet. See
+\code{\link{import_data}}.}
+
 \item{mcmc_config}{Path to the MCMC configuration Excel file.
 Defaults to the package default configuration.}
 

@@ -70,9 +70,13 @@ jobs:
       - name: Install CmdStan
         if: steps.cache-cmdstan.outputs.cache-hit != 'true'
         run: |
+          # install_cmdstan() only creates its default folder; a custom dir
+          # must already exist, otherwise it stops with an error
+          cmdstan_dir <- file.path(Sys.getenv("RUNNER_TEMP"), "cmdstan")
+          dir.create(cmdstan_dir, recursive = TRUE, showWarnings = FALSE)
           cmdstanr::check_cmdstan_toolchain(fix = TRUE, quiet = TRUE)
           cmdstanr::install_cmdstan(
-            dir     = file.path(Sys.getenv("RUNNER_TEMP"), "cmdstan"),
+            dir     = cmdstan_dir,
             version = Sys.getenv("CMDSTAN_VERSION"),
             cores   = parallel::detectCores()
           )
