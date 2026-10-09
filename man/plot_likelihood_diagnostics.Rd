@@ -30,7 +30,7 @@ representing the log-likelihood history of one MCMC chain.}
 
 \item{combine_plots}{A logical. If \code{TRUE}, the returned list also
 includes \code{$combined}: all four panels arranged in a single 2x2
-\code{ggpubr::ggarrange()} grid.}
+\code{patchwork::wrap_plots()} grid.}
 }
 \value{
 An invisible list with the numeric diagnostics (\code{gelman},

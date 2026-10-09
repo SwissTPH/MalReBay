@@ -1,0 +1,87 @@
+# Plot Allele Distribution
+
+Creates a distribution plot of raw allele values for each marker,
+pooling all samples and timepoints together, for all sites combined and
+for each site separately, with the y-axis showing frequency (percentage
+of that marker's calls) rather than raw counts. For length-polymorphic
+markers (microsatellites, MSP1/MSP2/GLURP) this is a histogram of
+fragment sizes; for AmpSeq markers (`binning_method = "exact"`), which
+have no numeric length, this is instead a bar chart of frequency per
+haplotype, labelled by haplotype name. One panel per marker, arranged in
+a grid with at most `max_cols` per row.
+
+## Usage
+
+``` r
+plot_allele_distribution(
+  genotypedata,
+  marker_info,
+  binwidth = NULL,
+  output_folder = NULL,
+  filename_prefix = "allele_distribution",
+  max_cols = 4
+)
+```
+
+## Arguments
+
+- genotypedata:
+
+  A data frame containing the genotyping data, with a `Sample.ID` column
+  and per-marker allele columns.
+
+- marker_info:
+
+  A data frame with marker definitions (`marker_id`, `repeatlength`,
+  `binning_method`). Used to size histogram bins to each marker's
+  natural repeat unit (unless `binwidth` is given) and to decide which
+  markers get a haplotype bar chart instead.
+
+- binwidth:
+
+  Fixed bin width to use for every length-polymorphic marker's histogram
+  (ignored for AmpSeq markers). If `NULL` (default), microsatellite
+  markers use their own `repeatlength` from `marker_info` (the true
+  repeat-unit size) as long as it yields at most 60 bins across the
+  observed allele range for that marker; MSP1/MSP2/GLURP markers, and
+  any marker where `repeatlength` would produce more than 60 bins (e.g.
+  because a few outlier alleles stretch the range), use a data-driven
+  default instead, since their `repeatlength` either encodes a
+  family-clustering gap threshold rather than a natural bin width, or
+  would otherwise chop the range into slivers too thin to see.
+
+- output_folder:
+
+  Path to the directory where the output PNGs will be saved:
+  `<prefix>.png` for all sites and `<prefix>_<site>.png` per site. If
+  `NULL` (default), the plots are not saved to disk.
+
+- filename_prefix:
+
+  A string prefix for the output filenames.
+
+- max_cols:
+
+  Maximum number of panels per row. Defaults to 4.
+
+## Value
+
+Invisibly returns a list with `all_sites` (one figure pooling all sites)
+and `by_site` (a list of figures named by site; `NULL` if there is no
+`Site` column), or `NULL` if no allele data is available to plot.
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+  gdata <- data.frame(
+    Sample.ID = c("P1 Day 0", "P1 recurrence", "P2 Day 0", "P2 recurrence"),
+    Site      = "SiteA",
+    TA1_1     = c(174, 177, 162, 171),
+    TA1_2     = c(NA, NA, NA, NA)
+  )
+  marker_info <- data.frame(marker_id = "TA1", repeatlength = 3,
+                             binning_method = "microsatellite")
+  plot_allele_distribution(gdata, marker_info)
+} # }
+```

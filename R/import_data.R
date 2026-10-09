@@ -169,7 +169,9 @@ import_data <- function(
     
     if (verbose) {
       message("INFO: Detected 2 sheets in ", basename(filepath), ": ",
-              "Sheet 1 (late failures) has ", nrow(late_failures_df), " sample(s), ",
+              "Sheet 1 (infection recurrences) has ",
+              length(unique(gsub(" Day 0$| recurrence$", "", late_failures_df$Sample.ID))),
+              " patient(s) (", nrow(late_failures_df), " samples), ",
               "Sheet 2 (additional) has ", nrow(additional_df), " sample(s).")
       if (!is.null(additional_filepath)) {
         message("INFO: Ignoring additional_filepath since Sheet 2 already ",
@@ -225,7 +227,7 @@ import_data <- function(
       if (!all(grepl(" Day 0$", additional_df$Sample.ID))) {
         stop("ERROR: additional_filepath must contain only Day 0 samples -- ",
              "found recurrence/non-Day-0 records. Check that you're pointing ",
-             "at background/additional data, not a late-failures file.")
+             "at background/additional data, not an infection recurrences file.")
       }
     }
     
@@ -280,7 +282,10 @@ import_data <- function(
   unmatched_markers <- setdiff(detected_markers, markers_to_use)
 
   if (verbose) {
+    sites <- sort(unique(late_failures_df$Site))
     message("")
+    message("INFO: Detected ", length(sites), " site(s) in the data file:")
+    message("      ", paste(sites, collapse = ", "))
     message("INFO: Detected ", length(detected_markers), " marker(s) in the data file.")
     if (length(unmatched_markers) > 0) {
       message("INFO: ", length(unmatched_markers),

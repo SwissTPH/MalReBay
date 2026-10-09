@@ -1,112 +1,108 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-
-# MalReBay
-
+<p align="left">
+<img src="man/figures/readme-banner.png" width="420" alt="MalReBay: Bayesian classification of malaria recurrences" />
+</p>
 <!-- badges: start -->
 
-[![Codecov test
-coverage](https://codecov.io/gh/SwissTPH/MalReBay/graph/badge.svg)](https://app.codecov.io/gh/SwissTPH/MalReBay)
 [![R-CMD-check](https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-**MalReBay** is an R package for Bayesian molecular correction of
-malaria therapeutic efficacy studies (TES). Given paired genotyping data
-from a patient’s Day 0 infection and a later recurrence, it estimates
-the posterior probability of **recrudescence** (treatment failure)
-versus **reinfection** (new parasite). It supports length-polymorphic
-markers (microsatellites, MSP, GLURP) and amplicon sequencing data, and
-uses Stan HMC-NUTS via `cmdstanr` for inference.
+**MalReBay** is an R package for classifying recurrent *Plasmodium
+falciparum* infections in therapeutic efficacy studies (TES). In a TES,
+patients are treated for malaria and followed up for several weeks. When
+parasites reappear during follow-up, the recurrence is either a
+**recrudescence**, meaning the original infection was not cleared by the
+treatment, or a **reinfection**, meaning a new infection acquired after
+treatment. The two cannot be distinguished clinically.
+
+For each patient, MalReBay compares the parasite genotypes at baseline
+(Day 0) with those at recurrence and estimates the **probability that
+the recurrence is a recrudescence**. The estimate is obtained with a
+Bayesian model, which accounts for polyclonal infections, the frequency
+of each allele in the local parasite population, and missing genotyping
+data.
+
+MalReBay supports the three main genotyping approaches used in TES:
+microsatellites, the length-polymorphic markers MSP1, MSP2 and GLURP,
+and amplicon sequencing.
 
 ## Installation
 
-Installing MalReBay takes three short steps and about 10 minutes in
-total, almost all of it hands-off waiting. You only need to do this
-**once** per computer — after that, `library(MalReBay)` is all you
-need, in every future R session.
-
-> **Why so many steps?** MalReBay’s statistical engine is written in
-> [Stan](https://mc-stan.org/), a language for Bayesian modelling that
-> needs to be compiled into fast machine code. Step 1 installs that
-> compiler toolkit (CmdStan) and step 2 checks it’s ready to go. Step 3
-> installs MalReBay itself, which compiles its model against the
-> CmdStan from step 1 — that’s why **the order below matters**: CmdStan
-> has to be in place *before* you install MalReBay.
+Installation is required only once per computer and takes approximately
+10 minutes. MalReBay’s statistical model is written in
+[Stan](https://mc-stan.org/), which requires the CmdStan software.
+CmdStan must therefore be installed **before** MalReBay, and the steps
+below should be followed in order.
 
 ### Prerequisites
 
-- **R version 4.1.0 or later.** Check yours by running
+- **R version 4.1.0 or later.** To check your version, run
   `R.version.string` in the R console.
-- **A C++ compiler**, needed to build CmdStan and MalReBay’s model.
-  This is usually a one-time, one-command install:
+- **A C++ compiler**, which is required to build CmdStan:
   - **Windows:** install
-    [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (pick the
-    version matching your R version).
-  - **macOS:** open Terminal and run `xcode-select --install`.
-  - **Linux (Debian/Ubuntu):** open a terminal and run
-    `sudo apt-get install build-essential`.
+    [Rtools](https://cran.r-project.org/bin/windows/Rtools/), selecting
+    the version that matches your R version.
+  - **macOS:** run `xcode-select --install` in the Terminal.
+  - **Linux (Debian/Ubuntu):** run
+    `sudo apt-get install build-essential` in a terminal.
 
-### Step 1 — Install CmdStan
+### Step 1: Install CmdStan
 
 ``` r
+# If the cmdstanr package is not yet installed, run the following line first:
 # install.packages("cmdstanr", repos = c("https://stan-dev.r-universe.dev", getOption("repos")))
 cmdstanr::install_cmdstan()
 ```
 
-This downloads and compiles CmdStan, MalReBay’s statistical engine — it
-takes around 5 minutes and shows its own progress as it goes.
+This step downloads and builds CmdStan. It takes approximately 5
+minutes.
 
-### Step 2 — Check your setup (optional but recommended)
+### Step 2: Check the setup (recommended)
 
 ``` r
 cmdstanr::check_cmdstan_toolchain()
 ```
 
-This confirms your C++ compiler is correctly set up *before* you try
-to install MalReBay, so any problem is caught here with a clear
-message rather than a confusing error later. If it reports a problem,
-follow its instructions (usually pointing back to the Prerequisites
-step above), then run it again.
+This step confirms that the C++ compiler is correctly configured. If a
+problem is reported, follow the instructions in the message, which
+usually refer to the prerequisites above, and run the check again.
 
-### Step 3 — Install MalReBay
+### Step 3: Install MalReBay
 
 ``` r
-# install.packages("remotes")  # run this line first if you don't have remotes
+# If the remotes package is not yet installed, run the following line first:
+# install.packages("remotes")
 remotes::install_github("SwissTPH/MalReBay")
 ```
 
-This step compiles MalReBay’s Stan model against the CmdStan from step
-1, so it takes a little longer than a typical package install (roughly
-a minute) — that one-time cost is also why the order matters: if
-CmdStan isn’t installed yet, this step will fail.
+On most systems, this step compiles MalReBay’s statistical model using
+CmdStan, and therefore takes slightly longer than a typical package
+installation.
 
-**That’s it!** Open a fresh R session and confirm everything worked:
+To confirm that the installation was successful, open a new R session
+and run:
 
 ``` r
 library(MalReBay)
 ```
 
-If this loads without a `NOTE: CmdStan is not installed...` message,
-you’re ready to go — see [Quick Start](#quick-start) below.
+The installation is complete if the package loads without the message
+`NOTE: CmdStan is not installed or not found`.
 
 ### Troubleshooting
 
-- **“unused argument” or a compiler error during step 3:** re-run
-  `cmdstanr::check_cmdstan_toolchain()` from step 2 — it usually
-  points directly at the missing piece (most often a missing C++
-  compiler).
-- **Installed once already, now reinstalling after making changes to
-  the package:** every reinstall recompiles the Stan model from
-  scratch, so step 3 will always take about a minute, even for small
-  changes elsewhere in the package.
-- **Still stuck?** Open an issue at
-  <https://github.com/SwissTPH/MalReBay/issues> with the exact error
-  message — it’s the fastest way for us to help.
+- **Compiler error during Step 3:** run
+  `cmdstanr::check_cmdstan_toolchain()` again. It usually identifies the
+  missing component, which is most often the C++ compiler.
+- **Other problems:** please open an issue at
+  <https://github.com/SwissTPH/MalReBay/issues> and include the complete
+  error message.
 
-## Quick Start
+## Quick start
 
-Try MalReBay right away on its bundled example dataset — no files of
-your own needed yet:
+The following example runs MalReBay on the example dataset included in
+the package:
 
 ``` r
 library(MalReBay)
@@ -116,18 +112,13 @@ results <- MalReBay()
 head(results$posterior_probabilities)
 ```
 
-Once you’re ready to use your own data, point `MalReBay()` at your
-files:
+To analyse your own data, please refer to the [package
+vignette](https://swisstph.github.io/MalReBay/articles/MalReBay.html),
+which describes the required input file formats and provides a complete
+worked example.
 
-``` r
-results <- MalReBay(
-  filepath        = "path/to/genotype_data.xlsx",
-  marker_filepath = "path/to/marker_info.xlsx",
-  output_folder   = "my_results"
-)
+## Documentation
 
-head(results$posterior_probabilities)
-```
-
-For a full walkthrough of the input file formats and a worked example,
-see the [package vignette](https://swisstph.github.io/MalReBay/).
+For further information and the full documentation, including the
+reference for all functions, please visit the MalReBay website:
+<https://swisstph.github.io/MalReBay/>.

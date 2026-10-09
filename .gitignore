@@ -18,6 +18,7 @@ src/stan/*
 !src/stan/*.stan
 !src/stan/malrebay_model
 !src/stan/libtbb.so.2
+!src/stan/malrebay_model.stan.md5
 
 # macOS files ----
 .DS_Store
@@ -54,8 +55,9 @@ README.html
 /Meta/
 /doc/
 inst/doc
-docs
 vignettes/bayesian_algorithm_output/
 inst/notebooks/malrebay_results/
 tests/testthat/marker_comparibility_test.R
 inst/extdata/MSP 2490_AL.xlsx
+Rplots.pdf
+*:Zone.Identifier

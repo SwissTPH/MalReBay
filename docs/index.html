@@ -6,13 +6,20 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Bayesian classification for malaria recurrences • MalReBay</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" sizes="any" href="favicon.ico">
+<link rel="manifest" href="site.webmanifest">
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Bayesian classification for malaria recurrences">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
+<meta property="og:title" content="Bayesian classification for malaria recurrences">
 <meta name="description" content="Classification of malaria infection recurrence using a Bayesian algorithm implemented in Stan for efficient sampling.">
 <meta property="og:description" content="Classification of malaria infection recurrence using a Bayesian algorithm implemented in Stan for efficient sampling.">
+<meta property="og:image" content="https://swisstph.github.io/MalReBay/logo.svg">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -47,107 +54,94 @@
   </div>
 </nav><div class="container template-home">
 <div class="row">
-  <main id="main" class="col-md-9"><div class="section level1">
-<div class="page-header"><h1 id="malrebay">MalReBay<a class="anchor" aria-label="anchor" href="#malrebay"></a>
-</h1></div>
+  <main id="main" class="col-md-9"><p align="left">
+<img src="reference/figures/readme-banner.png" width="420" alt="MalReBay: Bayesian classification of malaria recurrences"></p>
 <!-- badges: start -->
 
-<div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
-</h2>
-<p><strong>MalReBay</strong> is an R package for Bayesian molecular correction of malaria therapeutic efficacy studies (TES). Given paired genotyping data from a patient’s initial infection (Day 0) and a later recurrence, it estimates the posterior probability that the recurrence is a <strong>recrudescence</strong> (treatment failure, same parasite persisting) versus a <strong>reinfection</strong> (new parasite acquired after treatment).</p>
-<p>Unlike rule-based allele-matching methods, MalReBay:</p>
-<ul>
-<li>models sequencing error, allelic dropout, and allele loss explicitly</li>
-<li>handles <strong>polyclonal infections</strong> (MOI &gt; 1) at every locus</li>
-<li>incorporates <strong>local allele frequency</strong> information to weigh evidence</li>
-<li>uses a full <strong>Bayesian MCMC</strong> engine (Stan HMC-NUTS) for principled uncertainty quantification</li>
-<li>supports both <strong>length-polymorphic markers</strong> (microsatellites, MSP, GLURP) and <strong>amplicon sequencing</strong> (haplotype) data</li>
-</ul>
-<hr>
-</div>
-<div class="section level2">
-<h2 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
-</h2>
-<table class="table">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<thead><tr>
-<th>Feature</th>
-<th>Detail</th>
-</tr></thead>
-<tbody>
-<tr>
-<td><strong>Data types</strong></td>
-<td>Length-polymorphic markers and amplicon sequencing</td>
-</tr>
-<tr>
-<td><strong>MCMC engine</strong></td>
-<td>Stan HMC-NUTS via <code>rstan</code> — fast, well-mixing, gradient-based</td>
-</tr>
-<tr>
-<td><strong>Polyclonal infections</strong></td>
-<td>Analytically marginalises over within-host clone multiplicity</td>
-</tr>
-<tr>
-<td><strong>Error model</strong></td>
-<td>Estimates <code>q_mismatch</code>, <code>q_loss</code>, <code>q_dropout</code> from the data</td>
-</tr>
-<tr>
-<td><strong>Prior</strong></td>
-<td>Recrudescence probability fixed at 0.5 (no directional bias)</td>
-</tr>
-<tr>
-<td><strong>Convergence</strong></td>
-<td>Rank-normalised R̂, bulk/tail ESS, Geweke, Gelman-Rubin</td>
-</tr>
-<tr>
-<td><strong>Output</strong></td>
-<td>Per-patient posterior probability + match-counting comparison table</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</div>
+<p><strong>MalReBay</strong> is an R package for classifying recurrent <em>Plasmodium falciparum</em> infections in therapeutic efficacy studies (TES). In a TES, patients are treated for malaria and followed up for several weeks. When parasites reappear during follow-up, the recurrence is either a <strong>recrudescence</strong>, meaning the original infection was not cleared by the treatment, or a <strong>reinfection</strong>, meaning a new infection acquired after treatment. The two cannot be distinguished clinically.</p>
+<p>For each patient, MalReBay compares the parasite genotypes at baseline (Day 0) with those at recurrence and estimates the <strong>probability that the recurrence is a recrudescence</strong>. The estimate is obtained with a Bayesian model, which accounts for polyclonal infections, the frequency of each allele in the local parasite population, and missing genotyping data.</p>
+<p>MalReBay supports the three main genotyping approaches used in TES: microsatellites, the length-polymorphic markers MSP1, MSP2 and GLURP, and amplicon sequencing.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
+<p>Installation is required only once per computer and takes approximately 10 minutes. MalReBay’s statistical model is written in <a href="https://mc-stan.org/" class="external-link">Stan</a>, which requires the CmdStan software. CmdStan must therefore be installed <strong>before</strong> MalReBay, and the steps below should be followed in order.</p>
+<div class="section level3">
+<h3 id="prerequisites">Prerequisites<a class="anchor" aria-label="anchor" href="#prerequisites"></a>
+</h3>
+<ul>
+<li>
+<strong>R version 4.1.0 or later.</strong> To check your version, run <code>R.version.string</code> in the R console.</li>
+<li>
+<strong>A C++ compiler</strong>, which is required to build CmdStan:
+<ul>
+<li>
+<strong>Windows:</strong> install <a href="https://cran.r-project.org/bin/windows/Rtools/" class="external-link">Rtools</a>, selecting the version that matches your R version.</li>
+<li>
+<strong>macOS:</strong> run <code>xcode-select --install</code> in the Terminal.</li>
+<li>
+<strong>Linux (Debian/Ubuntu):</strong> run <code>sudo apt-get install build-essential</code> in a terminal.</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="step-1-install-cmdstan">Step 1: Install CmdStan<a class="anchor" aria-label="anchor" href="#step-1-install-cmdstan"></a>
+</h3>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install the development version from GitHub</span></span>
+<code class="sourceCode R"><span><span class="co"># If the cmdstanr package is not yet installed, run the following line first:</span></span>
+<span><span class="co"># install.packages("cmdstanr", repos = c("https://stan-dev.r-universe.dev", getOption("repos")))</span></span>
+<span><span class="fu">cmdstanr</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/cmdstanr/reference/install_cmdstan.html" class="external-link">install_cmdstan</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>This step downloads and builds CmdStan. It takes approximately 5 minutes.</p>
+</div>
+<div class="section level3">
+<h3 id="step-2-check-the-setup-recommended">Step 2: Check the setup (recommended)<a class="anchor" aria-label="anchor" href="#step-2-check-the-setup-recommended"></a>
+</h3>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">cmdstanr</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/cmdstanr/reference/install_cmdstan.html" class="external-link">check_cmdstan_toolchain</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>This step confirms that the C++ compiler is correctly configured. If a problem is reported, follow the instructions in the message, which usually refer to the prerequisites above, and run the check again.</p>
+</div>
+<div class="section level3">
+<h3 id="step-3-install-malrebay">Step 3: Install MalReBay<a class="anchor" aria-label="anchor" href="#step-3-install-malrebay"></a>
+</h3>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># If the remotes package is not yet installed, run the following line first:</span></span>
+<span><span class="co"># install.packages("remotes")</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"SwissTPH/MalReBay"</span><span class="op">)</span></span></code></pre></div>
-<blockquote>
-<p><strong>Note:</strong> MalReBay links against <code>rstan</code> and <code>StanHeaders</code>. On first use the Stan model is compiled once and cached. This may take a few minutes but only happens once per R installation.</p>
-</blockquote>
-<hr>
+<p>On most systems, this step compiles MalReBay’s statistical model using CmdStan, and therefore takes slightly longer than a typical package installation.</p>
+<p>To confirm that the installation was successful, open a new R session and run:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://swisstph.github.io/MalReBay">MalReBay</a></span><span class="op">)</span></span></code></pre></div>
+<p>The installation is complete if the package loads without the message <code>NOTE: CmdStan is not installed or not found</code>.</p>
+</div>
+<div class="section level3">
+<h3 id="troubleshooting">Troubleshooting<a class="anchor" aria-label="anchor" href="#troubleshooting"></a>
+</h3>
+<ul>
+<li>
+<strong>Compiler error during Step 3:</strong> run <code><a href="https://mc-stan.org/cmdstanr/reference/install_cmdstan.html" class="external-link">cmdstanr::check_cmdstan_toolchain()</a></code> again. It usually identifies the missing component, which is most often the C++ compiler.</li>
+<li>
+<strong>Other problems:</strong> please open an issue at <a href="https://github.com/SwissTPH/MalReBay/issues" class="external-link uri">https://github.com/SwissTPH/MalReBay/issues</a> and include the complete error message.</li>
+</ul>
+</div>
 </div>
 <div class="section level2">
-<h2 id="quick-start">Quick Start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<p>The following example runs MalReBay on the example dataset included in the package:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://swisstph.github.io/MalReBay">MalReBay</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Run the full pipeline on the bundled Angola 2021 TES example data</span></span>
-<span><span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/MalReBay.html">MalReBay</a></span><span class="op">(</span>output_folder <span class="op">=</span> <span class="st">"my_results"</span><span class="op">)</span></span>
+<span><span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/MalReBay.html">MalReBay</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># View posterior probabilities</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">results</span><span class="op">$</span><span class="va">posterior_probabilities</span><span class="op">)</span></span></code></pre></div>
-<hr>
+<p>To analyse your own data, please refer to the <a href="https://swisstph.github.io/MalReBay/articles/MalReBay.html">package vignette</a>, which describes the required input file formats and provides a complete worked example.</p>
 </div>
 <div class="section level2">
-<h2 id="workflow">Workflow<a class="anchor" aria-label="anchor" href="#workflow"></a>
+<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>MalReBay wraps a four-step pipeline that can also be called step by step:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">import_data</span>()</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    ↓</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">classify_infections</span>()</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    ↓</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">summarise_results</span>()</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    ↓</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="fu">save_results</span>()</span></code></pre></div>
+<p>For further information and the full documentation, including the reference for all functions, please visit the MalReBay website: <a href="https://swisstph.github.io/MalReBay/" class="uri">https://swisstph.github.io/MalReBay/</a>.</p>
 </div>
-</div>
+
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
@@ -168,7 +162,6 @@
 <h2 data-toc-skip>Community</h2>
 <ul class="list-unstyled">
 <li><a href="CONTRIBUTING.html">Contributing guide</a></li>
-<li><a href="CODE_OF_CONDUCT.html">Code of conduct</a></li>
 </ul>
 </div>
 
@@ -191,7 +184,6 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
-<li><a href="https://app.codecov.io/gh/SwissTPH/MalReBay" class="external-link"><img src="https://codecov.io/gh/SwissTPH/MalReBay/graph/badge.svg" alt="Codecov test coverage"></a></li>
 <li><a href="https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/SwissTPH/MalReBay/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 </ul>
 </div>
@@ -205,7 +197,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

@@ -34,20 +34,24 @@ instead, since their \code{repeatlength} either encodes a
 family-clustering gap threshold rather than a natural bin width, or
 would otherwise chop the range into slivers too thin to see.}
 
-\item{output_folder}{Path to the directory where the output PNG will be
-saved. If \code{NULL} (default), the plot is not saved to disk.}
+\item{output_folder}{Path to the directory where the output PNGs will be
+saved: \verb{<prefix>.png} for all sites and \verb{<prefix>_<site>.png}
+per site. If \code{NULL} (default), the plots are not saved to disk.}
 
-\item{filename_prefix}{A string prefix for the output filename.}
+\item{filename_prefix}{A string prefix for the output filenames.}
 
 \item{max_cols}{Maximum number of panels per row. Defaults to 4.}
 }
 \value{
-Invisibly returns the combined ggplot object, or \code{NULL} if no
+Invisibly returns a list with \code{all_sites} (one figure pooling
+all sites) and \code{by_site} (a list of figures named by site;
+\code{NULL} if there is no \code{Site} column), or \code{NULL} if no
 allele data is available to plot.
 }
 \description{
 Creates a distribution plot of raw allele values for each
-marker, pooling all samples and timepoints together, with the y-axis
+marker, pooling all samples and timepoints together, for all sites
+combined and for each site separately, with the y-axis
 showing frequency (percentage of that marker's calls) rather than raw
 counts. For length-polymorphic markers (microsatellites, MSP1/MSP2/GLURP)
 this is a histogram of fragment sizes; for AmpSeq markers

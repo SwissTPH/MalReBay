@@ -1,9 +1,9 @@
-pandoc: 3.6.3
-pkgdown: 2.2.0
+pandoc: '3.2'
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   MalReBay: MalReBay.html
-last_built: 2026-04-14T08:14Z
+last_built: 2026-10-09T12:20Z
 urls:
   reference: https://swisstph.github.io/MalReBay/reference
   article: https://swisstph.github.io/MalReBay/articles

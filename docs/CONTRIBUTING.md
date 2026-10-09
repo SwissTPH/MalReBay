@@ -1,263 +1,187 @@
-# Contributing to BayesMalariaTES
+# Contributing to MalReBay
 
-First off, thanks for taking the time to contribute to
-`BayesMalariaTES`!
+Thanks for considering a contribution. This document covers how the
+package is organised internally and the mechanics of making a change —
+for the statistical model itself and how to *use* the package, see the
+[tutorial
+vignette](https://swisstph.github.io/MalReBay/vignettes/MalReBay.qmd)
+instead.
 
-All types of contributions are encouraged and valued. See the [Table of
-contents](#table-of-contents) for different ways to help and details
-about how this project handles them. Please make sure to read the
-relevant section before making your contribution. It will make it a lot
-easier for us maintainers and smooth out the experience for all
-involved.
+## Getting set up
 
-## Table of contents
+Follow the [README’s installation
+instructions](https://swisstph.github.io/MalReBay/README.html#installation)
+first (CmdStan, then MalReBay) — you need a working CmdStan install to
+run almost anything in this package, including the test suite.
 
-- [Code of conduct](#code-of-conduct)
-- [Style guide](#style-guide)
-- [Commit messages](#commit-messages)
-- [Asking questions](#asking-questions)
-- [Reporting bugs](#reporting-bugs)
-- [Requesting features](#requesting-features)
-- [Contributing code](#contributing-code)
-
-## Code of conduct
-
-This project is released with a [Contributor Code of
-Conduct](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/blob/master/CODE_OF_CONDUCT.md).
-By participating, you are expected to uphold this code. Please report
-unacceptable behavior to <veronica.adhiambo@aims.ac.rw>.
-
-## Style guide
-
-We use the [Tidyverse style guide](https://style.tidyverse.org/) for
-writing R code. Functions are documented with the
-[roxygen2](https://roxygen2.r-lib.org/articles/roxygen2.html) syntax.
-`BayesMalariaTES` uses the `lower_snake_case`.
-
-## Commit messages
-
-If you want to contribute by commiting changes, please try to use the
-[Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
-specification.
-
-## Asking questions
-
-Before you ask a question, it is best to search for existing
-[Issues](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues)
-that might help you. In case you have found a suitable issue and still
-need clarification, you can write your question in this issue.
-
-If you then still feel the need to ask a question and need
-clarification, we recommend the following:
-
-- Open a new
-  [Issue](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues/new).
-- Use the template
-  [other_issue.md](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/blob/master/.github/ISSUE_TEMPLATE/other_issue.md).
-- Provide as much context as you can about what you’re running into.
-- Provide project and platform versions (paste the output of
-  [`sessionInfo()`](https://rdrr.io/r/utils/sessionInfo.html)).
-
-We will then take care of the issue as soon as possible.
-
-## Reporting bugs
-
-### Before submitting a bug report
-
-A good bug report shouldn’t leave others needing to chase you up for
-more information. Therefore, we ask you to investigate carefully,
-collect information and describe the issue in detail in your report.
-Please complete the following steps in advance to help us fix any
-potential bug as fast as possible.
-
-- Make sure that you are using the latest version of `BayesMalariaTES`.
-- Determine if your bug is really a bug and not an error on your side.
-- To see if other users have experienced (and potentially already
-  solved) the same issue you are having, check if there is not already a
-  bug report existing for your bug or error in the [bug
-  tracker](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues?q=label%3Abug).
-
-### How do I submit a bug report?
-
-We use [GitHub
-Issues](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues)
-to track bugs and errors. If you run into an issue with the project:
-
-- Open a new
-  [Issue](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues/new).
-- Use the template
-  [bug_report.md](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/blob/master/.github/ISSUE_TEMPLATE/bug_report.md).
-- Explain the behavior you would expect and the actual behavior.
-- Please provide as much context as possible and describe the
-  *reproduction steps* that someone else can follow to recreate the
-  issue on their own. This usually includes your code with a
-  reproducible example.
-
-We will then take care of the issue as soon as possible.
-
-## Requesting features
-
-### Before requesting a feature
-
-- Make sure that you are using the latest version of `BayesMalariaTES`.
-- Read the
-  [documentation](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/)
-  carefully and find out if the functionality is already covered.
-- Perform a
-  [search](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues)
-  to see if this enhancement has already been suggested. If it has, add
-  a comment to the existing issue instead of opening a new one.
-
-### How do I submit a feature request?
-
-Feature requests are tracked as [GitHub
-Issues](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues).
-
-- Open a new
-  [Issue](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/issues/new).
-- Use the template
-  [feature_request.md](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/blob/master/.github/ISSUE_TEMPLATE/feature_request.md).
-- Provide a clear and descriptive title for the issue to identify the
-  suggestion.
-- Provide a step-by-step description of the suggested enhancement in as
-  many details as possible.
-- Explain why this enhancement would be useful to most `BayesMalariaTES`
-  users.
-
-We will then take care of the issue as soon as possible.
-
-## Contributing code
-
-### General workflow
-
-We use the [GitHub
-flow](https://docs.github.com/en/get-started/quickstart/github-flow) to
-collaborate on this project:
-
-1.  [Fork](https://docs.github.com/en/get-started/quickstart/contributing-to-projects)
-    this repository using the GitHub interface.
-2.  [Clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-    your fork using `git clone fork-url` (replace `fork-url` by the URL
-    of your fork). Alternatively, open RStudio IDE and create a New
-    Project from Version Control.
-3.  Create a new branch w/ `git checkout -b branch-name` (replace
-    `branch-name` by the name of your new branch).
-4.  Make your contribution (see below for examples).
-5.  Stage (`git add`) and commit (`git commit`) your changes as often as
-    necessary
-6.  Push your changes to GitHub w/ `git push origin branch-name`.
-7.  Submit a [Pull
-    Request](https://docs.github.com/en/get-started/quickstart/contributing-to-projects#making-a-pull-request)
-    on the [original
-    repo](https://github.com/Veronica-adhiambo-ochieng/BayesMalariaTES/compare).
-
-We will then review the PR as soon as possible.
-
-### Improve documentation
-
-#### Editing the README
-
-If you want to contribute by improving the README, please edit the
-`README.Rmd` (not the `README.md`). Do not forget to update the
-`README.md` by running:
+Then clone the repo and install the package from source:
 
 ``` r
-rmarkdown::render("README.Rmd")
+# install.packages("devtools")
+devtools::install_deps(dependencies = TRUE)
+devtools::load_all()
 ```
 
-#### Editing vignettes
+## Package structure
 
-If you want to contribute by editing an existing vignette, just edit the
-corresponding `Rmd` file stored in the `vignettes/` folder.
+MalReBay classifies each recurrence in four stages —
+[`import_data()`](https://swisstph.github.io/MalReBay/reference/import_data.md)
+→
+[`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md)
+→
+[`summarise_results()`](https://swisstph.github.io/MalReBay/reference/summarise_results.md)
+→
+[`save_results()`](https://swisstph.github.io/MalReBay/reference/save_results.md),
+wrapped together by
+[`MalReBay()`](https://swisstph.github.io/MalReBay/reference/MalReBay.md)
+(see the vignette’s workflow diagram). Internally, the code is organised
+by what part of that pipeline it belongs to:
 
-If you want to contribute by adding a new vignette, create a new `Rmd`
-file in the `vignettes/` folder and add the following header:
+### Data preparation (`R/import_data.R`, `R/allele_utils.R`, `R/quality_control.R`)
 
-``` yaml
----
-title: "Vignette Title"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Vignette Title}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
----
-```
+- [`import_data()`](https://swisstph.github.io/MalReBay/reference/import_data.md)
+  reads the genotyping Excel/CSV and marker metadata, auto-detects
+  length-polymorphic vs. AmpSeq data from the first allele value, and
+  validates the input structure.
+- `define_alleles()` / `recodeallele()` group raw length-polymorphic
+  fragment sizes into allele bins, using each marker’s `repeatlength`
+  and `binning_method`.
+- [`detect_msp_variants()`](https://swisstph.github.io/MalReBay/reference/detect_msp_variants.md)
+  identifies which loci belong to the MSP1 (K1/MAD20/RO33) and MSP2
+  (3D7/FC27/IC) families, needed for the classic WHO 2/3-3/3 trio rule.
+- [`compute_locus_comparability()`](https://swisstph.github.io/MalReBay/reference/compute_locus_comparability.md)
+  and
+  [`data_quality_check()`](https://swisstph.github.io/MalReBay/reference/data_quality_check.md)
+  compute per-patient locus availability and run basic sanity checks on
+  the input.
 
-If you use a new external dependency, do not forget to add it in the
-`DESCRIPTION` file under the section `Suggests` (only if this package is
-not already listed under the section `Imports`).
+### Stan data prep and Bayesian inference (`R/stan_data_prep.R`, `R/stan_interface.R`, `src/stan/`)
 
-Check the integrity of the package with:
+- `prepare_stan_data()` (+ `validate_stan_data()`, `stan_data_only()`)
+  turns the imported data frame into the integer-coded arrays the Stan
+  model expects: recoded alleles, hidden-allele flags for polyclonal
+  infections, the locus-comparability matrix, and per-locus
+  allele-distance matrices.
+- `run_stan_sites()` / `extract_stan_results()` load the precompiled
+  model via
+  [`instantiate::stan_package_model()`](https://wlandau.github.io/instantiate/reference/stan_package_model.html)
+  and run `$sample()` once per TES site.
+- `src/stan/malrebay_model.stan` is the actual model — a single Stan
+  file shared by all three marker types; per-locus dispatch on
+  `binning_method` (microsatellite distance decay / MSP-GLURP family
+  clustering / AmpSeq exact match) happens inside the model via the
+  `method_int` array, not by branching in R. It’s precompiled at package
+  install time (see `src/install.libs.R`), which ships a portable
+  `stanc` binary and a stub CmdStan directory so installation doesn’t
+  require a full CmdStan toolchain — only *using* the package does (see
+  README).
 
-``` r
-devtools::check()
-```
+### Traditional match counting (`R/match_counting.R`, WHO helpers in `R/plot_utils.R`)
 
-#### Editing function documentation
+- `perform_match_counting()` (+ `assign_clusters()`) implements the
+  deterministic allele match-counting algorithm — per-locus
+  `R`/`NI`/`IND`/`ERR` calls — used as the classical comparison against
+  MalReBay’s Bayesian probability.
+- `build_who_table()`, `apply_who_rule()`, and `combine_msp_variants()`
+  turn those per-locus calls into the WHO loose/strict pass-fail
+  classification: the 2/3-3/3 rule for MSP1/MSP2 trio panels, or a
+  proportional 70%/100% rule otherwise.
 
-If you want to contribute by improving the documentation of a function,
-open the corresponding file in the `R/` folder and edit lines starting
-with `#'` ([roxygen2](https://roxygen2.r-lib.org/articles/roxygen2.html)
-syntax).
+### Results and output (`R/MalReBay.R`, `R/plot_utils.R`, `R/quality_control.R`)
 
-Update the documentation (`Rd` files in the `man/` folder) by running:
+- [`classify_infections()`](https://swisstph.github.io/MalReBay/reference/classify_infections.md),
+  [`summarise_results()`](https://swisstph.github.io/MalReBay/reference/summarise_results.md),
+  [`save_results()`](https://swisstph.github.io/MalReBay/reference/save_results.md),
+  and
+  [`MalReBay()`](https://swisstph.github.io/MalReBay/reference/MalReBay.md)
+  are the four pipeline stages described above.
+- Plotting functions in `R/plot_utils.R` —
+  [`plot_moi()`](https://swisstph.github.io/MalReBay/reference/plot_moi.md),
+  [`plot_markers_diversity()`](https://swisstph.github.io/MalReBay/reference/plot_markers_diversity.md),
+  [`plot_allele_distribution()`](https://swisstph.github.io/MalReBay/reference/plot_allele_distribution.md),
+  [`plot_probability_histogram()`](https://swisstph.github.io/MalReBay/reference/plot_probability_histogram.md),
+  [`plot_comparison_heatmap()`](https://swisstph.github.io/MalReBay/reference/plot_comparison_heatmap.md),
+  and
+  [`plot_likelihood_diagnostics()`](https://swisstph.github.io/MalReBay/reference/plot_likelihood_diagnostics.md)
+  (MCMC convergence diagnostics) — all return ggplot2 objects rather
+  than drawing directly, so callers can inspect, recombine, or save
+  them.
+- [`check_mcmc_diagnostics()`](https://swisstph.github.io/MalReBay/reference/check_mcmc_diagnostics.md)
+  (`R/quality_control.R`) prints plain-language guidance when
+  divergences, treedepth hits, or E-BFMI look problematic after a Stan
+  run.
 
-``` r
-devtools::document()
-```
+### Package-level bits
 
-If you use a new external dependency in the example section, do not
-forget to add it in the `DESCRIPTION` file under the section `Imports`
-(only if this package is not already listed).
+- `R/MalReBay-package.R` — package-level documentation and
+  [`utils::globalVariables()`](https://rdrr.io/r/utils/globalVariables.html)
+  declarations for the non-standard-evaluation column names used
+  throughout the dplyr pipelines.
+- `R/zzz.R` — `.onAttach()` warns once at load time if CmdStan isn’t
+  found.
+- `R/utils-pipe.R` — re-exports the `%>%` pipe.
 
-Check the integrity of the package with:
+## Tests
 
-``` r
-devtools::check()
-```
-
-### Fix bug
-
-If you want to contribute by improving the code of a function, open and
-edit the corresponding file in the `R/` folder.
-
-Check the integrity of the package with:
-
-``` r
-devtools::check()
-```
-
-Do not forget to adapt the [unit
-tests](https://r-pkgs.org/testing-basics.html#introducing-testthat) for
-the function by editing the corresponding file stored in the
-`tests/testthat/` folder. We use the package
-[`testthat`](https://testthat.r-lib.org/) to implement unit tests.
-
-Check your tests by running:
+Tests live in `tests/testthat/` and run with:
 
 ``` r
 devtools::test()
+# or a single file:
+testthat::test_file("tests/testthat/test_MalReBay.R")
 ```
 
-### New feature
+Most tests use in-memory mock data; a few use a real Angola TES dataset
+pre-imported and saved as `inst/extdata/imported_data.rds`, to avoid
+[`import_data()`](https://swisstph.github.io/MalReBay/reference/import_data.md)
+file-path issues before the package is installed. MCMC-based tests are
+slow (they run real Stan sampling) — expect the full suite to take a few
+minutes.
 
-If you want to contribute by submitting a new feature, please follow
-this workflow:
+## Documentation
 
-1.  Create a new `R` file in the folder `R/`.
-2.  Implement the code of the function.
-3.  Document your function w/ the
-    [roxygen2](https://roxygen2.r-lib.org/articles/roxygen2.html)
-    syntax.
-4.  If necessary, add additional dependencies in the `DESCRIPTION` file.
-5.  Update the package documentation w/
-    [`devtools::document()`](https://devtools.r-lib.org/reference/document.html).
-6.  Create a new `R` file in the folder `tests/testthat/`.
-7.  Implement [unit
-    tests](https://r-pkgs.org/testing-basics.html#introducing-testthat)
-    for the new function.
-8.  Check the integrity of the package w/
-    [`devtools::check()`](https://devtools.r-lib.org/reference/check.html).
+Roxygen comments in `R/*.R` are the source of truth for `man/*.Rd` and
+`NAMESPACE`. After changing any `#'` roxygen block, regenerate both
+with:
 
-**Thanks for your contribution!**
+``` r
+devtools::document()
+# or: roxygen2::roxygenise()
+```
+
+Do not hand-edit files under `man/` or `NAMESPACE` — they’re marked
+“Generated by roxygen2: do not edit by hand” for a reason; a hand edit
+will just get silently overwritten (or drift out of sync) the next time
+someone runs `devtools::document()`.
+
+## The tutorial vignette
+
+`vignettes/MalReBay.qmd` is the single source for the package tutorial —
+it’s a runnable Quarto notebook (open it directly in RStudio/Positron to
+execute it) *and* the vignette that gets rendered onto the [pkgdown
+site](https://swisstph.github.io/MalReBay/) as an Article. There is no
+separate notebook copy anywhere else in the repo — edit this file
+directly, and nowhere else, when updating the tutorial.
+
+Building it requires the [Quarto
+CLI](https://quarto.org/docs/get-started/) plus the `quarto` R package
+(`install.packages("quarto")`). To check it still renders after an edit:
+
+``` r
+quarto::quarto_render("vignettes/MalReBay.qmd")
+# or, to also rebuild the full site:
+pkgdown::build_site()
+```
+
+## Submitting changes
+
+- Open an issue first for anything non-trivial, so the approach can be
+  discussed before you invest time in it.
+- Keep pull requests focused — one logical change per PR is easier to
+  review than several bundled together.
+- Make sure `devtools::check()` and `devtools::test()` pass locally
+  before opening a PR; CI (`R-CMD-check.yaml`) runs the same checks on
+  GitHub.
+- If your change touches exported functions, update the relevant roxygen
+  docs (see above) and, if it changes user-facing behaviour, the
+  tutorial vignette.

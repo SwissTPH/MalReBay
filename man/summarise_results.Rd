@@ -9,7 +9,8 @@ summarise_results(
   imported_data,
   output_folder = NULL,
   verbose = TRUE,
-  prob_threshold = 0.5
+  prob_threshold = 0.5,
+  plots = TRUE
 )
 }
 \arguments{
@@ -29,6 +30,10 @@ column to \code{posterior_probabilities} (and \code{comparison}).
 Defaults to \code{0.5}, the natural cutoff under this model's equal
 50/50 prior (see @sec-interpretation-probability in the analysis
 notebook).}
+
+\item{plots}{Logical. If \code{FALSE}, convergence diagnostic plots are
+not saved to \code{output_folder}; the diagnostics themselves are still
+computed and returned in \code{convergence}. Defaults to \code{TRUE}.}
 }
 \value{
 A named list with \code{posterior_probabilities}, \code{comparison},

@@ -148,8 +148,7 @@ pkgdown::build_site()
 - Keep pull requests focused — one logical change per PR is easier to
   review than several bundled together.
 - Make sure `devtools::check()` and `devtools::test()` pass locally before
-  opening a PR; CI (`R-CMD-check.yaml`, `test-coverage.yaml`) runs the same
-  checks on GitHub.
+  opening a PR; CI (`R-CMD-check.yaml`) runs the same checks on GitHub.
 - If your change touches exported functions, update the relevant roxygen
   docs (see above) and, if it changes user-facing behaviour, the tutorial
   vignette.

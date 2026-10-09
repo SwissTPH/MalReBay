@@ -2,4 +2,5 @@
 
 ### All vignettes
 
-- [MalReBay](https://swisstph.github.io/MalReBay/articles/MalReBay.md):
+- [Classification of P. falciparum infection recurrences with
+  MalReBay](https://swisstph.github.io/MalReBay/articles/MalReBay.md):

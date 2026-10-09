@@ -20,8 +20,15 @@ run_stan_sites <- function(late_failures,
   burn_in_frac <- as.numeric(mcmc_config$burn_in_frac)
   base_seed    <- as.integer(mcmc_config$random_seed)
   adapt_delta  <- as.numeric(if(!is.null(mcmc_config$adapt_delta)) mcmc_config$adapt_delta else 0.85)
-  iter_warmup   <- max(200L, as.integer(floor(burn_in_frac * iter_total)))
-  iter_sampling <- max(200L, iter_total - iter_warmup)
+  # Sampling is computed from the requested warmup (before the floor), so a
+  # small `iter` keeps the user's split instead of collapsing onto the floor.
+  warmup_req    <- as.integer(floor(burn_in_frac * iter_total))
+  iter_warmup   <- max(50L, warmup_req)
+  iter_sampling <- max(50L, iter_total - warmup_req)
+  if (iter_warmup < 200L) {
+    warning("WARNING: warmup = ", iter_warmup, " (< 200) -- chains may not converge. ",
+            "Increase 'iter' or 'burn_in_frac' in mcmc_config.", call. = FALSE)
+  }
 
   # 2. Stan Global Setup
   # The model is pre-compiled at package install time via {instantiate}

@@ -1,0 +1,5 @@
+PatientID,Day,Site,cpmp_allele_1,cpmp_allele_2,cpmp_allele_3,cpmp_allele_4,cpmp_allele_5,cpp_allele_1,cpp_allele_2,cpp_allele_3,cpp_allele_4,amaD3_allele_1,amaD3_allele_2,amaD3_allele_3,amaD3_allele_4,amaD3_allele_5,amaD3_allele_6
+EXAMPLE-001,0,SiteA,cpmp-1,,,,,cpp-1,,,,ama1-D3-1,,,,,
+EXAMPLE-001,19,SiteA,cpmp-1,,,,,cpp-1,,,,ama1-D3-1,,,,,
+EXAMPLE-002,0,SiteA,cpmp-24,cpmp-3,,,,cpp-14,,,,ama1-D3-12,,,,,
+EXAMPLE-002,28,SiteA,cpmp-7,,,,,cpp-2,,,,ama1-D3-4,,,,,

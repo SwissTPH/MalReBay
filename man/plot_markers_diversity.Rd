@@ -21,18 +21,23 @@ plot_markers_diversity(
 \item{marker_info}{A dataframe with marker definitions; required when
 \code{data_type = "length_polymorphic"}.}
 
-\item{output_folder}{Path to the directory where the output PNG will be saved.}
+\item{output_folder}{Path to the directory where the output PNGs will be
+saved: \verb{<prefix>_<data_type>_comparison.png} for all sites and
+\verb{<prefix>_<data_type>_<site>.png} per site. If \code{NULL}, nothing is saved.}
 
-\item{filename_prefix}{A string prefix for the output filename.}
+\item{filename_prefix}{A string prefix for the output filenames.}
 
 \item{max_cols}{Maximum number of pie charts per row. Defaults to 4.}
 }
 \value{
-Invisibly returns the combined ggplot object, or \code{NULL} if no data.
+Invisibly returns a list with \code{all_sites} (one figure pooling all
+sites) and \code{by_site} (a list of figures named by site; \code{NULL} if there is
+no \code{Site} column), or \code{NULL} if no data.
 }
 \description{
-Creates pie charts visualising allele or haplotype diversity
-across all samples combined (Day 0 and recurrences pooled). Pies are
+Creates pie charts visualising allele or haplotype diversity,
+pooling Day 0 and recurrence samples: one figure for all sites combined
+and one figure per site (when a \code{Site} column is present). Pies are
 arranged with at most \code{max_cols} per row.
 }
 \examples{

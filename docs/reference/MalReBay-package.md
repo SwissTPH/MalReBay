@@ -19,6 +19,8 @@ Useful links:
 
 Authors:
 
+- Veronica Adhiambo Ochieng <veronica.adhiambo@aims.ac.rw>
+
 - Mateusz Plucinski
 
 - Monica Golumbeanu <monica.golumbeanu@swisstph.ch>

@@ -13,7 +13,8 @@ MalReBay(
   n_workers = 1,
   verbose = TRUE,
   suppress_warnings = TRUE,
-  prob_threshold = 0.5
+  prob_threshold = 0.5,
+  plots = TRUE
 )
 }
 \arguments{
@@ -50,6 +51,10 @@ at or above which a recurrence is classified as \code{"Recrudescence"}
 (below it, \code{"Reinfection"}). Defaults to \code{0.5}, the natural
 cutoff under this model's equal 50/50 prior. See
 \code{\link{summarise_results}} for where this is applied.}
+
+\item{plots}{Logical. If \code{FALSE}, skips all plots
+(descriptive, result and convergence diagnostic plots); convergence
+diagnostics are still computed and printed. Defaults to \code{TRUE}.}
 }
 \value{
 A list of per-site summary results (invisibly). See

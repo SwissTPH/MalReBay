@@ -24,3 +24,4 @@
 ^coverage_output\.txt$
 ^inst/stan/.*\.exe$
 ^inst/stan/.*\.o$
+^Rplots\.pdf$

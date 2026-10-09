@@ -3,25 +3,42 @@ template:
   bootstrap: 5
 
 reference:
-- title: Functions
+- title: Full pipeline
   desc: >
-    Run the full Bayesian recrudescence classification pipeline,
-    from importing genotype data to saving posterior probabilities and diagnostic plots. 
+    Run the complete analysis, from importing the genotyping data to saving
+    the posterior probabilities and plots, in a single call.
   contents:
   - MalReBay
-- title: Data import
+- title: Pipeline steps
   desc: >
-   Import and validate paired genotyping data from an Excel file, automatically detecting 
-   whether the data is length-polymorphic or amplicon sequencing.
+    Run the individual stages of the analysis separately, for example to
+    inspect intermediate results or to rerun the classification with
+    different settings.
   contents:
   - import_data
-- title: Plotting helpers
+  - classify_infections
+  - summarise_results
+  - save_results
+- title: Data quality checks
   desc: >
-    Visualize results to help you tune hyperparameters and choose model methods.
+    Check whether the imported data are suitable for the analysis.
   contents:
+  - data_quality_check
+  - compute_locus_comparability
+  - detect_msp_variants
+- title: Convergence diagnostics
+  desc: >
+    Assess whether the MCMC sampling has converged before interpreting the
+    results.
+  contents:
+  - check_mcmc_diagnostics
   - plot_likelihood_diagnostics
+- title: Plots
+  desc: >
+    Visualise the input data and the classification results.
+  contents:
   - plot_probability_histogram
+  - plot_comparison_heatmap
   - plot_moi
-  - plot_markers_diversity  
-  
-  
+  - plot_markers_diversity
+  - plot_allele_distribution

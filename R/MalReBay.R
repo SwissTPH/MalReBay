@@ -98,6 +98,9 @@ classify_infections <- function(imported_data,
 #'   Defaults to \code{0.5}, the natural cutoff under this model's equal
 #'   50/50 prior (see @sec-interpretation-probability in the analysis
 #'   notebook).
+#' @param plots Logical. If \code{FALSE}, convergence diagnostic plots are
+#'   not saved to \code{output_folder}; the diagnostics themselves are still
+#'   computed and returned in \code{convergence}. Defaults to \code{TRUE}.
 #'
 #' @return A named list with \code{posterior_probabilities}, \code{comparison},
 #'   \code{convergence}, \code{mcmc_loglikelihoods}, and the
@@ -124,7 +127,8 @@ summarise_results <- function(mcmc_results,
                               imported_data,
                               output_folder  = NULL,
                               verbose        = TRUE,
-                              prob_threshold = 0.5) {
+                              prob_threshold = 0.5,
+                              plots          = TRUE) {
 
   if (!is.numeric(prob_threshold) || length(prob_threshold) != 1 ||
       is.na(prob_threshold) || prob_threshold < 0 || prob_threshold > 1) {
@@ -172,7 +176,7 @@ summarise_results <- function(mcmc_results,
     # Convergence checks
     stan_fit  <- mcmc_results$stan_fits[[site]]
     loglik_ch <- mcmc_results$all_chains_loglikelihood[[site]]
-    save_plot <- !is.null(output_folder)
+    save_plot <- plots && !is.null(output_folder)
     
     diag_vals <- NULL
     if (!is.null(stan_fit) || !is.null(loglik_ch)) {
@@ -286,6 +290,8 @@ summarise_results <- function(mcmc_results,
 #' @param output_folder   Path to save files. \code{NULL} prints plots to
 #'   the R plot window and skips CSV saving.
 #' @param verbose         Logical.
+#' @param plots           Logical. If \code{FALSE}, no plots are generated,
+#'   shown or saved; only the CSV files are written. Defaults to \code{TRUE}.
 #' @return A named character vector of paths to the files that were written,
 #'   or \code{invisible(NULL)} when \code{output_folder} is \code{NULL}.
 #'
@@ -303,7 +309,8 @@ summarise_results <- function(mcmc_results,
 save_results <- function(summary_results,
                          imported_data = NULL,
                          output_folder = NULL,
-                         verbose       = TRUE) {
+                         verbose       = TRUE,
+                         plots         = TRUE) {
   
   required_keys <- c("posterior_probabilities", "comparison")
   if (!is.list(summary_results) ||
@@ -319,7 +326,7 @@ save_results <- function(summary_results,
   
   # Generate descriptive plots — display on screen when no output_folder,
   # save to disk when output_folder is provided
-  if (!is.null(imported_data)) {
+  if (plots && !is.null(imported_data)) {
     all_data <- dplyr::bind_rows(imported_data$late_failures,
                                  imported_data$additional)
     
@@ -330,7 +337,10 @@ save_results <- function(summary_results,
         imported_data$marker_info,
         output_folder = output_folder
       )
-      if (is.null(output_folder) && !is.null(p_div)) print(p_div)
+      if (is.null(output_folder) && !is.null(p_div)) {
+        print(p_div$all_sites)
+        for (p in p_div$by_site) print(p)
+      }
       
       p_moi <- plot_moi(all_data, output_folder = output_folder)
       if (is.null(output_folder) && !is.null(p_moi)) {
@@ -347,14 +357,16 @@ save_results <- function(summary_results,
     
   }
   
-  plot_probability_histogram(
-    summary_results,
-    output_folder = output_folder,
-    verbose       = verbose
-  )
+  if (plots) {
+    plot_probability_histogram(
+      summary_results,
+      output_folder = output_folder,
+      verbose       = verbose
+    )
+  }
   
   
-  # Stop here if no output folder — plots already shown above
+  # Stop here if no output folder — plots (if any) already shown above
   if (is.null(output_folder)) {
     if (verbose) message("INFO: No output_folder provided. Skipping file saving.")
     return(invisible(NULL))
@@ -415,6 +427,9 @@ save_results <- function(summary_results,
 #'   (below it, \code{"New infection"}). Defaults to \code{0.5}, the natural
 #'   cutoff under this model's equal 50/50 prior. See
 #'   \code{\link{summarise_results}} for where this is applied.
+#' @param plots           Logical. If \code{FALSE}, skips all plots
+#'   (descriptive, result and convergence diagnostic plots); convergence
+#'   diagnostics are still computed and printed. Defaults to \code{TRUE}.
 #'
 #' @return A list of per-site summary results (invisibly). See
 #'   \code{summarise_results()} for details of the list structure.
@@ -444,7 +459,8 @@ MalReBay <- function(
     n_workers       = 1,
     verbose         = TRUE,
     suppress_warnings = TRUE,
-    prob_threshold  = 0.5
+    prob_threshold  = 0.5,
+    plots           = TRUE
 ) {
 
   if (verbose) message("Starting MalReBay pipeline...")
@@ -473,14 +489,16 @@ MalReBay <- function(
     imported_data  = imported_data,
     output_folder  = output_folder,
     verbose        = verbose,
-    prob_threshold = prob_threshold
+    prob_threshold = prob_threshold,
+    plots          = plots
   )
 
   save_results(
     summary_results = summary_results,
     imported_data   = imported_data,
     output_folder   = output_folder,
-    verbose         = verbose
+    verbose         = verbose,
+    plots           = plots
   )
 
   invisible(summary_results)

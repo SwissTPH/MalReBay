@@ -1,0 +1,7 @@
+/* Page-header logo: slightly smaller than pkgdown's default (120px on
+   desktop) so it stays above the header rule */
+@media (min-width: 576px) {
+  img.logo {
+    width: 95px;
+  }
+}

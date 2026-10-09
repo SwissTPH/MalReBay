@@ -56,7 +56,7 @@ compute_gelman_rubin_trace <- function(mcmc_list, max_bins = 50, confidence = 0.
 #' @param stan_fit An optional \code{CmdStanMCMC} object (from cmdstanr) for additional diagnostics.
 #' @param combine_plots A logical. If \code{TRUE}, the returned list also
 #'   includes \code{$combined}: all four panels arranged in a single 2x2
-#'   \code{ggpubr::ggarrange()} grid.
+#'   \code{patchwork::wrap_plots()} grid.
 #'
 #' @return An invisible list with the numeric diagnostics (\code{gelman},
 #'   \code{ess}, \code{rhat_rank}, \code{ess_bulk}, \code{ess_tail},
@@ -288,7 +288,7 @@ plot_likelihood_diagnostics <- function(all_chains_loglikelihood = NULL,
   p_combined <- NULL
   if (combine_plots) {
     panels <- Filter(Negate(is.null), list(p_trace, p_gelman, p_hist, p_acf))
-    p_combined <- ggpubr::ggarrange(plotlist = panels, ncol = 2, nrow = 2)
+    p_combined <- patchwork::wrap_plots(panels, ncol = 2, nrow = 2)
   }
 
   if (save_plot) {
@@ -608,14 +608,14 @@ plot_moi <- function(genotypedata,
       ggplot2::scale_y_continuous(breaks = scales::pretty_breaks()) +
       ggplot2::coord_cartesian(ylim = c(-0.5, NA)) +
       ggplot2::labs(
-        title = paste("MOI by Marker \u2013", site),
+        title = paste("MOI distribution by marker \u2013", site),
         x     = "Marker",
-        y     = "MOI (Number of Alleles)"
+        y     = "MOI (Number of alleles)"
       ) +
       ggplot2::theme_classic(base_size = 14) +
       ggplot2::theme(
         legend.position  = "none",
-        plot.title       = ggplot2::element_text(hjust = 0.5, face = "bold"),
+        plot.title       = ggplot2::element_text(hjust = 0.5, face = "bold", size = 13),
         axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1),
         strip.background = ggplot2::element_rect(fill = "grey90", color = "black"),
         strip.text.y     = ggplot2::element_text(angle = 0, face = "bold")
@@ -806,18 +806,23 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 
 #' Generate and Save Diversity Pie Charts
 #'
-#' @description Creates pie charts visualising allele or haplotype diversity
-#'   across all samples combined (Day 0 and recurrences pooled). Pies are
+#' @description Creates pie charts visualising allele or haplotype diversity,
+#'   pooling Day 0 and recurrence samples: one figure for all sites combined
+#'   and one figure per site (when a `Site` column is present). Pies are
 #'   arranged with at most `max_cols` per row.
 #'
 #' @param genotypedata A dataframe containing the genotyping data.
 #' @param data_type A string: `"length_polymorphic"` or `"ampseq"`.
 #' @param marker_info A dataframe with marker definitions; required when
 #'   `data_type = "length_polymorphic"`.
-#' @param output_folder Path to the directory where the output PNG will be saved.
-#' @param filename_prefix A string prefix for the output filename.
+#' @param output_folder Path to the directory where the output PNGs will be
+#'   saved: `<prefix>_<data_type>_comparison.png` for all sites and
+#'   `<prefix>_<data_type>_<site>.png` per site. If `NULL`, nothing is saved.
+#' @param filename_prefix A string prefix for the output filenames.
 #' @param max_cols Maximum number of pie charts per row. Defaults to 4.
-#' @return Invisibly returns the combined ggplot object, or `NULL` if no data.
+#' @return Invisibly returns a list with `all_sites` (one figure pooling all
+#'   sites) and `by_site` (a list of figures named by site; `NULL` if there is
+#'   no `Site` column), or `NULL` if no data.
 #'
 #' @examples
 #' \dontrun{
@@ -833,7 +838,6 @@ plot_pie_chart <- function(data_df, color_marker, marker_name, total_n, data_typ
 #' @importFrom dplyr %>% filter mutate select distinct group_by summarise left_join all_of n
 #' @importFrom tidyr pivot_longer
 #' @importFrom ggplot2 ggsave
-#' @importFrom ggpubr ggarrange
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom purrr map_dfr
 #' @export
@@ -863,73 +867,105 @@ plot_markers_diversity <- function(genotypedata,
   }
   
 
-  # Build combined frequency data
-  if (data_type == "length_polymorphic") {
-    alleles_definitions_bin <- define_alleles_for_plotting(genotypedata, marker_info)
+  # One marker -> colour mapping shared by every figure, so a marker keeps
+  # the same colour in the all-sites and per-site plots
+  all_markers <- unique(gsub("_allele_\\d+$|_\\d+$", "",
+                             grep("_allele_\\d+$|_\\d+$", colnames(genotypedata), value = TRUE)))
+  base_colors   <- RColorBrewer::brewer.pal(max(3, min(length(all_markers), 8)), "Set2")
+  marker_colors <- stats::setNames(rep_len(base_colors, length(all_markers)), all_markers)
 
-    long_data      <- .pivot_long_genotypes(genotypedata, "allele_length")
-    binned_data    <- .bin_lp_alleles(long_data, alleles_definitions_bin)
-    frequency_data <- .compute_frequencies(binned_data, "true_alleles")
-    allele_col     <- "true_alleles"
+  # Build the pie-chart grid for one subset of the data (all sites or one site)
+  build_figure <- function(data, title) {
+    if (data_type == "length_polymorphic") {
+      alleles_definitions_bin <- define_alleles_for_plotting(data, marker_info)
 
-  } else {
-    # Normalise Sample.ID tags for ampseq if needed
-    if (!any(grepl(" Day ", genotypedata$Sample.ID))) {
-      genotypedata$Sample.ID <- gsub("D0$",          " Day 0",       genotypedata$Sample.ID)
-      genotypedata$Sample.ID <- gsub("D[1-9][0-9]*$", " Day Failure", genotypedata$Sample.ID)
+      long_data      <- .pivot_long_genotypes(data, "allele_length")
+      binned_data    <- .bin_lp_alleles(long_data, alleles_definitions_bin)
+      frequency_data <- .compute_frequencies(binned_data, "true_alleles")
+      allele_col     <- "true_alleles"
+
+    } else {
+      # Normalise Sample.ID tags for ampseq if needed
+      if (!any(grepl(" Day ", data$Sample.ID))) {
+        data$Sample.ID <- gsub("D0$",          " Day 0",       data$Sample.ID)
+        data$Sample.ID <- gsub("D[1-9][0-9]*$", " Day Failure", data$Sample.ID)
+      }
+
+      long_data      <- .pivot_long_genotypes(data, "haplotype")
+      frequency_data <- .compute_frequencies(long_data, "haplotype")
+      allele_col     <- "haplotype"
     }
 
-    long_data      <- .pivot_long_genotypes(genotypedata, "haplotype")
-    frequency_data <- .compute_frequencies(long_data, "haplotype")
-    allele_col     <- "haplotype"
+    if (nrow(frequency_data) == 0) return(NULL)
+
+    list_markers <- unique(frequency_data$marker_id)
+
+    p_array <- lapply(list_markers, function(marker_name) {
+      plot_data <- dplyr::filter(frequency_data, .data$marker_id == marker_name)
+      plot_pie_chart(
+        dplyr::select(plot_data, dplyr::all_of(c(allele_col, "Amount", "Frequency"))),
+        marker_colors[[marker_name]], marker_name, plot_data$TotalInfections[1], data_type
+      )
+    })
+
+    p_array <- Filter(Negate(is.null), p_array)
+    if (length(p_array) == 0) return(NULL)
+
+    num_cols <- min(length(p_array), max_cols)
+    num_rows <- ceiling(length(p_array) / num_cols)
+    figure   <- patchwork::wrap_plots(p_array, ncol = num_cols, nrow = num_rows) +
+      patchwork::plot_annotation(
+        title = title,
+        theme = ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 13))
+      )
+    attr(figure, "grid_dims") <- c(num_cols, num_rows)
+    figure
   }
 
-  if (nrow(frequency_data) == 0) {
+  # Pies (theme_void) have fixed aspect and no background, so the grid doesn't
+  # fill the page; bg = "white" stops the margins from being transparent
+  save_figure <- function(figure, suffix) {
+    dims <- attr(figure, "grid_dims")
+    ggplot2::ggsave(
+      file.path(output_folder, paste0(filename_prefix, "_", data_type, "_", suffix, ".png")),
+      plot = figure, width = dims[1] * 4, height = dims[2] * 4 + 0.5,
+      bg = "white", limitsize = FALSE
+    )
+  }
+
+  # All sites pooled
+  p_all <- build_figure(genotypedata, "Allele diversity by marker \u2013 All sites")
+  if (is.null(p_all)) {
     message("No frequency data could be computed. Skipping plot generation.")
     return(invisible(NULL))
   }
+  if (!is.null(output_folder)) save_figure(p_all, "comparison")
 
-  # Build pie charts 
-  list_markers <- unique(frequency_data$marker_id)
-  n_markers    <- length(list_markers)
+  # One figure per site
+  by_site <- NULL
+  if ("Site" %in% colnames(genotypedata)) {
+    sites   <- unique(as.character(genotypedata$Site))
+    by_site <- lapply(stats::setNames(sites, sites), function(site) {
+      build_figure(genotypedata[genotypedata$Site == site, , drop = FALSE],
+                   paste("Allele diversity by marker \u2013", site))
+    })
+    by_site <- Filter(Negate(is.null), by_site)
 
-  base_colors <- RColorBrewer::brewer.pal(max(3, min(n_markers, 8)), "Set2")
-  colors      <- rep_len(base_colors, n_markers)
-
-  p_array <- Map(function(marker_name, color) {
-    plot_data <- dplyr::filter(frequency_data, .data$marker_id == marker_name)
-    plot_pie_chart(
-      dplyr::select(plot_data, dplyr::all_of(c(allele_col, "Amount", "Frequency"))),
-      color, marker_name, plot_data$TotalInfections[1], data_type
-    )
-  }, list_markers, colors)
-
-  p_array <- Filter(Negate(is.null), p_array)
-  if (length(p_array) == 0) {
-    message("No pie charts were generated.")
-    return(invisible(NULL))
+    if (!is.null(output_folder)) {
+      for (site in names(by_site)) {
+        save_figure(by_site[[site]], gsub("[^A-Za-z0-9_-]", "_", site))
+      }
+    }
   }
 
-  # Arrange and save 
-  num_cols     <- min(length(p_array), max_cols)
-  num_rows     <- ceiling(length(p_array) / num_cols)
-  final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
-
-  if (!is.null(output_folder)) {
-    output_path <- file.path(output_folder, paste0(filename_prefix, "_", data_type, "_comparison.png"))
-    ggplot2::ggsave(output_path, plot = final_figure,
-                    width  = num_cols * 4,
-                    height = num_rows * 4,
-                    limitsize = FALSE)
-  }
-
-  invisible(final_figure)
+  invisible(list(all_sites = p_all, by_site = by_site))
 }
 
 #' Plot Allele Distribution
 #'
 #' @description Creates a distribution plot of raw allele values for each
-#'   marker, pooling all samples and timepoints together, with the y-axis
+#'   marker, pooling all samples and timepoints together, for all sites
+#'   combined and for each site separately, with the y-axis
 #'   showing frequency (percentage of that marker's calls) rather than raw
 #'   counts. For length-polymorphic markers (microsatellites, MSP1/MSP2/GLURP)
 #'   this is a histogram of fragment sizes; for AmpSeq markers
@@ -955,11 +991,14 @@ plot_markers_diversity <- function(genotypedata,
 #'   instead, since their \code{repeatlength} either encodes a
 #'   family-clustering gap threshold rather than a natural bin width, or
 #'   would otherwise chop the range into slivers too thin to see.
-#' @param output_folder Path to the directory where the output PNG will be
-#'   saved. If \code{NULL} (default), the plot is not saved to disk.
-#' @param filename_prefix A string prefix for the output filename.
+#' @param output_folder Path to the directory where the output PNGs will be
+#'   saved: \code{<prefix>.png} for all sites and \code{<prefix>_<site>.png}
+#'   per site. If \code{NULL} (default), the plots are not saved to disk.
+#' @param filename_prefix A string prefix for the output filenames.
 #' @param max_cols Maximum number of panels per row. Defaults to 4.
-#' @return Invisibly returns the combined ggplot object, or \code{NULL} if no
+#' @return Invisibly returns a list with \code{all_sites} (one figure pooling
+#'   all sites) and \code{by_site} (a list of figures named by site;
+#'   \code{NULL} if there is no \code{Site} column), or \code{NULL} if no
 #'   allele data is available to plot.
 #'
 #' @examples
@@ -987,8 +1026,11 @@ plot_allele_distribution <- function(genotypedata,
   if (length(sid_col) == 0) stop("Input data must contain a 'Sample.ID' column.")
   genotypedata$Sample.ID <- as.character(genotypedata[[sid_col[1]]])
 
-  long_data <- .pivot_long_genotypes(genotypedata, "allele")
-  long_data <- long_data[long_data$marker_id %in% marker_info$marker_id, ]
+  to_long <- function(data) {
+    ld <- .pivot_long_genotypes(data, "allele")
+    ld[ld$marker_id %in% marker_info$marker_id, ]
+  }
+  long_data <- to_long(genotypedata)
 
   if (nrow(long_data) == 0) {
     message("No allele data found for the markers listed in 'marker_info'.")
@@ -1013,97 +1055,130 @@ plot_allele_distribution <- function(genotypedata,
   )
   binning_lookup <- stats::setNames(marker_info$binning_method, marker_info$marker_id)
 
-  list_markers <- unique(long_data$marker_id)
-  n_markers    <- length(list_markers)
+  # One marker -> colour mapping shared by every figure, so a marker keeps
+  # the same colour in the all-sites and per-site plots
+  all_markers   <- unique(long_data$marker_id)
+  base_colors   <- RColorBrewer::brewer.pal(max(3, min(length(all_markers), 8)), "Set2")
+  marker_colors <- stats::setNames(rep_len(base_colors, length(all_markers)), all_markers)
 
-  base_colors <- RColorBrewer::brewer.pal(max(3, min(n_markers, 8)), "Set2")
-  colors      <- rep_len(base_colors, n_markers)
+  # Build the panel grid for one subset of the long data (all sites or one site)
+  build_figure <- function(ld, title) {
+    p_array <- lapply(unique(ld$marker_id), function(marker_name) {
+      color <- marker_colors[[marker_name]]
+      raw_vals <- ld$allele[ld$marker_id == marker_name]
+      if (length(raw_vals) == 0) return(NULL)
 
-  p_array <- Map(function(marker_name, color) {
-    raw_vals <- long_data$allele[long_data$marker_id == marker_name]
-    if (length(raw_vals) == 0) return(NULL)
+      # AmpSeq markers: haplotype strings have no length to histogram, so show
+      # a bar chart of counts per haplotype name instead.
+      if (identical(binning_lookup[[marker_name]], "exact")) {
+        haplo_counts <- as.data.frame(table(raw_vals), stringsAsFactors = FALSE)
+        colnames(haplo_counts) <- c("haplotype", "count")
+        haplo_counts <- haplo_counts[order(-haplo_counts$count), ]
+        haplo_counts$haplotype <- factor(haplo_counts$haplotype, levels = haplo_counts$haplotype)
+        haplo_counts$freq      <- haplo_counts$count / sum(haplo_counts$count)
 
-    # AmpSeq markers: haplotype strings have no length to histogram, so show
-    # a bar chart of counts per haplotype name instead.
-    if (identical(binning_lookup[[marker_name]], "exact")) {
-      haplo_counts <- as.data.frame(table(raw_vals), stringsAsFactors = FALSE)
-      colnames(haplo_counts) <- c("haplotype", "count")
-      haplo_counts <- haplo_counts[order(-haplo_counts$count), ]
-      haplo_counts$haplotype <- factor(haplo_counts$haplotype, levels = haplo_counts$haplotype)
-      haplo_counts$freq      <- haplo_counts$count / sum(haplo_counts$count)
-
-      return(
-        ggplot2::ggplot(haplo_counts, ggplot2::aes(x = .data$haplotype, y = .data$freq)) +
-          ggplot2::geom_col(fill = color, color = "white") +
-          ggplot2::scale_y_continuous(labels = scales::percent) +
-          ggplot2::labs(
-            title = paste0(marker_name, "\n(n=", length(raw_vals), ")"),
-            x     = "Haplotype",
-            y     = "Frequency"
-          ) +
-          ggplot2::theme_classic(base_size = 14) +
-          ggplot2::theme(
-            plot.title  = ggplot2::element_text(hjust = 0.5, size = 12),
-            axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
-          )
-      )
-    }
-
-    # Length-polymorphic markers: histogram of raw fragment sizes.
-    vals <- suppressWarnings(as.numeric(raw_vals))
-    vals <- vals[!is.na(vals)]
-    if (length(vals) == 0) return(NULL)
-
-    span <- diff(range(vals))
-    bw <- binwidth
-    if (is.null(bw)) {
-      bw <- if (marker_name %in% names(bin_lookup)) bin_lookup[[marker_name]] else NA_real_
-      # A few far-flung outlier alleles can stretch `span` well past the
-      # bulk of the data, so a `repeatlength`-sized bin (correct as a repeat
-      # unit) ends up chopping the range into dozens of near-empty slivers
-      # that are invisible at typical plot sizes. Cap it: once repeatlength
-      # would need more than max_bins bins to cover the observed range,
-      # fall back to a bin width scaled to that range instead.
-      max_bins <- 60
-      if (is.na(bw) || bw <= 0 || (span > 0 && span / bw > max_bins)) {
-        bw <- if (span > 0) span / 30 else 1
+        return(
+          ggplot2::ggplot(haplo_counts, ggplot2::aes(x = .data$haplotype, y = .data$freq)) +
+            ggplot2::geom_col(fill = color, color = "white") +
+            ggplot2::scale_y_continuous(labels = scales::percent) +
+            ggplot2::labs(
+              title = paste0(marker_name, "\n(n=", length(raw_vals), ")"),
+              x     = "Haplotype",
+              y     = "Frequency"
+            ) +
+            ggplot2::theme_classic(base_size = 14) +
+            ggplot2::theme(
+              plot.title  = ggplot2::element_text(hjust = 0.5, size = 12),
+              axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
+            )
+        )
       }
-    }
 
-    ggplot2::ggplot(data.frame(allele = vals), ggplot2::aes(x = .data$allele)) +
-      ggplot2::geom_histogram(
-        ggplot2::aes(y = ggplot2::after_stat(.data$count / sum(.data$count))),
-        binwidth = bw, fill = color, color = "white"
-      ) +
-      ggplot2::scale_y_continuous(labels = scales::percent) +
-      ggplot2::labs(
-        title = paste0(marker_name, "\n(n=", length(vals), ")"),
-        x     = "Allele size (bp)",
-        y     = "Frequency"
-      ) +
-      ggplot2::theme_classic(base_size = 14) +
-      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 12))
-  }, list_markers, colors)
+      # Length-polymorphic markers: histogram of raw fragment sizes.
+      vals <- suppressWarnings(as.numeric(raw_vals))
+      vals <- vals[!is.na(vals)]
+      if (length(vals) == 0) return(NULL)
 
-  p_array <- Filter(Negate(is.null), p_array)
-  if (length(p_array) == 0) {
+      span <- diff(range(vals))
+      bw <- binwidth
+      if (is.null(bw)) {
+        bw <- if (marker_name %in% names(bin_lookup)) bin_lookup[[marker_name]] else NA_real_
+        # A few far-flung outlier alleles can stretch `span` well past the
+        # bulk of the data, so a `repeatlength`-sized bin (correct as a repeat
+        # unit) ends up chopping the range into dozens of near-empty slivers
+        # that are invisible at typical plot sizes. Cap it: once repeatlength
+        # would need more than max_bins bins to cover the observed range,
+        # fall back to a bin width scaled to that range instead.
+        max_bins <- 60
+        if (is.na(bw) || bw <= 0 || (span > 0 && span / bw > max_bins)) {
+          bw <- if (span > 0) span / 30 else 1
+        }
+      }
+
+      ggplot2::ggplot(data.frame(allele = vals), ggplot2::aes(x = .data$allele)) +
+        ggplot2::geom_histogram(
+          ggplot2::aes(y = ggplot2::after_stat(.data$count / sum(.data$count))),
+          binwidth = bw, fill = color, color = "white"
+        ) +
+        ggplot2::scale_y_continuous(labels = scales::percent) +
+        ggplot2::labs(
+          title = paste0(marker_name, "\n(n=", length(vals), ")"),
+          x     = "Allele size (bp)",
+          y     = "Frequency"
+        ) +
+        ggplot2::theme_classic(base_size = 14) +
+        ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 12))
+    })
+
+    p_array <- Filter(Negate(is.null), p_array)
+    if (length(p_array) == 0) return(NULL)
+
+    num_cols <- min(length(p_array), max_cols)
+    num_rows <- ceiling(length(p_array) / num_cols)
+    figure   <- patchwork::wrap_plots(p_array, ncol = num_cols, nrow = num_rows) +
+      patchwork::plot_annotation(
+        title = title,
+        theme = ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 13))
+      )
+    attr(figure, "grid_dims") <- c(num_cols, num_rows)
+    figure
+  }
+
+  save_figure <- function(figure, suffix) {
+    dims <- attr(figure, "grid_dims")
+    ggplot2::ggsave(
+      file.path(output_folder, paste0(filename_prefix, suffix, ".png")),
+      plot = figure, width = dims[1] * 4, height = dims[2] * 4 + 0.5,
+      limitsize = FALSE
+    )
+  }
+
+  # All sites pooled
+  p_all <- build_figure(long_data, "Allele distribution by marker \u2013 All sites")
+  if (is.null(p_all)) {
     message("No plots were generated.")
     return(invisible(NULL))
   }
+  if (!is.null(output_folder)) save_figure(p_all, "")
 
-  num_cols     <- min(length(p_array), max_cols)
-  num_rows     <- ceiling(length(p_array) / num_cols)
-  final_figure <- ggpubr::ggarrange(plotlist = p_array, ncol = num_cols, nrow = num_rows)
+  # One figure per site
+  by_site <- NULL
+  if ("Site" %in% colnames(genotypedata)) {
+    sites   <- unique(as.character(genotypedata$Site))
+    by_site <- lapply(stats::setNames(sites, sites), function(site) {
+      build_figure(to_long(genotypedata[genotypedata$Site == site, , drop = FALSE]),
+                   paste("Allele distribution by marker \u2013", site))
+    })
+    by_site <- Filter(Negate(is.null), by_site)
 
-  if (!is.null(output_folder)) {
-    output_path <- file.path(output_folder, paste0(filename_prefix, ".png"))
-    ggplot2::ggsave(output_path, plot = final_figure,
-                    width  = num_cols * 4,
-                    height = num_rows * 4,
-                    limitsize = FALSE)
+    if (!is.null(output_folder)) {
+      for (site in names(by_site)) {
+        save_figure(by_site[[site]], paste0("_", gsub("[^A-Za-z0-9_-]", "_", site)))
+      }
+    }
   }
 
-  invisible(final_figure)
+  invisible(list(all_sites = p_all, by_site = by_site))
 }
 
 #' Combine MSP1/MSP2 family-variant results into one call per marker

@@ -8,7 +8,8 @@ save_results(
   summary_results,
   imported_data = NULL,
   output_folder = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  plots = TRUE
 )
 }
 \arguments{
@@ -21,6 +22,9 @@ data-dependent plots (diversity, MOI) are skipped.}
 the R plot window and skips CSV saving.}
 
 \item{verbose}{Logical.}
+
+\item{plots}{Logical. If \code{FALSE}, no plots are generated,
+shown or saved; only the CSV files are written. Defaults to \code{TRUE}.}
 }
 \value{
 A named character vector of paths to the files that were written,
