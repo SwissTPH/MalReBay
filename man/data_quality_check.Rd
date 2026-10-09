@@ -32,8 +32,8 @@ viable for analysis.
 }
 \examples{
 \dontrun{
-  data_file <- system.file("extdata", 
-                           "Dataset_microsatellite_panel.xlsx", 
+  data_file <- system.file("extdata",
+                           "Dataset_microsatellite_panel.xlsx",
                            package = "MalReBay")
   marker_file <- system.file("extdata", 
                              "makers_details.xlsx", 

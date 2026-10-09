@@ -25,7 +25,7 @@ summarise_results(
 
 \item{prob_threshold}{Numeric in \verb{[0, 1]}. The posterior probability
 at or above which a recurrence is classified as \code{"Recrudescence"}
-(below it, \code{"Reinfection"}); used to add the \code{Classification}
+(below it, \code{"New infection"}); used to add the \code{Classification}
 column to \code{posterior_probabilities} (and \code{comparison}).
 Defaults to \code{0.5}, the natural cutoff under this model's equal
 50/50 prior (see @sec-interpretation-probability in the analysis
@@ -37,9 +37,14 @@ computed and returned in \code{convergence}. Defaults to \code{TRUE}.}
 }
 \value{
 A named list with \code{posterior_probabilities}, \code{comparison},
-\code{convergence}, and \code{mcmc_loglikelihoods}. Both
-\code{posterior_probabilities} and \code{comparison} include a
+\code{convergence}, \code{mcmc_loglikelihoods}, and the
+\code{prob_threshold} used. \code{posterior_probabilities} includes a
 \code{Classification} column derived from \code{prob_threshold}.
+\code{comparison} has one row per patient: the per-marker match-counting
+calls, the two overall match-counting calls (e.g.
+\code{Match_counting_2of3}/\code{Match_counting_3of3} for MSP panels,
+\code{Match_counting_5of7}/\code{Match_counting_7of7} for a 7-marker
+panel), \code{MalReBay_probability} and \code{MalReBay_classification}.
 }
 \description{
 Post-processes raw MCMC output from \code{\link{classify_infections}} into

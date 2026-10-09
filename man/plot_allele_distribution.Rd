@@ -35,7 +35,7 @@ family-clustering gap threshold rather than a natural bin width, or
 would otherwise chop the range into slivers too thin to see.}
 
 \item{output_folder}{Path to the directory where the output PNGs will be
-saved: \verb{<prefix>.png} for all sites and \verb{<prefix>_<site>.png}
+saved: \code{<prefix>.png} for all sites and \code{<prefix>_<site>.png}
 per site. If \code{NULL} (default), the plots are not saved to disk.}
 
 \item{filename_prefix}{A string prefix for the output filenames.}
@@ -72,4 +72,5 @@ name. One panel per marker, arranged in a grid with at most
                              binning_method = "microsatellite")
   plot_allele_distribution(gdata, marker_info)
 }
+
 }

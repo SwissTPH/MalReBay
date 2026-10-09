@@ -21,19 +21,23 @@ traditional match-counting results).}
 on to \code{build_who_table()} to derive the WHO_loose/WHO_strict columns.}
 
 \item{output_folder}{A string specifying the directory where one PNG per
-site will be saved. If \code{NULL}, heatmaps are drawn on the current
-graphics device instead.}
+site (\code{comparison_heatmap_<site>.png}) and one for all sites
+(\code{comparison_heatmap_all_sites.png}) will be saved. If \code{NULL},
+heatmaps are drawn on the current graphics device instead.}
 
-\item{title_prefix}{Optional prefix before the site name in each plot's title.}
+\item{title_prefix}{Optional prefix before "Site \if{html}{\out{<name>}}" / "All sites" in
+each plot's title.}
 
 \item{verbose}{Logical. If \code{TRUE}, prints a message when each file is saved.}
 }
 \value{
-Invisibly NULL; draws one heatmap per site as a side effect.
+An invisible list of ggplot objects: \code{by_site} (a list named
+by site) and \code{all_sites}.
 }
 \description{
 Visualizes the WHO match-counting rules (loose and strict)
-alongside MalReBay's posterior probability, one heatmap per site, from
-the bayesian_match_counting_comparison table after it's been passed
-through build_who_table().
+alongside MalReBay's posterior probability, one heatmap per site plus
+one combining all sites (patients grouped by site), from the
+bayesian_match_counting_comparison table after it's been passed through
+build_who_table().
 }

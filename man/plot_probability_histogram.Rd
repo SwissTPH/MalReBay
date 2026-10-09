@@ -7,39 +7,55 @@
 plot_probability_histogram(
   summary_results,
   output_folder = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  prob_threshold = summary_results$prob_threshold
 )
 }
 \arguments{
 \item{summary_results}{A list returned by \code{\link{summarise_results}},
 containing a \code{posterior_probabilities} data frame with a
-\code{Probability} column.}
+\code{Probability} column, a \code{Site} column (needed for the per-site
+plot) and, optionally, the \code{prob_threshold} used for classification.}
 
 \item{output_folder}{A string specifying the directory where the histogram
-PNG will be saved. Defaults to \code{"results"}.}
+PNGs will be saved. If \code{NULL}, the plots are displayed instead.}
 
-\item{verbose}{Logical. If \code{TRUE}, prints a message when the file is
+\item{verbose}{Logical. If \code{TRUE}, prints a message when the files are
 saved. Defaults to \code{TRUE}.}
+
+\item{prob_threshold}{Numeric in \verb{[0, 1]}. The posterior probability
+at or above which a recurrence counts as recrudescence. Defaults to
+\code{summary_results$prob_threshold}, or \code{0.5} if that is missing.}
 }
 \value{
-When \code{output_folder} is \code{NULL}, displays the histogram
-on the current graphics device and returns \code{invisible(NULL)}.
-When \code{output_folder} is provided, saves a PNG and returns the file
-path invisibly. Returns \code{invisible(NULL)} if no probabilities are
-available.
+An invisible list of ggplot objects: \code{all_sites} (all patients
+pooled) and \code{by_site} (one facet per site, with a free y-axis so
+small sites stay readable; \code{NULL} if there is no \code{Site}
+column). When \code{output_folder} is \code{NULL} the plots are also
+printed; otherwise they are saved as
+\code{recrudescence_probability_histogram.png} and
+\code{recrudescence_probability_histogram_by_site.png} in
+\code{output_folder}. Returns \code{invisible(NULL)} if no probabilities
+are available.
 }
 \description{
-Creates and saves a histogram of posterior probabilities of recrudescence
-for all patients. This is an internal function called automatically by
-\code{\link{MalReBay}}.
+Creates and saves histograms of posterior probabilities of recrudescence:
+one pooling all patients across sites, and one with a facet per site. Bars
+are coloured by classification (dark red for recrudescence, light blue for
+new infection; ColorBrewer RdBu, colourblind-safe) and a dotted vertical line
+marks the classification threshold. This is an internal function called
+automatically by \code{\link{MalReBay}}.
 }
 \examples{
 summary_results <- list(
   posterior_probabilities = data.frame(
-    Patient_ID  = c("P1", "P2", "P3"),
-    Probability = c(0.12, 0.87, 0.45)
-  )
+    Patient_ID  = c("P1", "P2", "P3", "P4"),
+    Site        = c("A", "A", "B", "B"),
+    Probability = c(0.12, 0.87, 0.45, 0.93)
+  ),
+  prob_threshold = 0.5
 )
-plot_probability_histogram(summary_results)
+plots <- plot_probability_histogram(summary_results)
+plots$by_site
 
 }

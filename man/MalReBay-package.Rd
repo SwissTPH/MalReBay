@@ -5,6 +5,8 @@
 \alias{MalReBay-package}
 \title{MalReBay: Bayesian classification for malaria recurrences}
 \description{
+\if{html}{\figure{logo.svg}{options: style='float: right' alt='logo' width='120'}}
+
 Classification of malaria infection recurrence using a Bayesian algorithm implemented in Stan for efficient sampling.
 }
 \seealso{

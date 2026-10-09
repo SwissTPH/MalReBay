@@ -63,4 +63,4 @@ Additional_repositories:
 SystemRequirements: CmdStan (>= 2.32.0), installed before MalReBay itself so the
     bundled Stan model can be compiled during installation; see
     cmdstanr::install_cmdstan()
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.1

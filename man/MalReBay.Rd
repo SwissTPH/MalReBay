@@ -5,7 +5,8 @@
 \title{Run the MalReBay malaria recrudescence classification pipeline}
 \usage{
 MalReBay(
-  filepath = system.file("extdata", "Dataset_microsatellite_panel.xlsx", package = "MalReBay"),
+  filepath = system.file("extdata", "Dataset_microsatellite_panel.xlsx", package =
+    "MalReBay"),
   marker_filepath = system.file("extdata", "makers_details.xlsx", package = "MalReBay"),
   additional_filepath = NULL,
   mcmc_config = system.file("extdata", "default_mcmc_config.rds", package = "MalReBay"),
@@ -48,7 +49,7 @@ details -- these diagnostics remain available afterwards via
 
 \item{prob_threshold}{Numeric in \verb{[0, 1]}. The posterior probability
 at or above which a recurrence is classified as \code{"Recrudescence"}
-(below it, \code{"Reinfection"}). Defaults to \code{0.5}, the natural
+(below it, \code{"New infection"}). Defaults to \code{0.5}, the natural
 cutoff under this model's equal 50/50 prior. See
 \code{\link{summarise_results}} for where this is applied.}
 

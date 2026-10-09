@@ -7,7 +7,7 @@
 check_mcmc_diagnostics(fit, site_name, adapt_delta, verbose = TRUE)
 }
 \arguments{
-\item{fit}{A \code{CmdStanMCMC} fit object, as returned by \code{$sample()}.}
+\item{fit}{A \code{CmdStanMCMC} fit object, as returned by \verb{$sample()}.}
 
 \item{site_name}{A character string used to label messages.}
 
@@ -29,7 +29,7 @@ HMC/NUTS sampler diagnostics (divergent transitions, max-treedepth hits,
 E-BFMI) and, for any that look problematic, prints a plain-language
 explanation of what it means and what to change in \code{mcmc_config} to fix
 it. This is a supplement to cmdstanr's own diagnostic messages (already
-printed automatically during \code{$sample()}), not a replacement -- those
+printed automatically during \verb{$sample()}), not a replacement -- those
 are more technical but this translates them into a concrete next step.
 }
 \details{
